@@ -819,6 +819,10 @@
         <span class="icon">👩‍🎓</span>
         <span>Ученики</span>
       </button>
+      <button class="nav-btn" data-view="plans">
+        <span class="icon">📚</span>
+        <span>Уроки (КТП)</span>
+      </button>
       <button class="nav-btn" data-view="subscriptions">
         <span class="icon">💳</span>
         <span>Абонементы</span>
@@ -900,7 +904,8 @@
     lessons: [],
     subscriptions: [],
     weekNotes: "",
-    completedTasks: []   // чек-лист: что уже сделано
+    completedTasks: [],
+    coursePlans: []   // КТП: учебники/курсы и их уроки
   };
 
   function loadData() {
@@ -917,6 +922,7 @@
       if (!parsed.subscriptions) parsed.subscriptions = [];
       if (!parsed.weekNotes) parsed.weekNotes = "";
       if (!parsed.completedTasks) parsed.completedTasks = [];
+      if (!parsed.coursePlans) parsed.coursePlans = [];
 
       parsed.students.forEach(s => {
         if (!("parentName" in s)) s.parentName = "";
@@ -932,6 +938,8 @@
           s.doneOffset = 0;
         }
       });
+
+      if (!Array.isArray(parsed.coursePlans)) parsed.coursePlans = [];
 
       return parsed;
     } catch(e) {
@@ -1102,27 +1110,7 @@
     todayLabel.textContent = `${dateStr}, ${timeStr}`;
   }
 
-  /* Вспомогательные: оценки, абонементы, темы, чек-лист */
-
-  function computePerformance() {
-    const result=[];
-    data.students.forEach(st=>{
-      const lessons = getLessonsByStudent(st.id);
-      let sum=0, count=0;
-      lessons.forEach(l=>{
-        if(l.gradeLesson!=null){ sum+=l.gradeLesson; count++; }
-        if(l.gradeHW!=null){ sum+=l.gradeHW; count++; }
-      });
-      if(count>0){
-        const avg = sum / count;
-        let percent = Math.round(avg / 5 * 100);
-        if(percent>100) percent=100;
-        result.push({student:st, avg, percent});
-      }
-    });
-    result.sort((a,b)=>b.avg-a.avg);
-    return result;
-  }
+  /* Вспомогательные: критичные абонементы, темы, чек-лист */
 
   function computeCriticalSubscriptions() {
     const result=[];
@@ -2239,6 +2227,7 @@
   let currentLessonId=null;
   let currentSubscriptionStudentId=null;
   let journalFilterStudentId="all";
+  let currentPlanId=null; // для КТП
 
   function openStudentView(studentId){
     currentView="student";
@@ -2249,6 +2238,17 @@
   function editSubscription(studentId){
     currentView="subscriptionEdit";
     currentSubscriptionStudentId=studentId;
+    render();
+  }
+
+  function openPlansList(){
+    currentView="plans";
+    render();
+  }
+
+  function openPlanDetail(planId){
+    currentView="planDetail";
+    currentPlanId=planId;
     render();
   }
 
@@ -2563,7 +2563,7 @@
     main.appendChild(card);
   }
 
-  /* LESSON VIEW + ШАБЛОНЫ ТЕМ */
+  /* LESSON VIEW + ШАБЛОНЫ ТЕМ + КТП */
 
   function openLessonView(id){
     currentView="lesson";
@@ -2640,6 +2640,110 @@
     }
     rowTemplates.appendChild(lblTpl);
     rowTemplates.appendChild(tplWrap);
+
+    /* КТП: подставить тему и домашку из учебника */
+    const rowKTP=document.createElement("div");
+    rowKTP.className="form-row-inline";
+
+    const colPlan=document.createElement("div");
+    const lblPlan=document.createElement("div");
+    lblPlan.className="form-label";
+    lblPlan.textContent="Учебник / курс (КТП)";
+    const selPlan=document.createElement("select");
+    selPlan.className="form-select";
+    const plans = data.coursePlans || [];
+    const optNonePlan=document.createElement("option");
+    optNonePlan.value="none";
+    optNonePlan.textContent="— не выбрано —";
+    selPlan.appendChild(optNonePlan);
+    plans.forEach(p=>{
+      const opt=document.createElement("option");
+      opt.value=String(p.id);
+      opt.textContent=p.title || `Учебник #${p.id}`;
+      selPlan.appendChild(opt);
+    });
+    colPlan.appendChild(lblPlan);
+    colPlan.appendChild(selPlan);
+
+    const colLesson=document.createElement("div");
+    const lblLes=document.createElement("div");
+    lblLes.className="form-label";
+    lblLes.textContent="Урок из КТП";
+    const selLes=document.createElement("select");
+    selLes.className="form-select";
+    const optNoneLes=document.createElement("option");
+    optNoneLes.value="none";
+    optNoneLes.textContent="Сначала выбери учебник";
+    selLes.appendChild(optNoneLes);
+    colLesson.appendChild(lblLes);
+    colLesson.appendChild(selLes);
+
+    function refillLessons(){
+      selLes.innerHTML="";
+      const opt0=document.createElement("option");
+      const planId=selPlan.value==="none"?null:Number(selPlan.value);
+      if(!planId){
+        opt0.value="none";
+        opt0.textContent="Сначала выбери учебник";
+        selLes.appendChild(opt0);
+        return;
+      }
+      const plan = plans.find(p=>p.id===planId);
+      if(!plan || !plan.lessons || !plan.lessons.length){
+        opt0.value="none";
+        opt0.textContent="В этом учебнике пока нет уроков";
+        selLes.appendChild(opt0);
+        return;
+      }
+      opt0.value="none";
+      opt0.textContent="Выбери урок";
+      selLes.appendChild(opt0);
+      plan.lessons.forEach((ktpLesson,index)=>{
+        const opt=document.createElement("option");
+        opt.value=String(ktpLesson.id);
+        opt.textContent=`${index+1}. ${ktpLesson.title || ktpLesson.topic || "Урок"}`;
+        selLes.appendChild(opt);
+      });
+      selLes.value="none";
+    }
+
+    selPlan.onchange=refillLessons;
+
+    const colBtn=document.createElement("div");
+    const lblBtn=document.createElement("div");
+    lblBtn.className="form-label";
+    lblBtn.textContent="Подстановка из КТП";
+    const btnApply=document.createElement("button");
+    btnApply.type="button";
+    btnApply.className="btn-secondary";
+    btnApply.textContent="Подставить тему и Д/з";
+    btnApply.onclick=()=>{
+      const planId=selPlan.value==="none"?null:Number(selPlan.value);
+      const lesId=selLes.value==="none"?null:Number(selLes.value);
+      if(!planId || !lesId){
+        alert("Выбери учебник и урок из КТП.");
+        return;
+      }
+      const plan = plans.find(p=>p.id===planId);
+      if(!plan) return;
+      const ktpLesson = (plan.lessons||[]).find(x=>x.id===lesId);
+      if(!ktpLesson){
+        alert("Урок не найден в КТП.");
+        return;
+      }
+      if(ktpLesson.topic || ktpLesson.title){
+        inTopic.value = ktpLesson.topic || ktpLesson.title;
+      }
+      if(ktpLesson.homework){
+        inHW.value = ktpLesson.homework;
+      }
+    };
+    colBtn.appendChild(lblBtn);
+    colBtn.appendChild(btnApply);
+
+    rowKTP.appendChild(colPlan);
+    rowKTP.appendChild(colLesson);
+    rowKTP.appendChild(colBtn);
 
     const rowHW=document.createElement("div");
     rowHW.className="form-row";
@@ -2801,6 +2905,7 @@
 
     form.appendChild(rowTopic);
     form.appendChild(rowTemplates);
+    form.appendChild(rowKTP);
     form.appendChild(rowHW);
     form.appendChild(rowGradesWrap);
     form.appendChild(rowGradeComments);
@@ -2809,6 +2914,9 @@
 
     card.appendChild(form);
     main.appendChild(card);
+
+    // после создания формы заполним список уроков КТП (если выберешь учебник)
+    refillLessons();
   }
 
   /* MESSENGERS: напоминания и домашка */
@@ -3320,6 +3428,361 @@
     main.appendChild(card);
   }
 
+  /* КТП: учебники и их уроки */
+
+  function renderPlans(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Уроки (КТП)";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Учебники и календарно-тематическое планирование.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnAdd=document.createElement("button");
+    btnAdd.className="btn-main";
+    btnAdd.textContent="Добавить учебник / курс";
+    btnAdd.onclick=()=>{
+      const name=prompt("Название учебника или курса","Forward 3 класс");
+      if(!name) return;
+      const id = data.coursePlans.length
+        ? Math.max(...data.coursePlans.map(p=>p.id))+1
+        : 1;
+      data.coursePlans.push({
+        id,
+        title:name.trim(),
+        description:"",
+        lessons:[]
+      });
+      save();
+      currentPlanId=id;
+      currentView="planDetail";
+      render();
+    };
+
+    header.appendChild(left);
+    header.appendChild(btnAdd);
+    card.appendChild(header);
+
+    if(!data.coursePlans.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет учебников. Добавь первый — и начнёшь заполнять КТП.";
+      card.appendChild(empty);
+      main.appendChild(card);
+      return;
+    }
+
+    const list=document.createElement("div");
+    list.className="students-list";
+
+    data.coursePlans.forEach(plan=>{
+      const item=document.createElement("div");
+      item.className="student-card";
+      item.onclick=()=>openPlanDetail(plan.id);
+
+      const top=document.createElement("div");
+      top.className="student-top";
+      const name=document.createElement("div");
+      name.className="student-name";
+      name.textContent=plan.title || `Учебник #${plan.id}`;
+      const count=document.createElement("div");
+      count.className="tiny";
+      const len=(plan.lessons||[]).length;
+      count.textContent=`Уроков в КТП: ${len}`;
+      top.appendChild(name);
+      top.appendChild(count);
+
+      const desc=document.createElement("div");
+      desc.className="tiny";
+      desc.textContent=plan.description || "Описание не задано";
+
+      const btnRow=document.createElement("div");
+      btnRow.style.display="flex";
+      btnRow.style.gap="4px";
+      btnRow.style.justifyContent="flex-end";
+      btnRow.style.marginTop="4px";
+
+      const btnOpen=document.createElement("button");
+      btnOpen.className="btn-chip small";
+      btnOpen.textContent="Открыть";
+      btnOpen.onclick=(e)=>{e.stopPropagation();openPlanDetail(plan.id);};
+
+      const btnDel=document.createElement("button");
+      btnDel.className="btn-chip small danger";
+      btnDel.textContent="Удалить";
+      btnDel.onclick=(e)=>{
+        e.stopPropagation();
+        if(!confirm("Удалить этот учебник и его КТП? Уроки учеников не трогаем.")) return;
+        data.coursePlans = data.coursePlans.filter(p=>p.id!==plan.id);
+        save();
+      };
+
+      btnRow.appendChild(btnOpen);
+      btnRow.appendChild(btnDel);
+
+      item.appendChild(top);
+      item.appendChild(desc);
+      item.appendChild(btnRow);
+      list.appendChild(item);
+    });
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  function renderPlanDetail(main,planId){
+    const plan = (data.coursePlans||[]).find(p=>p.id===planId);
+    if(!plan){
+      const card=document.createElement("section");
+      card.className="card";
+      card.textContent="Учебник не найден.";
+      main.appendChild(card);
+      return;
+    }
+
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent=`КТП: ${plan.title || "Учебник"}`;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Здесь ты прописываешь общий план по учебнику.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← Ко всем учебникам";
+    btnBack.onclick=()=>{currentView="plans";render();};
+
+    header.appendChild(left);
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    /* Общее про учебник */
+    const info=document.createElement("div");
+    info.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+
+    const colTitle=document.createElement("div");
+    const lblTitle=document.createElement("div");
+    lblTitle.className="form-label";
+    lblTitle.textContent="Название учебника / курса";
+    const inTitle=document.createElement("input");
+    inTitle.className="form-input";
+    inTitle.value=plan.title || "";
+    colTitle.appendChild(lblTitle);
+    colTitle.appendChild(inTitle);
+
+    const colDesc=document.createElement("div");
+    const lblDesc=document.createElement("div");
+    lblDesc.className="form-label";
+    lblDesc.textContent="Краткое описание";
+    const inDesc=document.createElement("input");
+    inDesc.className="form-input";
+    inDesc.value=plan.description || "";
+    colDesc.appendChild(lblDesc);
+    colDesc.appendChild(inDesc);
+
+    row1.appendChild(colTitle);
+    row1.appendChild(colDesc);
+
+    const actionsInfo=document.createElement("div");
+    actionsInfo.className="form-actions";
+    const btnSaveInfo=document.createElement("button");
+    btnSaveInfo.className="btn-main";
+    btnSaveInfo.textContent="Сохранить учебник";
+    btnSaveInfo.onclick=()=>{
+      plan.title = inTitle.value.trim() || plan.title;
+      plan.description = inDesc.value.trim();
+      save();
+    };
+    actionsInfo.appendChild(btnSaveInfo);
+
+    info.appendChild(row1);
+    info.appendChild(actionsInfo);
+    card.appendChild(info);
+
+    /* Добавление урока в КТП */
+    const addBlock=document.createElement("div");
+    addBlock.className="form-section";
+    const addTitle=document.createElement("div");
+    addTitle.className="card-title";
+    addTitle.style.fontSize="13px";
+    addTitle.textContent="Добавить урок в КТП";
+    addBlock.appendChild(addTitle);
+
+    const rowL=document.createElement("div");
+    rowL.className="form-row-inline";
+
+    const colName=document.createElement("div");
+    const lblLName=document.createElement("div");
+    lblLName.className="form-label";
+    lblLName.textContent="Название урока";
+    const inLName=document.createElement("input");
+    inLName.className="form-input";
+    inLName.placeholder="например, Unit 3 Lesson 1";
+    colName.appendChild(lblLName);
+    colName.appendChild(inLName);
+
+    const colTopic=document.createElement("div");
+    const lblLTopic=document.createElement("div");
+    lblLTopic.className="form-label";
+    lblLTopic.textContent="Тема (подробнее)";
+    const inLTopic=document.createElement("input");
+    inLTopic.className="form-input";
+    inLTopic.placeholder="Past Simple, чтение текста про ...";
+    colTopic.appendChild(lblLTopic);
+    colTopic.appendChild(inLTopic);
+
+    rowL.appendChild(colName);
+    rowL.appendChild(colTopic);
+
+    const rowHW=document.createElement("div");
+    rowHW.className="form-row";
+    const lblLHW=document.createElement("div");
+    lblLHW.className="form-label";
+    lblLHW.textContent="Рекомендованное домашнее задание";
+    const inLHW=document.createElement("textarea");
+    inLHW.placeholder="SB p.34 ex.3, WB p.18 ex.1-2";
+    rowHW.appendChild(lblLHW);
+    rowHW.appendChild(inLHW);
+
+    const actionsAdd=document.createElement("div");
+    actionsAdd.className="form-actions";
+    const btnAddLesson=document.createElement("button");
+    btnAddLesson.className="btn-secondary";
+    btnAddLesson.textContent="Добавить урок в конец КТП";
+    btnAddLesson.onclick=()=>{
+      const tName=inLName.value.trim();
+      const tTopic=inLTopic.value.trim();
+      const tHW=inLHW.value.trim();
+      if(!tName && !tTopic){
+        alert("Нужно хотя бы название урока или тему.");
+        return;
+      }
+      const newId = (plan.lessons && plan.lessons.length)
+        ? Math.max(...plan.lessons.map(x=>x.id))+1
+        : 1;
+      if(!plan.lessons) plan.lessons=[];
+      plan.lessons.push({
+        id:newId,
+        title:tName,
+        topic:tTopic,
+        homework:tHW
+      });
+      save();
+      inLName.value="";
+      inLTopic.value="";
+      inLHW.value="";
+    };
+
+    actionsAdd.appendChild(btnAddLesson);
+
+    addBlock.appendChild(rowL);
+    addBlock.appendChild(rowHW);
+    addBlock.appendChild(actionsAdd);
+    card.appendChild(addBlock);
+
+    /* Список уроков КТП */
+    const listBlock=document.createElement("div");
+    listBlock.className="form-section";
+    const listTitle=document.createElement("div");
+    listTitle.className="card-title";
+    listTitle.style.fontSize="13px";
+    listTitle.textContent="Уроки в КТП (по порядку)";
+    listBlock.appendChild(listTitle);
+
+    if(!plan.lessons || !plan.lessons.length){
+      const empty=document.createElement("div");
+      empty.className="tiny";
+      empty.textContent="Пока уроков нет. Добавляй выше.";
+      listBlock.appendChild(empty);
+    } else {
+      const list=document.createElement("div");
+      list.className="lesson-list";
+      plan.lessons.forEach((les,index)=>{
+        const item=document.createElement("div");
+        item.className="lesson-card";
+        item.style.cursor="default";
+
+        const top=document.createElement("div");
+        top.className="lesson-top";
+        const left=document.createElement("div");
+        left.textContent=`${index+1}. ${les.title || les.topic || "Урок"}`;
+        const right=document.createElement("div");
+        right.className="tiny";
+        right.textContent=`ID: ${les.id}`;
+        top.appendChild(left);
+        top.appendChild(right);
+
+        const meta=document.createElement("div");
+        meta.className="tiny";
+        meta.innerHTML =
+          `<strong>Тема:</strong> ${les.topic || "—"}<br>`+
+          `<strong>Домашка:</strong> ${les.homework || "—"}`;
+
+        const btnRow=document.createElement("div");
+        btnRow.style.display="flex";
+        btnRow.style.gap="4px";
+        btnRow.style.marginTop="4px";
+        btnRow.style.justifyContent="flex-end";
+
+        const btnEdit=document.createElement("button");
+        btnEdit.className="btn-chip small";
+        btnEdit.textContent="Изменить";
+        btnEdit.onclick=(e)=>{
+          e.stopPropagation();
+          const newTitle=prompt("Название урока",les.title||"") ?? les.title;
+          const newTopic=prompt("Тема (подробнее)",les.topic||"") ?? les.topic;
+          const newHW=prompt("Домашка",les.homework||"") ?? les.homework;
+          les.title=newTitle.trim();
+          les.topic=newTopic.trim();
+          les.homework=newHW.trim();
+          save();
+        };
+
+        const btnDel=document.createElement("button");
+        btnDel.className="btn-chip small danger";
+        btnDel.textContent="Удалить";
+        btnDel.onclick=(e)=>{
+          e.stopPropagation();
+          if(!confirm("Удалить этот урок из КТП?")) return;
+          plan.lessons = plan.lessons.filter(x=>x.id!==les.id);
+          save();
+        };
+
+        btnRow.appendChild(btnEdit);
+        btnRow.appendChild(btnDel);
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        item.appendChild(btnRow);
+
+        list.appendChild(item);
+      });
+      listBlock.appendChild(list);
+    }
+
+    card.appendChild(listBlock);
+    main.appendChild(card);
+  }
+
   /* НАСТРОЙКИ + ВЫХОД */
 
   function renderSettings(main){
@@ -3379,7 +3842,7 @@
     btnReset.className="btn-danger";
     btnReset.textContent="Удалить все данные";
     btnReset.onclick=()=>{
-      if(confirm("Точно удалить ВСЕ данные (учеников, уроки, абонементы)?")) {
+      if(confirm("Точно удалить ВСЕ данные (учеников, уроки, абонементы, КТП)?")) {
         localStorage.removeItem(STORAGE_KEY);
         data = loadData();
         render();
@@ -3450,6 +3913,8 @@
     else if(currentView==="subscriptions") renderSubscriptions(mainCol);
     else if(currentView==="subscriptionEdit") renderSubscriptionEdit(mainCol,currentSubscriptionStudentId);
     else if(currentView==="journal") renderJournal(mainCol);
+    else if(currentView==="plans") renderPlans(mainCol);
+    else if(currentView==="planDetail") renderPlanDetail(mainCol,currentPlanId);
     else if(currentView==="settings") renderSettings(mainCol);
     else if(currentView==="logout") renderLogout(mainCol);
   }
