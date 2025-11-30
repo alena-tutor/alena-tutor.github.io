@@ -6,11 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
-      /* тёплый нейтральный премиум-стиль (как первая картинка) */
       --bg: #F6F5F3;
       --bg-alt: #ECEAE6;
       --card: #FFFFFF;
-      --accent: #C7924B;       /* карамельные кнопки */
+      --accent: #C7924B;
       --accent-soft: #EAD2B3;
       --text: #2F2B28;
       --muted: #7C756F;
@@ -38,7 +37,7 @@
       display: flex;
     }
 
-    /* ---------- SIDEBAR (широкое меню) ---------- */
+    /* SIDEBAR */
 
     .sidebar {
       width: 260px;
@@ -153,7 +152,7 @@
       border: 1px solid rgba(221, 213, 204, 0.7);
     }
 
-    /* ---------- MAIN PANEL ---------- */
+    /* MAIN PANEL */
 
     .main-panel {
       flex: 1;
@@ -211,7 +210,7 @@
       color: var(--muted);
     }
 
-    /* ---------- CLOCK ---------- */
+    /* CLOCK */
 
     .clock {
       width: 70px;
@@ -281,7 +280,7 @@
     .clock-num.n6 { bottom: 8px; left: 50%; }
     .clock-num.n9 { top: 50%; left: 8px; transform: translate(-50%, -50%); }
 
-    /* ---------- CONTENT ---------- */
+    /* CONTENT */
 
     main {
       flex: 1;
@@ -331,7 +330,6 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      cursor: default;
       border: 1px solid rgba(199, 146, 75, 0.3);
     }
 
@@ -438,7 +436,7 @@
       color: var(--muted);
     }
 
-    /* ---------- HOME LAYOUT ---------- */
+    /* HOME LAYOUT */
 
     .home-grid {
       display: grid;
@@ -547,7 +545,7 @@
       color: var(--muted);
     }
 
-    /* ---------- PERFORMANCE ---------- */
+    /* PERFORMANCE */
 
     .perf-row {
       display: grid;
@@ -587,7 +585,7 @@
       border: 1px solid rgba(221, 213, 204, 0.7);
     }
 
-    /* ---------- CALENDAR ---------- */
+    /* CALENDAR */
 
     .calendar-grid {
       display: grid;
@@ -672,7 +670,7 @@
       flex-wrap: wrap;
     }
 
-    /* ---------- FORMS ---------- */
+    /* FORMS */
 
     .form-section {
       border-radius: 14px;
@@ -729,7 +727,7 @@
       flex-wrap: wrap;
     }
 
-    /* ---------- STUDENTS & SUBSCRIPTIONS ---------- */
+    /* STUDENTS & SUBSCRIPTIONS */
 
     .students-list {
       display: flex;
@@ -793,7 +791,6 @@
     .subs-table-row:nth-child(odd) {
       background: rgba(255,255,255,0.3);
     }
-
   </style>
 </head>
 <body>
@@ -902,7 +899,8 @@
     students: [],
     lessons: [],
     subscriptions: [],
-    weekNotes: ""
+    weekNotes: "",
+    completedTasks: []   // чек-лист: что уже сделано
   };
 
   function loadData() {
@@ -918,8 +916,8 @@
       if (!parsed.lessons) parsed.lessons = [];
       if (!parsed.subscriptions) parsed.subscriptions = [];
       if (!parsed.weekNotes) parsed.weekNotes = "";
+      if (!parsed.completedTasks) parsed.completedTasks = [];
 
-      // добавляем новые поля для родителей, если их не было
       parsed.students.forEach(s => {
         if (!("parentName" in s)) s.parentName = "";
         if (!("parentContact" in s)) s.parentContact = "";
@@ -934,6 +932,7 @@
           s.doneOffset = 0;
         }
       });
+
       return parsed;
     } catch(e) {
       console.error(e);
@@ -1103,7 +1102,77 @@
     todayLabel.textContent = `${dateStr}, ${timeStr}`;
   }
 
-  /* ---------- HOME (ГЛАВНАЯ) ---------- */
+  /* Вспомогательные: оценки, абонементы, темы, чек-лист */
+
+  function computePerformance() {
+    const result=[];
+    data.students.forEach(st=>{
+      const lessons = getLessonsByStudent(st.id);
+      let sum=0, count=0;
+      lessons.forEach(l=>{
+        if(l.gradeLesson!=null){ sum+=l.gradeLesson; count++; }
+        if(l.gradeHW!=null){ sum+=l.gradeHW; count++; }
+      });
+      if(count>0){
+        const avg = sum / count;
+        let percent = Math.round(avg / 5 * 100);
+        if(percent>100) percent=100;
+        result.push({student:st, avg, percent});
+      }
+    });
+    result.sort((a,b)=>b.avg-a.avg);
+    return result;
+  }
+
+  function computeCriticalSubscriptions() {
+    const result=[];
+    data.students.forEach(st=>{
+      const stats = getSubscriptionStats(st.id);
+      const {sub,remaining,debt} = stats;
+      if(!sub) return;
+      if(remaining<=2 || debt>0){
+        result.push({student:st, stats});
+      }
+    });
+    result.sort((a,b)=>{
+      const debtA = a.stats.debt || 0;
+      const debtB = b.stats.debt || 0;
+      if (debtA !== debtB) return debtB - debtA;
+      return (a.stats.remaining || 0) - (b.stats.remaining || 0);
+    });
+    return result;
+  }
+
+  function getRecentTopics(limit=8) {
+    const lessons = data.lessons
+      .filter(l=>l.topic && l.topic.trim())
+      .sort((a,b)=> (b.date||"").localeCompare(a.date||""));
+    const seen = new Set();
+    const result=[];
+    for(const l of lessons){
+      const t = l.topic.trim();
+      if(!seen.has(t)){
+        seen.add(t);
+        result.push(t);
+        if(result.length>=limit) break;
+      }
+    }
+    return result;
+  }
+
+  function isTaskDone(id) {
+    return data.completedTasks && data.completedTasks.includes(id);
+  }
+
+  function toggleTaskDone(id) {
+    if(!data.completedTasks) data.completedTasks=[];
+    const idx = data.completedTasks.indexOf(id);
+    if(idx>=0) data.completedTasks.splice(idx,1);
+    else data.completedTasks.push(id);
+    save();
+  }
+
+  /* HOME (Главная) */
 
   function renderToday(main) {
     const container=document.createElement("div");
@@ -1112,7 +1181,7 @@
     const leftCol=document.createElement("div");
     leftCol.className="home-left";
 
-    // заметки на неделю
+    /* Заметки на неделю */
     const notesCard=document.createElement("section");
     notesCard.className="card";
     const nh=document.createElement("div");
@@ -1152,7 +1221,7 @@
 
     leftCol.appendChild(notesCard);
 
-    // уроки сегодня
+    /* Уроки сегодня */
     const today = todayISO();
     const todays = data.lessons
       .filter(l=>l.date===today && l.status!=="cancelled")
@@ -1168,7 +1237,7 @@
     lTitle.textContent="Уроки сегодня";
     const lSub=document.createElement("div");
     lSub.className="card-subtitle";
-    lSub.textContent="Статусы, быстрый переход к карточке урока";
+    lSub.textContent="Статусы, быстрые действия и переход к карточке урока";
     lLeft.appendChild(lTitle);
     lLeft.appendChild(lSub);
     const lTag=document.createElement("div");
@@ -1193,11 +1262,12 @@
     lessonsCard.appendChild(list);
     leftCol.appendChild(lessonsCard);
 
-    // правая колонка
+    /* Правая колонка */
+
     const rightCol=document.createElement("div");
     rightCol.className="home-right";
 
-    // карточка "Сегодня"
+    /* Карточка "Сегодня" */
     const todayCard=document.createElement("section");
     todayCard.className="card";
     const tHeader=document.createElement("div");
@@ -1239,62 +1309,140 @@
     todayCard.appendChild(sr3);
     rightCol.appendChild(todayCard);
 
-    // статистика успеваемости
-    const statsCard=document.createElement("section");
-    statsCard.className="card";
-    const sHeader=document.createElement("div");
-    sHeader.className="card-header";
-    const sLeft=document.createElement("div");
-    const sTitle=document.createElement("div");
-    sTitle.className="card-title";
-    sTitle.textContent="Статистика успеваемости";
-    const sSub=document.createElement("div");
-    sSub.className="card-subtitle";
-    sSub.textContent="Средний процентаж по оценкам за урок и Д/з";
-    sLeft.appendChild(sTitle);
-    sLeft.appendChild(sSub);
-    sHeader.appendChild(sLeft);
-    statsCard.appendChild(sHeader);
+    /* Критичные абонементы */
+    const critCard=document.createElement("section");
+    critCard.className="card";
+    const cHeader=document.createElement("div");
+    cHeader.className="card-header";
+    const cLeft=document.createElement("div");
+    const cTitle=document.createElement("div");
+    cTitle.className="card-title";
+    cTitle.textContent="Критичные абонементы";
+    const cSub=document.createElement("div");
+    cSub.className="card-subtitle";
+    cSub.textContent="Долги и абонементы, которые вот-вот закончатся";
+    cLeft.appendChild(cTitle);
+    cLeft.appendChild(cSub);
+    cHeader.appendChild(cLeft);
+    critCard.appendChild(cHeader);
 
-    const perfContainer=document.createElement("div");
+    const critList=document.createElement("div");
+    critList.style.display="flex";
+    critList.style.flexDirection="column";
+    critList.style.gap="4px";
 
-    const perfData = computePerformance();
-
-    if (!perfData.length) {
+    const critData = computeCriticalSubscriptions();
+    if(!critData.length){
       const empty=document.createElement("div");
       empty.className="empty-state";
-      empty.textContent="Пока нет оценок.";
-      perfContainer.appendChild(empty);
+      empty.textContent="Пока всё спокойно: долгов и заканчивающихся абонементов нет.";
+      critList.appendChild(empty);
     } else {
-      perfData.slice(0,5).forEach(item=>{
+      critData.slice(0,5).forEach(({student,stats})=>{
         const row=document.createElement("div");
-        row.className="perf-row";
+        row.style.display="flex";
+        row.style.justifyContent="space-between";
+        row.style.alignItems="center";
+        row.style.fontSize="11px";
+        row.style.padding="3px 0";
 
-        const name=document.createElement("div");
-        name.textContent=item.student.name;
+        const left=document.createElement("div");
+        left.innerHTML =
+          `<strong>${student.name}</strong><br>`+
+          `<span class="tiny">Осталось: ${stats.remaining} из ${stats.total}, `+
+          `долг: ${stats.debt} ₽</span>`;
 
-        const perc=document.createElement("div");
-        perc.textContent=item.percent + "%";
+        const right=document.createElement("div");
+        right.style.display="flex";
+        right.style.gap="4px";
+        const btnNotif=document.createElement("button");
+        btnNotif.className="btn-chip small primary";
+        btnNotif.textContent="Оповестить";
+        btnNotif.onclick=()=>notifySubscription(student, stats);
+        const btnEdit=document.createElement("button");
+        btnEdit.className="btn-chip small";
+        btnEdit.textContent="Открыть";
+        btnEdit.onclick=()=>editSubscription(student.id);
 
-        const bar=document.createElement("div");
-        bar.className="perf-bar";
-        const fill=document.createElement("div");
-        fill.className="perf-bar-fill";
-        fill.style.width = item.percent + "%";
-        bar.appendChild(fill);
+        right.appendChild(btnNotif);
+        right.appendChild(btnEdit);
 
-        row.appendChild(name);
-        row.appendChild(perc);
-        row.appendChild(bar);
-
-        perfContainer.appendChild(row);
+        row.appendChild(left);
+        row.appendChild(right);
+        critList.appendChild(row);
       });
     }
+    critCard.appendChild(critList);
+    rightCol.appendChild(critCard);
 
-    statsCard.appendChild(perfContainer);
-    rightCol.appendChild(statsCard);
+    /* Чек-лист на сегодня */
+    const tasksCard=document.createElement("section");
+    tasksCard.className="card";
+    const chkHeader=document.createElement("div");
+    chkHeader.className="card-header";
+    const chkLeft=document.createElement("div");
+    const chkTitle=document.createElement("div");
+    chkTitle.className="card-title";
+    chkTitle.textContent="Чек-лист на сегодня";
+    const chkSub=document.createElement("div");
+    chkSub.className="card-subtitle";
+    chkSub.textContent="Поставить оценки, отправить Д/з, напомнить о занятиях и абонементах";
+    chkLeft.appendChild(chkTitle);
+    chkLeft.appendChild(chkSub);
+    chkHeader.appendChild(chkLeft);
+    tasksCard.appendChild(chkHeader);
 
-    // темы сегодня
+    const tasksContainer=document.createElement("div");
+    tasksContainer.style.display="flex";
+    tasksContainer.style.flexDirection="column";
+    tasksContainer.style.gap="4px";
+
+    const tasks = buildTodayTasks(todays);
+    if(!tasks.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Никаких задач на сегодня — можно выдохнуть.";
+      tasksContainer.appendChild(empty);
+    } else {
+      tasks.forEach(task=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.alignItems="center";
+        row.style.justifyContent="space-between";
+        row.style.gap="6px";
+
+        const left=document.createElement("label");
+        left.style.display="flex";
+        left.style.alignItems="center";
+        left.style.gap="6px";
+        left.style.flex="1";
+
+        const cb=document.createElement("input");
+        cb.type="checkbox";
+        cb.checked=isTaskDone(task.id);
+        cb.onchange=()=>toggleTaskDone(task.id);
+
+        const text=document.createElement("span");
+        text.className="tiny";
+        text.textContent=task.text;
+
+        left.appendChild(cb);
+        left.appendChild(text);
+
+        const btnDo=document.createElement("button");
+        btnDo.className="btn-chip small";
+        btnDo.textContent="Сделать";
+        btnDo.onclick=()=>task.action();
+
+        row.appendChild(left);
+        row.appendChild(btnDo);
+        tasksContainer.appendChild(row);
+      });
+    }
+    tasksCard.appendChild(tasksContainer);
+    rightCol.appendChild(tasksCard);
+
+    /* Темы сегодня */
     const topicsCard=document.createElement("section");
     topicsCard.className="card";
     const h=document.createElement("div");
@@ -1340,25 +1488,55 @@
     main.appendChild(container);
   }
 
-  function computePerformance() {
-    const result=[];
-    data.students.forEach(st=>{
-      const lessons = getLessonsByStudent(st.id);
-      let sum=0, count=0;
-      lessons.forEach(l=>{
-        if(l.gradeLesson!=null){ sum+=l.gradeLesson; count++; }
-        if(l.gradeHW!=null){ sum+=l.gradeHW; count++; }
+  function buildTodayTasks(todays) {
+    const tasks=[];
+    todays.forEach(l=>{
+      const st=getStudent(l.studentId);
+      const name = st ? st.name : "—";
+      const labelBase = `${name} (${l.time})`;
+
+      const idRem = `reminder|${l.id}`;
+      tasks.push({
+        id:idRem,
+        text:`Напомнить о занятии: ${labelBase}`,
+        action:()=>sendLessonReminder(l,st)
       });
-      if(count>0){
-        const avg = sum / count;
-        let percent = Math.round(avg / 5 * 100);
-        if(percent>100) percent=100;
-        result.push({student:st, avg, percent});
+
+      if(l.hw && l.hw.trim()){
+        const idHW=`homework|${l.id}`;
+        tasks.push({
+          id:idHW,
+          text:`Отправить домашнее задание: ${name}`,
+          action:()=>sendHomework(l,st)
+        });
+      }
+
+      if(l.gradeLesson==null || l.gradeHW==null){
+        const idGr=`grade|${l.id}`;
+        tasks.push({
+          id:idGr,
+          text:`Поставить оценку: ${name}`,
+          action:()=>openLessonView(l.id)
+        });
       }
     });
-    result.sort((a,b)=>b.avg-a.avg);
-    return result;
+
+    computeCriticalSubscriptions().forEach(({student,stats})=>{
+      const idSub=`subNotify|${student.id}`;
+      const base = stats.remaining<=0
+        ? "Оповестить об окончании абонемента"
+        : "Оповестить о скором окончании абонемента";
+      tasks.push({
+        id:idSub,
+        text:`${base}: ${student.name}`,
+        action:()=>notifySubscription(student,stats)
+      });
+    });
+
+    return tasks;
   }
+
+  /* УРОКИ СЕГОДНЯ: карточка + быстрые действия */
 
   function renderLessonCard(lesson) {
     const st=getStudent(lesson.studentId);
@@ -1420,13 +1598,25 @@
     btnCancel.onclick=(e)=>{e.stopPropagation(); setLessonStatus(lesson.id,"cancelled");};
 
     const btnOpen=document.createElement("button");
-    btnOpen.className="btn-chip";
+    btnOpen.className="btn-chip small";
     btnOpen.textContent="📖 Открыть";
     btnOpen.onclick=(e)=>{e.stopPropagation(); openLessonView(lesson.id);};
+
+    const btnRem=document.createElement("button");
+    btnRem.className="btn-chip small";
+    btnRem.textContent="🔔 Напомнить";
+    btnRem.onclick=(e)=>{e.stopPropagation(); sendLessonReminder(lesson,st);};
+
+    const btnHW=document.createElement("button");
+    btnHW.className="btn-chip small";
+    btnHW.textContent="📩 Д/з";
+    btnHW.onclick=(e)=>{e.stopPropagation(); sendHomework(lesson,st);};
 
     actions.appendChild(btnDone);
     actions.appendChild(btnCancel);
     actions.appendChild(btnOpen);
+    actions.appendChild(btnRem);
+    actions.appendChild(btnHW);
 
     el.appendChild(top);
     el.appendChild(meta);
@@ -1442,7 +1632,7 @@
     save();
   }
 
-  /* ---------- CALENDAR ---------- */
+  /* КАЛЕНДАРЬ */
 
   let currentMonthDate = new Date();
 
@@ -1598,7 +1788,7 @@
     save();
   }
 
-  /* ---------- STUDENTS LIST ---------- */
+  /* УЧЕНИКИ */
 
   let showAddStudentForm = false;
 
@@ -1681,11 +1871,10 @@
           sch.textContent="Расписание: "+text;
         } else sch.textContent="Расписание не задано";
 
-        const {remaining:rem} = getSubscriptionStats(st.id);
         const subInfo=document.createElement("div");
         subInfo.className="tiny";
-        if (rem || rem===0){
-          subInfo.textContent = `Осталось занятий по абонементу: ${rem}`;
+        if (remaining || remaining===0){
+          subInfo.textContent = `Осталось занятий по абонементу: ${remaining}`;
         } else {
           subInfo.textContent = "Абонемент не настроен";
         }
@@ -1745,7 +1934,6 @@
     const form=document.createElement("div");
     form.className="form-section";
 
-    // ученик: имя + контакт
     const row1=document.createElement("div");
     row1.className="form-row-inline";
 
@@ -1770,7 +1958,6 @@
     row1.appendChild(colName);
     row1.appendChild(colContact);
 
-    // родитель: ФИ + контакт
     const rowParent=document.createElement("div");
     rowParent.className="form-row-inline";
 
@@ -1795,7 +1982,6 @@
     rowParent.appendChild(colPName);
     rowParent.appendChild(colPContact);
 
-    // типы контактов + TZ
     const row2=document.createElement("div");
     row2.className="form-row-inline";
 
@@ -2046,7 +2232,7 @@
     save();
   }
 
-  /* ---------- STUDENT VIEW + EDIT ---------- */
+  /* STUDENT VIEW + EDIT */
 
   let currentView="today";
   let currentStudentId=null;
@@ -2377,7 +2563,7 @@
     main.appendChild(card);
   }
 
-  /* ---------- LESSON VIEW ---------- */
+  /* LESSON VIEW + ШАБЛОНЫ ТЕМ */
 
   function openLessonView(id){
     currentView="lesson";
@@ -2425,6 +2611,35 @@
     const inTopic=document.createElement("input");
     inTopic.className="form-input";inTopic.value=l.topic||"";
     rowTopic.appendChild(lblTopic);rowTopic.appendChild(inTopic);
+
+    /* Шаблоны тем */
+    const rowTemplates=document.createElement("div");
+    rowTemplates.className="form-row";
+    const lblTpl=document.createElement("div");
+    lblTpl.className="form-label";
+    lblTpl.textContent="Шаблоны тем (последние темы)";
+    const tplWrap=document.createElement("div");
+    tplWrap.style.display="flex";
+    tplWrap.style.flexWrap="wrap";
+    tplWrap.style.gap="4px";
+    const recentTopics = getRecentTopics(8);
+    if(!recentTopics.length){
+      const tiny=document.createElement("div");
+      tiny.className="tiny";
+      tiny.textContent="Пока нет сохранённых тем — они появятся после того, как начнёшь заполнять.";
+      tplWrap.appendChild(tiny);
+    } else {
+      recentTopics.forEach(t=>{
+        const btn=document.createElement("button");
+        btn.type="button";
+        btn.className="btn-chip small";
+        btn.textContent=t;
+        btn.onclick=()=>{inTopic.value=t;};
+        tplWrap.appendChild(btn);
+      });
+    }
+    rowTemplates.appendChild(lblTpl);
+    rowTemplates.appendChild(tplWrap);
 
     const rowHW=document.createElement("div");
     rowHW.className="form-row";
@@ -2585,6 +2800,7 @@
     actions.appendChild(btnHW);
 
     form.appendChild(rowTopic);
+    form.appendChild(rowTemplates);
     form.appendChild(rowHW);
     form.appendChild(rowGradesWrap);
     form.appendChild(rowGradeComments);
@@ -2595,7 +2811,7 @@
     main.appendChild(card);
   }
 
-  /* ---------- MESSENGERS ---------- */
+  /* MESSENGERS: напоминания и домашка */
 
   function sendLessonReminder(lesson,student){
     if(!student){alert("Ученик не найден");return;}
@@ -2609,7 +2825,6 @@
     openMessenger(student,text);
   }
 
-  // сообщение родителю про абонемент
   function notifySubscription(student, stats){
     const {remaining,total,price,paid,doneCount} = stats;
     let text;
@@ -2641,7 +2856,6 @@
     let type = student.parentContactType || "phone";
     let contact = (student.parentContact || "").trim();
     if(!contact){
-      // если нет контакта родителя — пробуем ученика
       type = student.contactType || "phone";
       contact = (student.contact || "").trim();
     }
@@ -2670,7 +2884,7 @@
     }
   }
 
-  /* ---------- SUBSCRIPTIONS MAIN VIEW ---------- */
+  /* АБОНЕМЕНТЫ */
 
   function renderSubscriptions(main){
     const card=document.createElement("section");
@@ -2735,6 +2949,14 @@
       const row=document.createElement("div");
       row.className="subs-table-row";
 
+      if(sub){
+        if(debt>0 || remaining<=0){
+          row.style.background="#fbe4e8";
+        } else if(remaining<=2){
+          row.style.background="#fff4dd";
+        }
+      }
+
       const c1=document.createElement("div");
       c1.textContent=st.name;
 
@@ -2784,8 +3006,6 @@
 
     main.appendChild(card);
   }
-
-  /* ---------- SUBSCRIPTION EDIT VIEW ---------- */
 
   function renderSubscriptionEdit(main,studentId){
     const st=getStudent(studentId);
@@ -2954,7 +3174,7 @@
     main.appendChild(card);
   }
 
-  /* ---------- ЖУРНАЛ ---------- */
+  /* ЖУРНАЛ */
 
   function renderJournal(main){
     const card=document.createElement("section");
@@ -3100,7 +3320,7 @@
     main.appendChild(card);
   }
 
-  /* ---------- SETTINGS & LOGOUT ---------- */
+  /* НАСТРОЙКИ + ВЫХОД */
 
   function renderSettings(main){
     const card=document.createElement("section");
@@ -3204,7 +3424,7 @@
     main.appendChild(card);
   }
 
-  /* ---------- ROOT RENDER ---------- */
+  /* ROOT RENDER */
 
   const mainCol=document.getElementById("mainCol");
   const navBtns=document.querySelectorAll(".nav-btn");
@@ -3238,4 +3458,3 @@
 </script>
 </body>
 </html>
-
