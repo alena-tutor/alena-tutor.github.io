@@ -6,17 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     :root {
-      --bg: #F6F5F3;
-      --bg-alt: #ECEAE6;
+      --bg: #FFFFFF;
+      --bg-alt: #F7F6F4;
       --card: #FFFFFF;
-      --accent: #C7924B;
-      --accent-soft: #EAD2B3;
-      --text: #2F2B28;
-      --muted: #7C756F;
-      --border: #DDD5CC;
-      --danger: #D9686F;
-      --radius: 18px;
-      --shadow: 0 12px 30px rgba(47, 43, 40, 0.06);
+      --accent: #FF7A3D;
+      --accent-soft: #FFE4D3;
+      --teal: #2E8C82;
+      --teal-soft: #DCEFEC;
+      --text: #1C2528;
+      --muted: #6E7E81;
+      --border: #E2EAEA;
+      --danger: #E0524A;
+      --danger-soft: #FBDAD7;
+      --success: #2E8C72;
+      --success-soft: #DCF1E6;
+      --surface: #F7F6F4;
+      --radius: 16px;
+      --shadow: 0 10px 26px rgba(28, 37, 40, 0.07);
     }
 
     * {
@@ -47,7 +53,7 @@
       display: flex;
       flex-direction: column;
       gap: 28px;
-      box-shadow: 8px 0 28px rgba(47, 43, 40, 0.08);
+      box-shadow: 8px 0 28px rgba(28, 37, 40, 0.06);
       position: sticky;
       top: 0;
       height: 100vh;
@@ -64,14 +70,14 @@
       width: 32px;
       height: 32px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #dca867, #c7924b);
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
       font-weight: 700;
       font-size: 18px;
-      box-shadow: 0 8px 16px rgba(199, 146, 75, 0.45);
+      box-shadow: 0 8px 16px rgba(255, 122, 61, 0.35);
     }
 
     .sidebar-logo-text {
@@ -128,14 +134,14 @@
     .nav-btn:hover {
       background: rgba(255, 255, 255, 0.9);
       color: var(--text);
-      box-shadow: 0 5px 12px rgba(47, 43, 40, 0.12);
+      box-shadow: 0 5px 12px rgba(28, 37, 40, 0.10);
       transform: translateY(-1px);
     }
 
     .nav-btn.active {
-      background: linear-gradient(135deg, #dca867, #c7924b);
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
       color: #fff;
-      box-shadow: 0 8px 18px rgba(199, 146, 75, 0.5);
+      box-shadow: 0 8px 18px rgba(255, 122, 61, 0.35);
     }
 
     .nav-btn.active span.icon {
@@ -149,7 +155,7 @@
       color: var(--muted);
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.8);
-      border: 1px solid rgba(221, 213, 204, 0.7);
+      border: 1px solid var(--border);
     }
 
     /* MAIN PANEL */
@@ -167,9 +173,9 @@
       justify-content: space-between;
       gap: 16px;
       padding: 14px 22px;
-      background: rgba(246, 245, 243, 0.9);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(221, 213, 204, 0.8);
+      border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 5;
@@ -202,7 +208,7 @@
       padding: 2px 6px;
       border-radius: 999px;
       border: 1px solid var(--border);
-      background: #fdfbf7;
+      background: #FFFFFF;
     }
 
     .header-right {
@@ -221,7 +227,7 @@
       background: var(--card);
       box-shadow:
         0 2px 6px rgba(0,0,0,0.06) inset,
-        0 6px 14px rgba(47,43,40,0.12);
+        0 6px 14px rgba(28, 37, 40, 0.10);
     }
 
     .clock-center {
@@ -285,6 +291,7 @@
     main {
       flex: 1;
       padding: 16px 22px 22px;
+      background: var(--bg);
     }
 
     #mainCol {
@@ -298,8 +305,8 @@
       background: var(--card);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding: 14px;
-      border: 1px solid rgba(221, 213, 204, 0.6);
+      padding: 16px;
+      border: 1px solid var(--border);
     }
 
     .card-header {
@@ -337,7 +344,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #6fbf73;
+      background: var(--teal);
     }
 
     .empty-state {
@@ -350,23 +357,23 @@
       border: none;
       border-radius: 999px;
       padding: 7px 16px;
-      background: linear-gradient(135deg, #dca867, #c7924b);
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
       color: #fff;
       cursor: pointer;
       font-size: 13px;
-      box-shadow: 0 8px 18px rgba(199,146,75,0.55);
+      box-shadow: 0 8px 18px rgba(255, 122, 61, 0.35);
       transition: transform 0.08s ease, box-shadow 0.12s ease;
     }
 
     .btn-main:hover {
-      box-shadow: 0 10px 22px rgba(199,146,75,0.65);
+      box-shadow: 0 10px 22px rgba(255, 122, 61, 0.45);
       transform: translateY(-1px);
     }
 
     .btn-secondary {
       border-radius: 999px;
       padding: 7px 14px;
-      background: #f6f2eb;
+      background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
       cursor: pointer;
@@ -374,14 +381,14 @@
     }
 
     .btn-secondary:hover {
-      background: #f0e7dd;
+      background: #ECECEC;
     }
 
     .btn-danger {
       border-radius: 999px;
       padding: 7px 14px;
-      background: #f7d1d5;
-      border: 1px solid #e4a7af;
+      background: var(--danger-soft);
+      border: 1px solid #F0BDB8;
       color: var(--danger);
       cursor: pointer;
       font-size: 13px;
@@ -399,12 +406,17 @@
     }
 
     .btn-chip.primary {
-      background: linear-gradient(135deg, #dca867, #c7924b);
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
       color: #fff;
     }
 
+    .btn-chip.teal {
+      background: var(--accent-soft);
+      color: #C75A28;
+    }
+
     .btn-chip.danger {
-      background: #f7d1d5;
+      background: var(--danger-soft);
       color: var(--danger);
     }
 
@@ -422,13 +434,13 @@
     }
 
     .status-done {
-      background: #daf1dd;
-      border-color: #c0e4c1;
+      background: var(--success-soft);
+      border-color: #AEDFC8;
     }
 
     .status-cancelled {
-      background: #f6d6d6;
-      border-color: #ebbbbb;
+      background: var(--danger-soft);
+      border-color: #F0BDB8;
     }
 
     .tiny {
@@ -465,7 +477,7 @@
       border: 1px solid var(--border);
       padding: 8px;
       font-size: 13px;
-      background: #fdfbf7;
+      background: #FFFFFF;
     }
 
     .lesson-list {
@@ -477,19 +489,19 @@
     .lesson-card {
       padding: 9px 9px;
       border-radius: 14px;
-      background: #f4efe7;
+      background: var(--surface);
       cursor: pointer;
       display: flex;
       flex-direction: column;
       gap: 4px;
-      border: 1px solid rgba(221, 213, 204, 0.7);
+      border: 1px solid var(--border);
       transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
     }
 
     .lesson-card:hover {
-      background: #f1e7da;
+      background: #FFEDE2;
       transform: translateY(-1px);
-      box-shadow: 0 6px 14px rgba(47, 43, 40, 0.12);
+      box-shadow: 0 6px 14px rgba(28, 37, 40, 0.10);
     }
 
     .lesson-top {
@@ -560,14 +572,14 @@
       width: 100%;
       height: 6px;
       border-radius: 999px;
-      background: #f2ebe2;
+      background: var(--teal-soft);
       overflow: hidden;
     }
 
     .perf-bar-fill {
       height: 100%;
       border-radius: 999px;
-      background: linear-gradient(90deg, #dca867, #c7924b);
+      background: linear-gradient(90deg, #FF8F5C, #FF7A3D);
       width: 0%;
     }
 
@@ -581,8 +593,8 @@
     .topics-item {
       padding: 5px 7px;
       border-radius: 12px;
-      background: #f4efe7;
-      border: 1px solid rgba(221, 213, 204, 0.7);
+      background: var(--surface);
+      border: 1px solid var(--border);
     }
 
     /* CALENDAR */
@@ -596,15 +608,25 @@
 
     .calendar-day {
       border-radius: 14px;
-      background: #f4efe7;
+      background: var(--surface);
       padding: 6px;
       min-height: 95px;
       display: flex;
       flex-direction: column;
       gap: 4px;
       font-size: 11px;
-      border: 1px solid rgba(221, 213, 204, 0.8);
+      border: 1px solid var(--border);
       transition: box-shadow 0.12s ease, transform 0.08s ease;
+    }
+
+    .calendar-day.is-today {
+      border: 1.5px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .calendar-day.is-today .calendar-day-header span:first-child {
+      color: var(--accent);
+      font-weight: 700;
     }
 
     .calendar-day-header {
@@ -630,16 +652,16 @@
       flex-direction: column;
       gap: 1px;
       cursor: grab;
-      border: 1px solid rgba(221, 213, 204, 0.8);
+      border: 1px solid var(--border);
     }
 
     .calendar-mini.done {
-      border-color: #b7ddb9;
-      background: #e8f4ea;
+      border-color: #9FD9BE;
+      background: var(--success-soft);
     }
 
     .calendar-mini.cancelled {
-      border-color: #e4b0b0;
+      border-color: #F0BDB8;
       opacity: 0.6;
     }
 
@@ -658,7 +680,7 @@
       outline: 2px dashed var(--accent);
       outline-offset: 2px;
       transform: translateY(-1px);
-      box-shadow: 0 6px 14px rgba(199,146,75,0.35);
+      box-shadow: 0 6px 14px rgba(255, 122, 61, 0.30);
     }
 
     .calendar-controls {
@@ -674,13 +696,13 @@
 
     .form-section {
       border-radius: 14px;
-      background: #f4efe7;
+      background: var(--surface);
       padding: 10px;
       margin-bottom: 8px;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      border: 1px solid rgba(221,213,204,0.8);
+      border: 1px solid var(--border);
     }
 
     .form-row {
@@ -711,7 +733,7 @@
       border-radius: 9px;
       border: 1px solid var(--border);
       font-size: 12px;
-      background: #fdfbf7;
+      background: #FFFFFF;
     }
 
     textarea {
@@ -737,21 +759,21 @@
 
     .student-card {
       border-radius: 14px;
-      background: #f4efe7;
+      background: var(--surface);
       padding: 7px 9px;
       cursor: pointer;
       font-size: 12px;
       display: flex;
       flex-direction: column;
       gap: 3px;
-      border: 1px solid rgba(221, 213, 204, 0.8);
+      border: 1px solid var(--border);
       transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
     }
 
     .student-card:hover {
-      background: #f1e7da;
+      background: #FFEDE2;
       transform: translateY(-1px);
-      box-shadow: 0 6px 14px rgba(47,43,40,0.14);
+      box-shadow: 0 6px 14px rgba(28, 37, 40, 0.10);
     }
 
     .student-top {
@@ -818,6 +840,10 @@
       <button class="nav-btn" data-view="students">
         <span class="icon">👩‍🎓</span>
         <span>Ученики</span>
+      </button>
+      <button class="nav-btn" data-view="parents">
+        <span class="icon">👪</span>
+        <span>Родители</span>
       </button>
       <button class="nav-btn" data-view="plans">
         <span class="icon">📚</span>
@@ -974,6 +1000,33 @@
     const m = String(d.getMonth()+1).padStart(2,"0");
     const day = String(d.getDate()).padStart(2,"0");
     return `${y}-${m}-${day}`;
+  }
+
+  const MONTHS_RU = ["января","февраля","марта","апреля","мая","июня",
+    "июля","августа","сентября","октября","ноября","декабря"];
+
+  function formatBirthdayShort(birthday){
+    if(!birthday) return "";
+    const [,m,d] = birthday.split("-").map(Number);
+    return `${d} ${MONTHS_RU[m-1]}`;
+  }
+
+  function daysUntilBirthday(birthday){
+    if(!birthday) return null;
+    const [,bm,bd] = birthday.split("-").map(Number);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let next = new Date(now.getFullYear(), bm-1, bd);
+    if (next < todayStart) next = new Date(now.getFullYear()+1, bm-1, bd);
+    return Math.round((next - todayStart) / 86400000);
+  }
+
+  function getUpcomingBirthdays(withinDays=3){
+    return data.students
+      .filter(s=>s.birthday)
+      .map(s=>({student:s, daysUntil:daysUntilBirthday(s.birthday)}))
+      .filter(x=>x.daysUntil!==null && x.daysUntil>=0 && x.daysUntil<=withinDays)
+      .sort((a,b)=>a.daysUntil-b.daysUntil);
   }
 
   function getStudent(id) {
@@ -1344,7 +1397,7 @@
         right.style.display="flex";
         right.style.gap="4px";
         const btnNotif=document.createElement("button");
-        btnNotif.className="btn-chip small primary";
+        btnNotif.className="btn-chip small teal";
         btnNotif.textContent="Оповестить";
         btnNotif.onclick=()=>notifySubscription(student, stats);
         const btnEdit=document.createElement("button");
@@ -1362,6 +1415,48 @@
     }
     critCard.appendChild(critList);
     rightCol.appendChild(critCard);
+
+    /* Дни рождения */
+    const upcomingBirthdays = getUpcomingBirthdays(3);
+    if (upcomingBirthdays.length) {
+      const bdayCard=document.createElement("section");
+      bdayCard.className="card";
+      bdayCard.style.borderColor="var(--accent-soft)";
+      bdayCard.style.background="linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 60%)";
+      const bHeader=document.createElement("div");
+      bHeader.className="card-header";
+      const bLeft=document.createElement("div");
+      const bTitle=document.createElement("div");
+      bTitle.className="card-title";
+      bTitle.textContent="🎂 Дни рождения";
+      const bSub=document.createElement("div");
+      bSub.className="card-subtitle";
+      bSub.textContent="Скоро или сегодня";
+      bLeft.appendChild(bTitle);
+      bLeft.appendChild(bSub);
+      bHeader.appendChild(bLeft);
+      bdayCard.appendChild(bHeader);
+
+      const bList=document.createElement("div");
+      bList.style.display="flex";
+      bList.style.flexDirection="column";
+      bList.style.gap="4px";
+
+      upcomingBirthdays.forEach(({student,daysUntil})=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.justifyContent="space-between";
+        row.style.alignItems="center";
+        row.style.fontSize="12px";
+        row.style.padding="3px 0";
+        const label = daysUntil===0 ? "сегодня! 🎉" : daysUntil===1 ? "завтра" : `через ${daysUntil} дн.`;
+        row.innerHTML = `<strong>${student.name}</strong>`+
+          `<span class="tiny">${formatBirthdayShort(student.birthday)} • ${label}</span>`;
+        bList.appendChild(row);
+      });
+      bdayCard.appendChild(bList);
+      rightCol.appendChild(bdayCard);
+    }
 
     /* Чек-лист на сегодня */
     const tasksCard=document.createElement("section");
@@ -1672,6 +1767,7 @@
       const iso=dateToISO(d);
       const col=document.createElement("div");
       col.className="calendar-day";
+      if (iso===todayISO()) col.classList.add("is-today");
       col.dataset.date=iso;
 
       col.addEventListener("dragover",e=>{
@@ -1692,6 +1788,13 @@
       head.className="calendar-day-header";
       const dayNum=document.createElement("span");
       dayNum.textContent=d.getDate();
+      const dMonth=d.getMonth()+1, dDay=d.getDate();
+      const hasBirthday = data.students.some(s=>{
+        if(!s.birthday) return false;
+        const [,bm,bd]=s.birthday.split("-").map(Number);
+        return bm===dMonth && bd===dDay;
+      });
+      if (hasBirthday) dayNum.textContent += " 🎂";
       const short=document.createElement("span");
       short.className="tiny";
       short.textContent=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][(d.getDay()+6)%7];
@@ -1849,6 +1952,20 @@
           pContact.textContent="Родитель не указан";
         }
 
+        const birthdayRow=document.createElement("div");
+        birthdayRow.className="tiny";
+        if(st.birthday){
+          const daysU = daysUntilBirthday(st.birthday);
+          birthdayRow.textContent = `Др: ${formatBirthdayShort(st.birthday)}`+
+            (daysU===0 ? " — сегодня! 🎉" : daysU<=3 ? ` (через ${daysU} дн.)` : "");
+          if(daysU<=3){
+            birthdayRow.style.color="var(--accent)";
+            birthdayRow.style.fontWeight="600";
+          }
+        } else {
+          birthdayRow.textContent="Дата рождения не указана";
+        }
+
         const sch=document.createElement("div");
         sch.className="tiny";
         if (st.schedule && st.schedule.length){
@@ -1899,6 +2016,7 @@
         el.appendChild(top);
         el.appendChild(contact);
         el.appendChild(pContact);
+        el.appendChild(birthdayRow);
         el.appendChild(sch);
         el.appendChild(subInfo);
         el.appendChild(info);
@@ -1967,8 +2085,19 @@
     colPContact.appendChild(lblPContact);
     colPContact.appendChild(inPContact);
 
+    const colBirthday=document.createElement("div");
+    const lblBirthday=document.createElement("div");
+    lblBirthday.className="form-label";
+    lblBirthday.textContent="Дата рождения ученика";
+    const inBirthday=document.createElement("input");
+    inBirthday.className="form-input";
+    inBirthday.type="date";
+    colBirthday.appendChild(lblBirthday);
+    colBirthday.appendChild(inBirthday);
+
     rowParent.appendChild(colPName);
     rowParent.appendChild(colPContact);
+    rowParent.appendChild(colBirthday);
 
     const row2=document.createElement("div");
     row2.className="form-row-inline";
@@ -2150,6 +2279,7 @@
         parentName: inPName.value.trim() || "",
         parentContactType: selPCT.value,
         parentContact: inPContact.value.trim() || "",
+        birthday: inBirthday.value || "",
         tz: selTZ.value,
         schedule: schedule.length?schedule:null,
         notes:""
@@ -2193,6 +2323,7 @@
       inContact.value="";
       inPName.value="";
       inPContact.value="";
+      inBirthday.value="";
       inPrice.value="";
       inTotal.value="";
       inNextPay.value="";
@@ -2218,6 +2349,88 @@
     data.lessons = data.lessons.filter(l=>l.studentId!==id);
     data.subscriptions = data.subscriptions.filter(s=>s.studentId!==id);
     save();
+  }
+
+  /* PARENTS VIEW */
+
+  function renderParents(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Родители";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Контакты родителей и быстрый переход к ребёнку";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    header.appendChild(left);
+    card.appendChild(header);
+
+    const list=document.createElement("div");
+    list.className="students-list";
+
+    const withParent = data.students.filter(s=>s.parentName || s.parentContact);
+
+    if (!withParent.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет родителей с указанными контактами. Добавьте их в карточке ученика.";
+      list.appendChild(empty);
+    } else {
+      withParent.forEach(st=>{
+        const el=document.createElement("div");
+        el.className="student-card";
+        el.style.cursor="default";
+
+        const top=document.createElement("div");
+        top.className="student-top";
+        const name=document.createElement("div");
+        name.className="student-name";
+        name.textContent = st.parentName || "ФИО не указано";
+        top.appendChild(name);
+
+        const phone=document.createElement("div");
+        phone.className="tiny";
+        phone.textContent = st.parentContact
+          ? `${st.parentContactType||"phone"}: ${st.parentContact}`
+          : "Контакт не указан";
+
+        const childRow=document.createElement("div");
+        childRow.className="tiny";
+        childRow.style.display="flex";
+        childRow.style.alignItems="center";
+        childRow.style.gap="6px";
+        const childLabel=document.createElement("span");
+        childLabel.textContent="Ребёнок: ";
+        const childLink=document.createElement("button");
+        childLink.className="btn-chip small primary";
+        childLink.textContent=st.name;
+        childLink.onclick=(e)=>{e.stopPropagation(); openStudentView(st.id);};
+        childRow.appendChild(childLabel);
+        childRow.appendChild(childLink);
+
+        el.appendChild(top);
+        el.appendChild(phone);
+        el.appendChild(childRow);
+
+        if (st.notes){
+          const notes=document.createElement("div");
+          notes.className="tiny";
+          notes.textContent="Заметка: "+st.notes;
+          el.appendChild(notes);
+        }
+
+        list.appendChild(el);
+      });
+    }
+
+    card.appendChild(list);
+    main.appendChild(card);
   }
 
   /* STUDENT VIEW + EDIT */
@@ -2472,7 +2685,13 @@
     const inPContact=document.createElement("input");
     inPContact.className="form-input";inPContact.value=st.parentContact||"";
     colPContact.appendChild(lblPContact);colPContact.appendChild(inPContact);
-    rowParent.appendChild(colPName);rowParent.appendChild(colPContact);
+    const colBirthday=document.createElement("div");
+    const lblBirthday=document.createElement("div");
+    lblBirthday.className="form-label";lblBirthday.textContent="Дата рождения ученика";
+    const inBirthday=document.createElement("input");
+    inBirthday.className="form-input";inBirthday.type="date";inBirthday.value=st.birthday||"";
+    colBirthday.appendChild(lblBirthday);colBirthday.appendChild(inBirthday);
+    rowParent.appendChild(colPName);rowParent.appendChild(colPContact);rowParent.appendChild(colBirthday);
 
     const row2=document.createElement("div");
     row2.className="form-row-inline";
@@ -2537,6 +2756,7 @@
       st.parentName=inPName.value.trim();
       st.parentContact=inPContact.value.trim();
       st.parentContactType=selPCT.value;
+      st.birthday=inBirthday.value||"";
       st.tz=selTZ.value;
       st.notes=inNotes.value;
       save();
@@ -3059,9 +3279,9 @@
 
       if(sub){
         if(debt>0 || remaining<=0){
-          row.style.background="#fbe4e8";
+          row.style.background="var(--danger-soft)";
         } else if(remaining<=2){
-          row.style.background="#fff4dd";
+          row.style.background="var(--accent-soft)";
         }
       }
 
@@ -3094,7 +3314,7 @@
       btnEdit.onclick=()=>editSubscription(st.id);
 
       const btnNotify=document.createElement("button");
-      btnNotify.className="btn-chip small primary";
+      btnNotify.className="btn-chip small teal";
       btnNotify.textContent="Оповестить";
       btnNotify.onclick=()=>notifySubscription(st, stats);
 
@@ -3251,9 +3471,8 @@
       sub.total = inTotal.value ? parseInt(inTotal.value,10) : 0;
       sub.nextPaymentDate = inNext.value || "";
 
-      const manualDone = inDone.value ? parseInt(inDone.value,10) : 0;
-      const offset = manualDone - rawDone;
-      sub.doneOffset = offset>0 ? offset : 0;
+      const manualDone = inDone.value !== "" ? parseInt(inDone.value,10) : 0;
+      sub.doneOffset = manualDone - rawDone;
 
       save();
       currentView="student";
@@ -3916,8 +4135,8 @@
     /* Блок: полный сброс */
     const danger=document.createElement("div");
     danger.className="form-section";
-    danger.style.background="#f7d1d5";
-    danger.style.borderColor="#e4a7af";
+    danger.style.background="var(--danger-soft)";
+    danger.style.borderColor="#F0BDB8";
 
     const dTitle=document.createElement("div");
     dTitle.className="card-title";
@@ -3993,6 +4212,7 @@
     if(currentView==="today") renderToday(mainCol);
     else if(currentView==="calendar") renderCalendar(mainCol);
     else if(currentView==="students") renderStudents(mainCol);
+    else if(currentView==="parents") renderParents(mainCol);
     else if(currentView==="student") renderStudent(mainCol,currentStudentId);
     else if(currentView==="editStudent") renderEditStudent(mainCol,currentStudentId);
     else if(currentView==="lesson") renderLesson(mainCol,currentLessonId);
