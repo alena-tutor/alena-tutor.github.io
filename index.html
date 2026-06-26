@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Teacher Desk</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #FFFFFF;
@@ -23,6 +26,8 @@
       --surface: #F7F6F4;
       --radius: 16px;
       --shadow: 0 10px 26px rgba(28, 37, 40, 0.07);
+      --font-display: "Manrope", system-ui, -apple-system, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
     * {
@@ -87,8 +92,10 @@
     }
 
     .sidebar-logo-title {
-      font-weight: 700;
-      font-size: 17px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -0.01em;
     }
 
     .sidebar-logo-sub {
@@ -319,8 +326,10 @@
     }
 
     .card-title {
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 700;
       font-size: 15px;
+      letter-spacing: -0.01em;
     }
 
     .card-subtitle {
@@ -513,11 +522,12 @@
     }
 
     .lesson-name {
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 700;
     }
 
     .lesson-time {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
 
@@ -545,8 +555,10 @@
     }
 
     .summary-number {
-      font-size: 26px;
-      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
     }
 
     .summary-row {
@@ -784,7 +796,9 @@
     }
 
     .student-name {
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
     }
 
     .subs-table-header,
@@ -844,6 +858,10 @@
       <button class="nav-btn" data-view="parents">
         <span class="icon">👪</span>
         <span>Родители</span>
+      </button>
+      <button class="nav-btn" data-view="groups">
+        <span class="icon">🐣</span>
+        <span>Группы</span>
       </button>
       <button class="nav-btn" data-view="plans">
         <span class="icon">📚</span>
@@ -931,7 +949,9 @@
     subscriptions: [],
     weekNotes: "",
     completedTasks: [],
-    coursePlans: []   // КТП: учебники/курсы и их уроки
+    coursePlans: [],  // КТП: учебники/курсы и их уроки
+    groups: [],        // группы (напр. билингвальная группа): name, schedule, buildinLink, memberIds
+    groupLessons: []   // занятия группы: groupId, date, time, attendance[{studentId,present,comment}]
   };
 
   function loadData() {
@@ -949,11 +969,14 @@
       if (!parsed.weekNotes) parsed.weekNotes = "";
       if (!parsed.completedTasks) parsed.completedTasks = [];
       if (!parsed.coursePlans) parsed.coursePlans = [];
+      if (!parsed.groups) parsed.groups = [];
+      if (!parsed.groupLessons) parsed.groupLessons = [];
 
       parsed.students.forEach(s => {
         if (!("parentName" in s)) s.parentName = "";
         if (!("parentContact" in s)) s.parentContact = "";
         if (!("parentContactType" in s)) s.parentContactType = "phone";
+        if (!("paymentMode" in s)) s.paymentMode = "subscription"; // "subscription" | "perLesson"
       });
 
       parsed.subscriptions.forEach(s => {
@@ -965,7 +988,13 @@
         }
       });
 
+      parsed.lessons.forEach(l => {
+        if (!("paidAmount" in l)) l.paidAmount = null; // used when student.paymentMode === "perLesson"
+      });
+
       if (!Array.isArray(parsed.coursePlans)) parsed.coursePlans = [];
+      if (!Array.isArray(parsed.groups)) parsed.groups = [];
+      if (!Array.isArray(parsed.groupLessons)) parsed.groupLessons = [];
 
       return parsed;
     } catch(e) {
@@ -1033,6 +1062,72 @@
     return data.students.find(s => s.id === id) || null;
   }
 
+  function getGroup(id) {
+    return data.groups.find(g => g.id === id) || null;
+  }
+
+  function getGroupMembers(groupId) {
+    const g = getGroup(groupId);
+    if (!g) return [];
+    return g.memberIds.map(id=>getStudent(id)).filter(Boolean);
+  }
+
+  function getGroupForStudent(studentId) {
+    return data.groups.find(g => g.memberIds.includes(studentId)) || null;
+  }
+
+  function createGroupLesson(groupId, date, time) {
+    const g = getGroup(groupId);
+    if (!g) return null;
+    const exists = data.groupLessons.find(gl=>gl.groupId===groupId && gl.date===date && gl.time===time);
+    if (exists) return exists;
+    const id = data.groupLessons.length ? Math.max(...data.groupLessons.map(l=>l.id))+1 : 1;
+    const lesson = {
+      id, groupId, date, time,
+      topic: "",
+      attendance: g.memberIds.map(studentId=>({studentId, present:null, comment:""}))
+    };
+    data.groupLessons.push(lesson);
+    return lesson;
+  }
+
+  function autoCreateLessonsForGroup(group, weeks, startDate) {
+    if (!group.schedule || !group.schedule.length) return;
+    const base = startDate ? new Date(startDate) : new Date();
+    base.setHours(0,0,0,0);
+    const msWeek = 7*24*60*60*1000;
+
+    group.schedule.forEach(slot => {
+      if (!slot.time) return;
+      const dow = daysOfWeek.find(d=>d.key===slot.dayKey)?.dow;
+      if (dow == null) return;
+
+      const first = new Date(base);
+      let diff = (dow - first.getDay() + 7) % 7;
+      first.setDate(first.getDate()+diff);
+
+      for(let w=0; w<weeks; w++){
+        const d = new Date(first.getTime() + w*msWeek);
+        createGroupLesson(group.id, dateToISO(d), slot.time);
+      }
+    });
+  }
+
+  function syncGroupLessonsAttendance(groupId) {
+    // Ensure every group lesson's attendance array matches current member list
+    const g = getGroup(groupId);
+    if (!g) return;
+    data.groupLessons.filter(gl=>gl.groupId===groupId).forEach(gl=>{
+      const existingIds = gl.attendance.map(a=>a.studentId);
+      g.memberIds.forEach(sid=>{
+        if (!existingIds.includes(sid)) {
+          gl.attendance.push({studentId:sid, present:null, comment:""});
+        }
+      });
+      gl.attendance = gl.attendance.filter(a=>g.memberIds.includes(a.studentId));
+    });
+  }
+
   function getLessonsByStudent(id) {
     return data.lessons.filter(l => l.studentId === id);
   }
@@ -1053,6 +1148,43 @@
     const paid  = sub ? (sub.paid  || 0) : 0;
     const debt  = Math.max(price - paid, 0);
     return {sub,lessons,rawDone,doneCount,total,remaining,price,paid,debt};
+  }
+
+  function getPerLessonStats(studentId, yearMonth){
+    // yearMonth like "2026-06"; defaults to current month
+    const ym = yearMonth || todayISO().slice(0,7);
+    const lessons = getLessonsByStudent(studentId)
+      .filter(l=>l.date.slice(0,7)===ym && l.status==="done");
+    const totalLessons = lessons.length;
+    const totalPaid = lessons.reduce((sum,l)=> sum + (l.paidAmount||0), 0);
+    const unpaidCount = lessons.filter(l=>!l.paidAmount || l.paidAmount<=0).length;
+    return {ym, lessons, totalLessons, totalPaid, unpaidCount};
+  }
+
+  function getMonthlyIncomeStats(yearMonth){
+    const ym = yearMonth || todayISO().slice(0,7);
+    let subscriptionIncome=0, perLessonIncome=0;
+
+    // For subscription students: count payments whose nextPaymentDate-ish... simplify:
+    // we approximate subscription income as "paid" amounts recorded on subscriptions
+    // updated/created within this month is not tracked, so we instead sum done-lesson value
+    // proportionally is overkill — show subscription "paid" totals for active subs as a simple figure,
+    // and per-lesson income computed precisely from paidAmount in this month.
+    data.students.forEach(st=>{
+      if (st.paymentMode==="perLesson"){
+        const stats=getPerLessonStats(st.id, ym);
+        perLessonIncome += stats.totalPaid;
+      }
+    });
+
+    data.subscriptions.forEach(sub=>{
+      const st=getStudent(sub.studentId);
+      if (st && st.paymentMode!=="perLesson"){
+        subscriptionIncome += (sub.paid||0);
+      }
+    });
+
+    return {ym, subscriptionIncome, perLessonIncome, total: subscriptionIncome+perLessonIncome};
   }
 
   function createLesson(studentId,date,time) {
@@ -1098,6 +1230,34 @@
         createLesson(student.id, dateToISO(d), slot.time);
       }
     });
+  }
+
+  function updateScheduleForStudent(studentId, newSchedule) {
+    const student = getStudent(studentId);
+    if (!student) return;
+
+    const today = todayISO();
+    // Determine how far ahead lessons were generated, based on existing future scheduled lessons
+    const futureScheduled = data.lessons.filter(l =>
+      l.studentId===studentId && l.status==="scheduled" && l.date>=today
+    );
+    let weeksAhead = 4;
+    if (futureScheduled.length) {
+      const maxDate = futureScheduled.reduce((max,l)=> l.date>max ? l.date : max, today);
+      const diffDays = Math.round((new Date(maxDate) - new Date(today)) / 86400000);
+      weeksAhead = Math.max(1, Math.ceil(diffDays/7) + 1);
+    }
+
+    // Remove future scheduled lessons (keep past/done/cancelled lessons untouched)
+    data.lessons = data.lessons.filter(l =>
+      !(l.studentId===studentId && l.status==="scheduled" && l.date>=today)
+    );
+
+    student.schedule = newSchedule.length ? newSchedule : null;
+
+    if (student.schedule) {
+      autoCreateLessonsForStudent(student, weeksAhead, today);
+    }
   }
 
   function extendScheduleForStudent(studentId,weeks) {
@@ -2188,6 +2348,29 @@
     rowSchedule.appendChild(lblSch);
     rowSchedule.appendChild(daysWrap);
 
+    const rowGroup=document.createElement("div");
+    rowGroup.className="form-row";
+    const lblGroup=document.createElement("div");
+    lblGroup.className="form-label";
+    lblGroup.textContent="Группа (если этот ученик — часть группы, например билингвальной)";
+    const groupHint=document.createElement("div");
+    groupHint.className="tiny";
+    groupHint.style.marginBottom="6px";
+    groupHint.textContent="Если выбрать группу, расписание выше игнорируется — используется общее расписание группы.";
+    const selGroup=document.createElement("select");
+    selGroup.className="form-select";
+    const optNone=document.createElement("option");
+    optNone.value="";optNone.textContent="— без группы —";
+    selGroup.appendChild(optNone);
+    data.groups.forEach(g=>{
+      const opt=document.createElement("option");
+      opt.value=g.id;opt.textContent=g.name;
+      selGroup.appendChild(opt);
+    });
+    rowGroup.appendChild(lblGroup);
+    rowGroup.appendChild(groupHint);
+    rowGroup.appendChild(selGroup);
+
     const rowSub=document.createElement("div");
     rowSub.className="form-row-inline";
 
@@ -2239,8 +2422,13 @@
     const selDur=document.createElement("select");
     selDur.className="form-select";
     [
-      {val:"month",txt:"1 месяц"},
-      {val:"halfyear",txt:"Полгода"},
+      {val:"m1",txt:"1 месяц"},
+      {val:"m2",txt:"2 месяца"},
+      {val:"m3",txt:"3 месяца"},
+      {val:"m4",txt:"4 месяца"},
+      {val:"m5",txt:"5 месяцев"},
+      {val:"m6",txt:"6 месяцев"},
+      {val:"m9",txt:"9 месяцев"},
       {val:"year",txt:"Год"}
     ].forEach(o=>{
       const opt=document.createElement("option");
@@ -2261,7 +2449,6 @@
       const name=inName.value.trim();
       const contact=inContact.value.trim();
       if(!name){alert("Введите имя ученика");return;}
-      if(!contact){alert("Введите контакт ученика");return;}
 
       const schedule=[];
       schedControls.forEach(s=>{
@@ -2269,6 +2456,8 @@
           schedule.push({dayKey:s.dayKey,time:s.time.value||"18:00"});
         }
       });
+
+      const selectedGroupId = selGroup.value ? parseInt(selGroup.value,10) : null;
 
       const id=data.students.length?Math.max(...data.students.map(s=>s.id))+1:1;
       const student={
@@ -2281,10 +2470,19 @@
         parentContact: inPContact.value.trim() || "",
         birthday: inBirthday.value || "",
         tz: selTZ.value,
-        schedule: schedule.length?schedule:null,
-        notes:""
+        schedule: selectedGroupId ? null : (schedule.length?schedule:null),
+        notes:"",
+        paymentMode: "subscription"
       };
       data.students.push(student);
+
+      if (selectedGroupId) {
+        const grp = getGroup(selectedGroupId);
+        if (grp) {
+          grp.memberIds.push(id);
+          syncGroupLessonsAttendance(grp.id);
+        }
+      }
 
       const priceVal = inPrice.value ? parseFloat(inPrice.value) : 0;
       const totalVal = inTotal.value ? parseInt(inTotal.value,10) : 0;
@@ -2305,10 +2503,10 @@
         });
       }
 
-      let weeks=4;
-      if (selDur.value==="halfyear") weeks=26;
-      else if (selDur.value==="year") weeks=52;
-      if (student.schedule) autoCreateLessonsForStudent(student,weeks);
+      const monthsMap={m1:1,m2:2,m3:3,m4:4,m5:5,m6:6,m9:9,year:12};
+      const monthsVal = monthsMap[selDur.value] || 1;
+      let weeks = Math.round(monthsVal * 4.345);
+      if (!selectedGroupId && student.schedule) autoCreateLessonsForStudent(student,weeks);
 
       save();
       showAddStudentForm=false;
@@ -2337,6 +2535,7 @@
     form.appendChild(rowParent);
     form.appendChild(row2);
     form.appendChild(rowSchedule);
+    form.appendChild(rowGroup);
     form.appendChild(rowSub);
     form.appendChild(rowDur);
     form.appendChild(actions);
@@ -2433,6 +2632,570 @@
     main.appendChild(card);
   }
 
+  /* GROUPS */
+
+  let showAddGroupForm = false;
+
+  function renderGroups(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Группы";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Билингвальные и другие группы: расписание, состав, посещаемость";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    header.appendChild(left);
+
+    const btnAdd=document.createElement("button");
+    btnAdd.className="btn-main";
+    btnAdd.textContent = showAddGroupForm ? "Скрыть форму" : "Создать группу";
+    btnAdd.onclick=()=>{ showAddGroupForm=!showAddGroupForm; render(); };
+    header.appendChild(btnAdd);
+    card.appendChild(header);
+
+    if (showAddGroupForm) {
+      card.appendChild(buildGroupForm());
+    }
+
+    const list=document.createElement("div");
+    list.className="students-list";
+
+    if (!data.groups.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Групп пока нет. Создайте первую — например, билингвальную группу.";
+      list.appendChild(empty);
+    } else {
+      data.groups.forEach(g=>{
+        const members=getGroupMembers(g.id);
+        const el=document.createElement("div");
+        el.className="student-card";
+        el.style.cursor="pointer";
+        el.onclick=()=>{currentView="groupDetail"; currentGroupId=g.id; render();};
+
+        const top=document.createElement("div");
+        top.className="student-top";
+        const name=document.createElement("div");
+        name.className="student-name";
+        name.textContent=g.name;
+        top.appendChild(name);
+
+        const schedText=document.createElement("div");
+        schedText.className="tiny";
+        schedText.textContent = (g.schedule&&g.schedule.length)
+          ? "Расписание: "+g.schedule.map(s=>{
+              const d=daysOfWeek.find(d=>d.key===s.dayKey);
+              return (d?d.label:s.dayKey)+" "+s.time;
+            }).join(", ")
+          : "Расписание не задано";
+
+        const membersText=document.createElement("div");
+        membersText.className="tiny";
+        membersText.textContent = members.length
+          ? "Участники: "+members.map(m=>m.name).join(", ")
+          : "Участников пока нет";
+
+        el.appendChild(top);
+        el.appendChild(schedText);
+        el.appendChild(membersText);
+        list.appendChild(el);
+      });
+    }
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  function buildGroupForm(opts){
+    opts = opts || {};
+    const editingGroup = opts.group || null;
+
+    const wrap=document.createElement("div");
+    wrap.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+    const colName=document.createElement("div");
+    const lblName=document.createElement("div");
+    lblName.className="form-label";lblName.textContent="Название группы";
+    const inName=document.createElement("input");
+    inName.className="form-input";
+    inName.placeholder="например, Ducklings";
+    inName.value = editingGroup ? editingGroup.name : "";
+    colName.appendChild(lblName);colName.appendChild(inName);
+
+    const colLink=document.createElement("div");
+    const lblLink=document.createElement("div");
+    lblLink.className="form-label";lblLink.textContent="Ссылка на план (Buildin и т.п.)";
+    const inLink=document.createElement("input");
+    inLink.className="form-input";
+    inLink.placeholder="https://...";
+    inLink.value = editingGroup ? (editingGroup.buildinLink||"") : "";
+    colLink.appendChild(lblLink);colLink.appendChild(inLink);
+
+    row1.appendChild(colName);row1.appendChild(colLink);
+
+    const rowSchedule=document.createElement("div");
+    rowSchedule.className="form-row";
+    const lblSch=document.createElement("div");
+    lblSch.className="form-label";
+    lblSch.textContent="Дни недели и время занятий группы";
+    const daysWrap=document.createElement("div");
+    daysWrap.style.display="flex";
+    daysWrap.style.flexWrap="wrap";
+    daysWrap.style.gap="6px";
+
+    const existingSchedMap={};
+    if (editingGroup) (editingGroup.schedule||[]).forEach(s=>{existingSchedMap[s.dayKey]=s.time;});
+
+    const schedControls=[];
+    daysOfWeek.forEach(d=>{
+      const box=document.createElement("div");
+      box.style.display="flex";
+      box.style.alignItems="center";
+      box.style.gap="4px";
+      box.style.fontSize="11px";
+      const cb=document.createElement("input");
+      cb.type="checkbox";
+      const label=document.createElement("span");
+      label.textContent=d.label;
+      const time=document.createElement("input");
+      time.type="time";
+      time.style.width="80px";
+      if (existingSchedMap[d.key]) { cb.checked=true; time.value=existingSchedMap[d.key]; }
+      box.appendChild(cb);box.appendChild(label);box.appendChild(time);
+      daysWrap.appendChild(box);
+      schedControls.push({dayKey:d.key, cb, time});
+    });
+    rowSchedule.appendChild(lblSch);
+    rowSchedule.appendChild(daysWrap);
+
+    const rowDur=document.createElement("div");
+    rowDur.className="form-row-inline";
+    const colDur=document.createElement("div");
+    const lblDur=document.createElement("div");
+    lblDur.className="form-label";
+    lblDur.textContent="Создать расписание занятий на период";
+    const selDur=document.createElement("select");
+    selDur.className="form-select";
+    [
+      {val:"m1",txt:"1 месяц"},{val:"m2",txt:"2 месяца"},{val:"m3",txt:"3 месяца"},
+      {val:"m4",txt:"4 месяца"},{val:"m5",txt:"5 месяцев"},{val:"m6",txt:"6 месяцев"},
+      {val:"m9",txt:"9 месяцев"},{val:"year",txt:"Год"}
+    ].forEach(o=>{
+      const opt=document.createElement("option");
+      opt.value=o.val;opt.textContent=o.txt;
+      selDur.appendChild(opt);
+    });
+    colDur.appendChild(lblDur);colDur.appendChild(selDur);
+    rowDur.appendChild(colDur);
+
+    const actions=document.createElement("div");
+    actions.className="form-actions";
+    const btnSave=document.createElement("button");
+    btnSave.className="btn-main";
+    btnSave.textContent = editingGroup ? "Сохранить группу" : "Создать группу";
+    btnSave.onclick=()=>{
+      const name=inName.value.trim();
+      if(!name){alert("Введите название группы");return;}
+      const schedule=[];
+      schedControls.forEach(s=>{
+        if(s.cb.checked) schedule.push({dayKey:s.dayKey,time:s.time.value||"18:00"});
+      });
+
+      let group;
+      if (editingGroup) {
+        group = editingGroup;
+        group.name = name;
+        group.buildinLink = inLink.value.trim();
+        group.schedule = schedule.length ? schedule : null;
+      } else {
+        const id = data.groups.length ? Math.max(...data.groups.map(g=>g.id))+1 : 1;
+        group = { id, name, buildinLink: inLink.value.trim(), schedule: schedule.length?schedule:null, memberIds: [] };
+        data.groups.push(group);
+      }
+
+      const monthsMap={m1:1,m2:2,m3:3,m4:4,m5:5,m6:6,m9:9,year:12};
+      const monthsVal = monthsMap[selDur.value] || 1;
+      const weeks = Math.round(monthsVal * 4.345);
+      if (group.schedule) autoCreateLessonsForGroup(group, weeks, todayISO());
+
+      save();
+      showAddGroupForm=false;
+      currentView="groupDetail";
+      currentGroupId=group.id;
+      render();
+    };
+
+    const btnCancel=document.createElement("button");
+    btnCancel.className="btn-secondary";
+    btnCancel.textContent="Отмена";
+    btnCancel.onclick=()=>{
+      if (editingGroup) { currentView="groupDetail"; render(); }
+      else { showAddGroupForm=false; render(); }
+    };
+
+    actions.appendChild(btnSave);
+    actions.appendChild(btnCancel);
+
+    wrap.appendChild(row1);
+    wrap.appendChild(rowSchedule);
+    if (!editingGroup) wrap.appendChild(rowDur);
+    wrap.appendChild(actions);
+    return wrap;
+  }
+
+  function renderGroupDetail(main, groupId){
+    const g=getGroup(groupId);
+    if(!g){
+      const card=document.createElement("section");
+      card.className="card";card.textContent="Группа не найдена.";main.appendChild(card);return;
+    }
+
+    const card=document.createElement("section");
+    card.className="card";
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent=g.name;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent = g.buildinLink
+      ? "План занятий: ссылка ниже"
+      : "Ссылка на план не добавлена";
+    left.appendChild(title);left.appendChild(subtitle);
+    header.appendChild(left);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← К группам";
+    btnBack.onclick=()=>{currentView="groups";render();};
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    if (g.buildinLink) {
+      const linkRow=document.createElement("div");
+      linkRow.style.margin="6px 0 10px";
+      const a=document.createElement("a");
+      a.href=g.buildinLink; a.target="_blank"; a.rel="noopener";
+      a.textContent="Открыть план группы (Buildin) ↗";
+      a.style.color="var(--accent)";
+      a.style.fontWeight="600";
+      linkRow.appendChild(a);
+      card.appendChild(linkRow);
+    }
+
+    const btnRow=document.createElement("div");
+    btnRow.style.display="flex";
+    btnRow.style.gap="6px";
+    btnRow.style.flexWrap="wrap";
+    btnRow.style.marginBottom="10px";
+
+    const btnEdit=document.createElement("button");
+    btnEdit.className="btn-secondary";
+    btnEdit.textContent="Изменить группу";
+    let editingGroupForm=false;
+    btnEdit.onclick=()=>{
+      editingGroupForm=!editingGroupForm;
+      rerenderGroupForm();
+    };
+
+    const btnDelete=document.createElement("button");
+    btnDelete.className="btn-chip danger";
+    btnDelete.textContent="Удалить группу";
+    btnDelete.onclick=()=>{
+      if(!confirm("Удалить группу и все её занятия? Дети из группы останутся в системе как обычные ученики.")) return;
+      data.groups = data.groups.filter(x=>x.id!==g.id);
+      data.groupLessons = data.groupLessons.filter(x=>x.groupId!==g.id);
+      currentView="groups";
+      save();
+    };
+
+    btnRow.appendChild(btnEdit);
+    btnRow.appendChild(btnDelete);
+    card.appendChild(btnRow);
+
+    const groupFormHolder=document.createElement("div");
+    card.appendChild(groupFormHolder);
+    function rerenderGroupForm(){
+      groupFormHolder.innerHTML="";
+      if (editingGroupForm) groupFormHolder.appendChild(buildGroupForm({group:g}));
+    }
+
+    /* Members management */
+    const membersCard=document.createElement("div");
+    membersCard.style.marginTop="6px";
+    const membersTitle=document.createElement("div");
+    membersTitle.className="card-title";
+    membersTitle.style.fontSize="13px";
+    membersTitle.textContent="Участники группы";
+    membersCard.appendChild(membersTitle);
+
+    const membersList=document.createElement("div");
+    membersList.style.display="flex";
+    membersList.style.flexWrap="wrap";
+    membersList.style.gap="6px";
+    membersList.style.margin="8px 0";
+
+    getGroupMembers(g.id).forEach(m=>{
+      const chip=document.createElement("span");
+      chip.className="tag";
+      chip.style.display="inline-flex";
+      chip.style.alignItems="center";
+      chip.style.gap="4px";
+      const nameSpan=document.createElement("span");
+      nameSpan.textContent=m.name;
+      nameSpan.style.cursor="pointer";
+      nameSpan.onclick=()=>{currentView="student";currentStudentId=m.id;render();};
+      const removeBtn=document.createElement("span");
+      removeBtn.textContent="✕";
+      removeBtn.style.cursor="pointer";
+      removeBtn.style.marginLeft="4px";
+      removeBtn.onclick=()=>{
+        g.memberIds = g.memberIds.filter(id=>id!==m.id);
+        syncGroupLessonsAttendance(g.id);
+        save();
+      };
+      chip.appendChild(nameSpan);
+      chip.appendChild(removeBtn);
+      membersList.appendChild(chip);
+    });
+    membersCard.appendChild(membersList);
+
+    const addMemberRow=document.createElement("div");
+    addMemberRow.style.display="flex";
+    addMemberRow.style.gap="6px";
+    addMemberRow.style.alignItems="center";
+    addMemberRow.style.flexWrap="wrap";
+
+    const selStudent=document.createElement("select");
+    selStudent.className="form-select";
+    const optEmpty=document.createElement("option");
+    optEmpty.value="";optEmpty.textContent="Выбрать существующего ученика...";
+    selStudent.appendChild(optEmpty);
+    data.students.filter(s=>!g.memberIds.includes(s.id)).forEach(s=>{
+      const opt=document.createElement("option");
+      opt.value=s.id;opt.textContent=s.name;
+      selStudent.appendChild(opt);
+    });
+    const btnAddExisting=document.createElement("button");
+    btnAddExisting.className="btn-chip small primary";
+    btnAddExisting.textContent="Добавить в группу";
+    btnAddExisting.onclick=()=>{
+      const sid=parseInt(selStudent.value,10);
+      if(!sid){alert("Выберите ученика");return;}
+      g.memberIds.push(sid);
+      syncGroupLessonsAttendance(g.id);
+      save();
+    };
+
+    const inNewChild=document.createElement("input");
+    inNewChild.className="form-input";
+    inNewChild.placeholder="...или имя нового ребёнка";
+    inNewChild.style.maxWidth="200px";
+    const btnAddNew=document.createElement("button");
+    btnAddNew.className="btn-chip small";
+    btnAddNew.textContent="Создать и добавить";
+    btnAddNew.onclick=()=>{
+      const name=inNewChild.value.trim();
+      if(!name){alert("Введите имя ребёнка");return;}
+      const id=data.students.length?Math.max(...data.students.map(s=>s.id))+1:1;
+      data.students.push({
+        id, name, contactType:"phone", contact:"",
+        parentName:"", parentContactType:"phone", parentContact:"",
+        birthday:"", tz:data.tutorTZ, schedule:null, notes:"", paymentMode:"subscription"
+      });
+      g.memberIds.push(id);
+      syncGroupLessonsAttendance(g.id);
+      save();
+    };
+
+    addMemberRow.appendChild(selStudent);
+    addMemberRow.appendChild(btnAddExisting);
+    addMemberRow.appendChild(inNewChild);
+    addMemberRow.appendChild(btnAddNew);
+    membersCard.appendChild(addMemberRow);
+    card.appendChild(membersCard);
+
+    /* Upcoming/past group lessons */
+    const lessonsTitle=document.createElement("div");
+    lessonsTitle.className="card-title";
+    lessonsTitle.style.fontSize="13px";
+    lessonsTitle.style.marginTop="16px";
+    lessonsTitle.textContent="Занятия группы";
+    card.appendChild(lessonsTitle);
+
+    const lessonsList=document.createElement("div");
+    lessonsList.style.display="flex";
+    lessonsList.style.flexDirection="column";
+    lessonsList.style.gap="6px";
+    lessonsList.style.marginTop="8px";
+
+    const groupLessons = data.groupLessons
+      .filter(gl=>gl.groupId===g.id)
+      .sort((a,b)=> (a.date+a.time) > (b.date+b.time) ? 1 : -1);
+
+    if (!groupLessons.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Занятий пока нет. Задайте расписание выше или через «Изменить группу».";
+      lessonsList.appendChild(empty);
+    } else {
+      groupLessons.forEach(gl=>{
+        const row=document.createElement("div");
+        row.className="lesson-card";
+        row.style.cursor="pointer";
+        row.onclick=()=>{currentView="groupLessonDetail";currentGroupLessonId=gl.id;render();};
+
+        const top=document.createElement("div");
+        top.className="lesson-top";
+        const dateSpan=document.createElement("span");
+        dateSpan.className="lesson-time";
+        dateSpan.textContent=`${gl.date} ${gl.time}`;
+        const presentCount = gl.attendance.filter(a=>a.present===true).length;
+        const totalCount = gl.attendance.length;
+        const statusSpan=document.createElement("span");
+        statusSpan.className="tiny";
+        statusSpan.textContent = gl.date < todayISO()
+          ? `Пришло: ${presentCount}/${totalCount}`
+          : "Запланировано";
+        top.appendChild(dateSpan);
+        top.appendChild(statusSpan);
+        row.appendChild(top);
+        lessonsList.appendChild(row);
+      });
+    }
+    card.appendChild(lessonsList);
+    main.appendChild(card);
+  }
+
+  function renderGroupLessonDetail(main, lessonId){
+    const gl = data.groupLessons.find(l=>l.id===lessonId);
+    if(!gl){
+      const card=document.createElement("section");
+      card.className="card";card.textContent="Занятие не найдено.";main.appendChild(card);return;
+    }
+    const g = getGroup(gl.groupId);
+
+    const card=document.createElement("section");
+    card.className="card";
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent = `${g?g.name:"Группа"} — ${gl.date} ${gl.time}`;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Отметь присутствие и оставь комментарий по каждому ребёнку";
+    left.appendChild(title);left.appendChild(subtitle);
+    header.appendChild(left);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← К группе";
+    btnBack.onclick=()=>{currentView="groupDetail";currentGroupId=gl.groupId;render();};
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    const topicRow=document.createElement("div");
+    topicRow.className="form-row";
+    const topicLbl=document.createElement("div");
+    topicLbl.className="form-label";
+    topicLbl.textContent="Тема занятия (необязательно)";
+    const topicInput=document.createElement("input");
+    topicInput.className="form-input";
+    topicInput.value=gl.topic||"";
+    topicInput.onchange=()=>{ gl.topic=topicInput.value; save(); };
+    topicRow.appendChild(topicLbl);
+    topicRow.appendChild(topicInput);
+    card.appendChild(topicRow);
+
+    const attendanceWrap=document.createElement("div");
+    attendanceWrap.style.display="flex";
+    attendanceWrap.style.flexDirection="column";
+    attendanceWrap.style.gap="10px";
+    attendanceWrap.style.marginTop="10px";
+
+    gl.attendance.forEach(att=>{
+      const st=getStudent(att.studentId);
+      if(!st) return;
+      const row=document.createElement("div");
+      row.className="lesson-card";
+
+      const top=document.createElement("div");
+      top.className="lesson-top";
+      const nameSpan=document.createElement("span");
+      nameSpan.className="lesson-name";
+      nameSpan.textContent=st.name;
+      top.appendChild(nameSpan);
+
+      const btns=document.createElement("div");
+      btns.style.display="flex";
+      btns.style.gap="6px";
+
+      const btnPresent=document.createElement("button");
+      btnPresent.className="btn-chip small"+(att.present===true?" primary":"");
+      btnPresent.textContent="Пришёл";
+      const btnAbsent=document.createElement("button");
+      btnAbsent.className="btn-chip small"+(att.present===false?" danger":"");
+      btnAbsent.textContent="Не пришёл";
+
+      btnPresent.onclick=()=>{ att.present=true; save(); };
+      btnAbsent.onclick=()=>{ att.present=false; save(); };
+
+      btns.appendChild(btnPresent);
+      btns.appendChild(btnAbsent);
+      top.appendChild(btns);
+      row.appendChild(top);
+
+      const commentArea=document.createElement("textarea");
+      commentArea.placeholder="Комментарий: болел / просто пропустил / как прошло занятие...";
+      commentArea.value=att.comment||"";
+      commentArea.style.marginTop="6px";
+      commentArea.style.minHeight="50px";
+      commentArea.onchange=()=>{ att.comment=commentArea.value; save(); };
+      row.appendChild(commentArea);
+
+      attendanceWrap.appendChild(row);
+    });
+
+    card.appendChild(attendanceWrap);
+    main.appendChild(card);
+  }
+
+  function getAllCommentsForStudentInGroup(studentId){
+    const entries = [];
+    data.groupLessons.forEach(gl=>{
+      const att = gl.attendance.find(a=>a.studentId===studentId);
+      if (att && att.comment && att.comment.trim()){
+        entries.push({date:gl.date, present:att.present, comment:att.comment.trim()});
+      }
+    });
+    entries.sort((a,b)=> a.date>b.date?1:-1);
+    return entries;
+  }
+
+  function buildMonthlyCommentText(studentId, studentName){
+    const entries = getAllCommentsForStudentInGroup(studentId);
+    if (!entries.length) return `Комментариев по ученику ${studentName} пока нет.`;
+    let text = `Комментарии по занятиям — ${studentName}\n\n`;
+    entries.forEach(e=>{
+      const statusLabel = e.present===true ? "был" : e.present===false ? "не был" : "статус не указан";
+      text += `${e.date} (${statusLabel}): ${e.comment}\n`;
+    });
+    return text;
+  }
+
   /* STUDENT VIEW + EDIT */
 
   let currentView="today";
@@ -2441,6 +3204,8 @@
   let currentSubscriptionStudentId=null;
   let journalFilterStudentId="all";
   let currentPlanId=null; // для КТП
+  let currentGroupId=null;
+  let currentGroupLessonId=null;
 
   function openStudentView(studentId){
     currentView="student";
@@ -2503,10 +3268,13 @@
     btnExtend.className="btn-main";
     btnExtend.textContent="Продлить расписание";
     btnExtend.onclick=()=>{
-      const choice=prompt("Продлить на: 1 — месяц, 2 — полгода, 3 — год","1");
-      let weeks=4;
-      if(choice==="2") weeks=26;
-      else if(choice==="3") weeks=52;
+      const choice=prompt(
+        "На сколько месяцев продлить расписание?\nВведите число от 1 до 9, или 12 — на год.",
+        "1"
+      );
+      const months = parseFloat(choice);
+      if(!months || months<=0){ if(choice!==null) alert("Введите число месяцев."); return; }
+      const weeks = Math.round(months * 4.345);
       extendScheduleForStudent(studentId,weeks);
     };
 
@@ -2531,6 +3299,23 @@
     btnRow.appendChild(btnExtend);
     btnRow.appendChild(btnAdd);
     btnRow.appendChild(btnEdit);
+
+    const studentGroup = getGroupForStudent(studentId);
+    if (studentGroup) {
+      const btnCopyComments=document.createElement("button");
+      btnCopyComments.className="btn-chip small teal";
+      btnCopyComments.textContent="Скопировать комментарии за период";
+      btnCopyComments.onclick=async()=>{
+        const text = buildMonthlyCommentText(studentId, st.name);
+        try {
+          await navigator.clipboard.writeText(text);
+          alert("Комментарии скопированы. Можно вставить в чат с ИИ для отчёта родителю.");
+        } catch(e) {
+          prompt("Скопируйте текст вручную (Ctrl+C):", text);
+        }
+      };
+      btnRow.appendChild(btnCopyComments);
+    }
 
     header.appendChild(left);
     header.appendChild(btnRow);
@@ -2562,31 +3347,75 @@
 
     const subBlock=document.createElement("div");
     subBlock.className="form-section";
-    const subTitle=document.createElement("div");
-    subTitle.className="card-title";
-    subTitle.style.fontSize="13px";
-    subTitle.textContent="Абонемент";
-    const subText=document.createElement("div");
-    subText.className="tiny";
-    if(sub){
-      subText.innerHTML =
-        `<strong>Осталось занятий: ${remaining}</strong> (прошли ${doneCount} из ${total})<br>`+
-        `Стоимость абонемента: <strong>${price}</strong> ₽<br>`+
-        `Оплачено: <strong>${paid}</strong> ₽`+
-        (debt>0?` (долг: <strong>${debt}</strong> ₽)`:"")+
-        `<br>Следующая оплата: <strong>${sub.nextPaymentDate || "не указана"}</strong>`;
-    } else {
-      subText.textContent="Абонемент ещё не настроен.";
-    }
-    const subBtn=document.createElement("button");
-    subBtn.className="btn-secondary";
-    subBtn.textContent="Изменить абонемент";
-    subBtn.style.marginTop="6px";
-    subBtn.onclick=()=>editSubscription(studentId);
 
-    subBlock.appendChild(subTitle);
-    subBlock.appendChild(subText);
-    subBlock.appendChild(subBtn);
+    const modeRow=document.createElement("div");
+    modeRow.style.display="flex";
+    modeRow.style.alignItems="center";
+    modeRow.style.gap="8px";
+    modeRow.style.marginBottom="8px";
+    const modeLabel=document.createElement("span");
+    modeLabel.className="tiny";
+    modeLabel.textContent="Режим оплаты:";
+    const selMode=document.createElement("select");
+    selMode.className="form-select";
+    selMode.style.maxWidth="220px";
+    [["subscription","Абонемент"],["perLesson","По занятиям"]].forEach(([val,txt])=>{
+      const opt=document.createElement("option");
+      opt.value=val;opt.textContent=txt;
+      if((st.paymentMode||"subscription")===val) opt.selected=true;
+      selMode.appendChild(opt);
+    });
+    selMode.onchange=()=>{
+      st.paymentMode = selMode.value;
+      save();
+    };
+    modeRow.appendChild(modeLabel);
+    modeRow.appendChild(selMode);
+    subBlock.appendChild(modeRow);
+
+    if ((st.paymentMode||"subscription") === "perLesson") {
+      const plStats = getPerLessonStats(studentId);
+      const subTitle=document.createElement("div");
+      subTitle.className="card-title";
+      subTitle.style.fontSize="13px";
+      subTitle.textContent="Оплата по занятиям";
+      const subText=document.createElement("div");
+      subText.className="tiny";
+      subText.innerHTML =
+        `За текущий месяц (${plStats.ym}):<br>`+
+        `Проведено занятий: <strong>${plStats.totalLessons}</strong><br>`+
+        `Оплачено всего: <strong>${plStats.totalPaid}</strong> ₽`+
+        (plStats.unpaidCount>0 ? `<br><span style="color:var(--danger)">Без указанной оплаты: ${plStats.unpaidCount} занятие(й)</span>` : "")+
+        `<br><span class="tiny">Чтобы указать сумму за конкретное занятие — откройте занятие в списке ниже.</span>`;
+      subBlock.appendChild(subTitle);
+      subBlock.appendChild(subText);
+    } else {
+      const subTitle=document.createElement("div");
+      subTitle.className="card-title";
+      subTitle.style.fontSize="13px";
+      subTitle.textContent="Абонемент";
+      const subText=document.createElement("div");
+      subText.className="tiny";
+      if(sub){
+        subText.innerHTML =
+          `<strong>Осталось занятий: ${remaining}</strong> (прошли ${doneCount} из ${total})<br>`+
+          `Стоимость абонемента: <strong>${price}</strong> ₽<br>`+
+          `Оплачено: <strong>${paid}</strong> ₽`+
+          (debt>0?` (долг: <strong>${debt}</strong> ₽)`:"")+
+          `<br>Следующая оплата: <strong>${sub.nextPaymentDate || "не указана"}</strong>`;
+      } else {
+        subText.textContent="Абонемент ещё не настроен.";
+      }
+      const subBtn=document.createElement("button");
+      subBtn.className="btn-secondary";
+      subBtn.textContent="Изменить абонемент";
+      subBtn.style.marginTop="6px";
+      subBtn.onclick=()=>editSubscription(studentId);
+
+      subBlock.appendChild(subTitle);
+      subBlock.appendChild(subText);
+      subBlock.appendChild(subBtn);
+    }
     card.appendChild(subBlock);
 
     const list=document.createElement("div");
@@ -2736,6 +3565,79 @@
 
     row2.appendChild(colCT);row2.appendChild(colPCT);row2.appendChild(colTZ);
 
+    const rowSchedule=document.createElement("div");
+    rowSchedule.className="form-row";
+    const lblSch=document.createElement("div");
+    lblSch.className="form-label";
+    lblSch.textContent="Дни недели и время занятий";
+    const schedHint=document.createElement("div");
+    schedHint.className="tiny";
+    schedHint.style.marginBottom="6px";
+    schedHint.textContent="Изменение коснётся только будущих запланированных уроков. Прошлые и уже проведённые уроки останутся как есть.";
+    const daysWrap=document.createElement("div");
+    daysWrap.style.display="flex";
+    daysWrap.style.flexWrap="wrap";
+    daysWrap.style.gap="6px";
+
+    const currentSchedMap={};
+    (st.schedule||[]).forEach(s=>{currentSchedMap[s.dayKey]=s.time;});
+
+    const schedControls=[];
+    daysOfWeek.forEach(d=>{
+      const box=document.createElement("div");
+      box.style.display="flex";
+      box.style.alignItems="center";
+      box.style.gap="4px";
+      box.style.fontSize="11px";
+      const cb=document.createElement("input");
+      cb.type="checkbox";
+      const label=document.createElement("span");
+      label.textContent=d.label;
+      const time=document.createElement("input");
+      time.type="time";
+      time.style.width="80px";
+      if (currentSchedMap[d.key]) {
+        cb.checked=true;
+        time.value=currentSchedMap[d.key];
+      }
+      box.appendChild(cb);
+      box.appendChild(label);
+      box.appendChild(time);
+      daysWrap.appendChild(box);
+      schedControls.push({dayKey:d.key, cb, time});
+    });
+
+    rowSchedule.appendChild(lblSch);
+    rowSchedule.appendChild(schedHint);
+    rowSchedule.appendChild(daysWrap);
+
+    const rowGroup=document.createElement("div");
+    rowGroup.className="form-row";
+    const lblGroup=document.createElement("div");
+    lblGroup.className="form-label";
+    lblGroup.textContent="Группа";
+    const currentGroup = getGroupForStudent(st.id);
+    const groupHint=document.createElement("div");
+    groupHint.className="tiny";
+    groupHint.style.marginBottom="6px";
+    groupHint.textContent = currentGroup
+      ? `Сейчас в группе «${currentGroup.name}». Расписание занятий определяется расписанием группы.`
+      : "Ученик не состоит в группе. Если он из билингвальной или другой группы — добавьте его сюда.";
+    const selGroup=document.createElement("select");
+    selGroup.className="form-select";
+    const optNone=document.createElement("option");
+    optNone.value="";optNone.textContent="— без группы —";
+    selGroup.appendChild(optNone);
+    data.groups.forEach(g=>{
+      const opt=document.createElement("option");
+      opt.value=g.id;opt.textContent=g.name;
+      if (currentGroup && currentGroup.id===g.id) opt.selected=true;
+      selGroup.appendChild(opt);
+    });
+    rowGroup.appendChild(lblGroup);
+    rowGroup.appendChild(groupHint);
+    rowGroup.appendChild(selGroup);
+
     const rowNotes=document.createElement("div");
     rowNotes.className="form-row";
     const lblN=document.createElement("div");
@@ -2759,6 +3661,38 @@
       st.birthday=inBirthday.value||"";
       st.tz=selTZ.value;
       st.notes=inNotes.value;
+
+      const newGroupId = selGroup.value ? parseInt(selGroup.value,10) : null;
+      const prevGroup = getGroupForStudent(st.id);
+      if ((prevGroup?prevGroup.id:null) !== newGroupId) {
+        if (prevGroup) {
+          prevGroup.memberIds = prevGroup.memberIds.filter(id=>id!==st.id);
+          syncGroupLessonsAttendance(prevGroup.id);
+        }
+        if (newGroupId) {
+          const newGroup = getGroup(newGroupId);
+          if (newGroup) {
+            newGroup.memberIds.push(st.id);
+            syncGroupLessonsAttendance(newGroup.id);
+            // Group schedule supersedes individual schedule
+            st.schedule = null;
+          }
+        }
+      }
+
+      const newSchedule=[];
+      schedControls.forEach(s=>{
+        if(s.cb.checked){
+          newSchedule.push({dayKey:s.dayKey,time:s.time.value||"18:00"});
+        }
+      });
+      if (!newGroupId) {
+        const scheduleChanged = JSON.stringify(newSchedule) !== JSON.stringify(st.schedule||[]);
+        if (scheduleChanged) {
+          updateScheduleForStudent(st.id, newSchedule);
+        }
+      }
+
       save();
       currentView="student";
       render();
@@ -2776,6 +3710,8 @@
     form.appendChild(row1);
     form.appendChild(rowParent);
     form.appendChild(row2);
+    form.appendChild(rowSchedule);
+    form.appendChild(rowGroup);
     form.appendChild(rowNotes);
     form.appendChild(actions);
 
@@ -3097,6 +4033,26 @@
       save();
     };
 
+    const rowPaid=document.createElement("div");
+    rowPaid.className="form-row";
+    if (st && st.paymentMode==="perLesson"){
+      const lblPaid=document.createElement("div");
+      lblPaid.className="form-label";
+      lblPaid.textContent="Оплачено за это занятие (₽)";
+      const inPaid=document.createElement("input");
+      inPaid.className="form-input";
+      inPaid.type="number";
+      inPaid.min="0";
+      inPaid.placeholder="например, 1500";
+      inPaid.value = (l.paidAmount!=null) ? l.paidAmount : "";
+      inPaid.onchange=()=>{
+        l.paidAmount = inPaid.value!=="" ? parseFloat(inPaid.value) : null;
+        save();
+      };
+      rowPaid.appendChild(lblPaid);
+      rowPaid.appendChild(inPaid);
+    }
+
     const btnDone=document.createElement("button");
     btnDone.className="btn-secondary";
     btnDone.textContent="Отметить как проведён";
@@ -3130,6 +4086,7 @@
     form.appendChild(rowGradesWrap);
     form.appendChild(rowGradeComments);
     form.appendChild(rowComment);
+    form.appendChild(rowPaid);
     form.appendChild(actions);
 
     card.appendChild(form);
@@ -3238,6 +4195,18 @@
     header.appendChild(left);
     header.appendChild(btnBack);
     card.appendChild(header);
+
+    const incomeStats = getMonthlyIncomeStats();
+    const incomeCard=document.createElement("div");
+    incomeCard.style.background="var(--accent-soft)";
+    incomeCard.style.borderRadius="var(--radius)";
+    incomeCard.style.padding="12px 14px";
+    incomeCard.style.marginBottom="12px";
+    incomeCard.innerHTML =
+      `<div class="tiny" style="margin-bottom:4px;">Доход за ${incomeStats.ym}</div>`+
+      `<div style="font-family:var(--font-display);font-size:22px;font-weight:800;">${incomeStats.total} ₽</div>`+
+      `<div class="tiny">По занятиям: ${incomeStats.perLessonIncome} ₽ · По абонементам (оплачено всего): ${incomeStats.subscriptionIncome} ₽</div>`;
+    card.appendChild(incomeCard);
 
     if (!data.students.length){
       const empty=document.createElement("div");
@@ -4213,6 +5182,9 @@
     else if(currentView==="calendar") renderCalendar(mainCol);
     else if(currentView==="students") renderStudents(mainCol);
     else if(currentView==="parents") renderParents(mainCol);
+    else if(currentView==="groups") renderGroups(mainCol);
+    else if(currentView==="groupDetail") renderGroupDetail(mainCol, currentGroupId);
+    else if(currentView==="groupLessonDetail") renderGroupLessonDetail(mainCol, currentGroupLessonId);
     else if(currentView==="student") renderStudent(mainCol,currentStudentId);
     else if(currentView==="editStudent") renderEditStudent(mainCol,currentStudentId);
     else if(currentView==="lesson") renderLesson(mainCol,currentLessonId);
