@@ -1,0 +1,4231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Teacher Desk</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --bg-alt: #F7F6F4;
+      --card: #FFFFFF;
+      --accent: #FF7A3D;
+      --accent-soft: #FFE4D3;
+      --teal: #2E8C82;
+      --teal-soft: #DCEFEC;
+      --text: #1C2528;
+      --muted: #6E7E81;
+      --border: #E2EAEA;
+      --danger: #E0524A;
+      --danger-soft: #FBDAD7;
+      --success: #2E8C72;
+      --success-soft: #DCF1E6;
+      --surface: #F7F6F4;
+      --radius: 16px;
+      --shadow: 0 10px 26px rgba(28, 37, 40, 0.07);
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* SIDEBAR */
+
+    .sidebar {
+      width: 260px;
+      background: var(--bg-alt);
+      border-right: 1px solid var(--border);
+      padding: 22px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      box-shadow: 8px 0 28px rgba(28, 37, 40, 0.06);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 4px;
+    }
+
+    .sidebar-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: 0 8px 16px rgba(255, 122, 61, 0.35);
+    }
+
+    .sidebar-logo-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sidebar-logo-title {
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+    .sidebar-logo-sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sidebar-section-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 4px 4px;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 10px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.08s ease;
+    }
+
+    .nav-btn span.icon {
+      font-size: 16px;
+      width: 22px;
+      text-align: center;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--text);
+      box-shadow: 0 5px 12px rgba(28, 37, 40, 0.10);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(255, 122, 61, 0.35);
+    }
+
+    .nav-btn.active span.icon {
+      color: #fff;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--border);
+    }
+
+    /* MAIN PANEL */
+
+    .main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .header-date-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #todayLabel {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .header-timezone {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .header-timezone select {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #FFFFFF;
+    }
+
+    .header-right {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* CLOCK */
+
+    .clock {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: 2px solid var(--accent-soft);
+      position: relative;
+      background: var(--card);
+      box-shadow:
+        0 2px 6px rgba(0,0,0,0.06) inset,
+        0 6px 14px rgba(28, 37, 40, 0.10);
+    }
+
+    .clock-center {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+    }
+
+    .clock-hand {
+      position: absolute;
+      left: 50%;
+      transform-origin: bottom center;
+      transform: translateX(-50%) rotate(0deg);
+      border-radius: 999px;
+    }
+
+    .clock-hand.hour {
+      width: 3px;
+      height: 22px;
+      bottom: 50%;
+      background: var(--accent);
+      z-index: 2;
+    }
+
+    .clock-hand.min {
+      width: 2px;
+      height: 28px;
+      bottom: 50%;
+      background: var(--text);
+      z-index: 2;
+    }
+
+    .clock-hand.sec {
+      width: 1px;
+      height: 30px;
+      bottom: 50%;
+      background: var(--danger);
+      z-index: 1;
+    }
+
+    .clock-num {
+      position: absolute;
+      font-size: 9px;
+      color: var(--muted);
+      transform: translate(-50%, -50%);
+    }
+
+    .clock-num.n12 { top: 8px; left: 50%; }
+    .clock-num.n3 { top: 50%; right: 8px; transform: translate(50%, -50%); }
+    .clock-num.n6 { bottom: 8px; left: 50%; }
+    .clock-num.n9 { top: 50%; left: 8px; transform: translate(-50%, -50%); }
+
+    /* CONTENT */
+
+    main {
+      flex: 1;
+      padding: 16px 22px 22px;
+      background: var(--bg);
+    }
+
+    #mainCol {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .card-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .tag {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid rgba(199, 146, 75, 0.3);
+    }
+
+    .tag-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+    }
+
+    .empty-state {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px;
+    }
+
+    .btn-main {
+      border: none;
+      border-radius: 999px;
+      padding: 7px 16px;
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      box-shadow: 0 8px 18px rgba(255, 122, 61, 0.35);
+      transition: transform 0.08s ease, box-shadow 0.12s ease;
+    }
+
+    .btn-main:hover {
+      box-shadow: 0 10px 22px rgba(255, 122, 61, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      padding: 7px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .btn-secondary:hover {
+      background: #ECECEC;
+    }
+
+    .btn-danger {
+      border-radius: 999px;
+      padding: 7px 14px;
+      background: var(--danger-soft);
+      border: 1px solid #F0BDB8;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .btn-chip {
+      border-radius: 999px;
+      border: none;
+      padding: 3px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      background: var(--card);
+      color: var(--text);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.04);
+    }
+
+    .btn-chip.primary {
+      background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
+      color: #fff;
+    }
+
+    .btn-chip.teal {
+      background: var(--accent-soft);
+      color: #C75A28;
+    }
+
+    .btn-chip.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .btn-chip.small {
+      font-size: 10px;
+      padding: 2px 7px;
+    }
+
+    .status-label {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid rgba(0,0,0,0.04);
+      font-size: 10px;
+    }
+
+    .status-done {
+      background: var(--success-soft);
+      border-color: #AEDFC8;
+    }
+
+    .status-cancelled {
+      background: var(--danger-soft);
+      border-color: #F0BDB8;
+    }
+
+    .tiny {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* HOME LAYOUT */
+
+    .home-grid {
+      display: grid;
+      grid-template-columns: 2.1fr 1.1fr;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .home-left {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .home-right {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .notes-area {
+      width: 100%;
+      min-height: 90px;
+      resize: vertical;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 8px;
+      font-size: 13px;
+      background: #FFFFFF;
+    }
+
+    .lesson-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .lesson-card {
+      padding: 9px 9px;
+      border-radius: 14px;
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid var(--border);
+      transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
+    }
+
+    .lesson-card:hover {
+      background: #FFEDE2;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(28, 37, 40, 0.10);
+    }
+
+    .lesson-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .lesson-name {
+      font-weight: 600;
+    }
+
+    .lesson-time {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+    }
+
+    .lesson-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .lesson-grades {
+      font-size: 11px;
+      display: flex;
+      gap: 10px;
+      color: var(--muted);
+    }
+
+    .lesson-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .summary-number {
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    /* PERFORMANCE */
+
+    .perf-row {
+      display: grid;
+      grid-template-columns: 1.4fr 0.6fr 1.5fr;
+      gap: 6px;
+      align-items: center;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .perf-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      overflow: hidden;
+    }
+
+    .perf-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #FF8F5C, #FF7A3D);
+      width: 0%;
+    }
+
+    .topics-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .topics-item {
+      padding: 5px 7px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    /* CALENDAR */
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .calendar-day {
+      border-radius: 14px;
+      background: var(--surface);
+      padding: 6px;
+      min-height: 95px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.12s ease, transform 0.08s ease;
+    }
+
+    .calendar-day.is-today {
+      border: 1.5px solid var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .calendar-day.is-today .calendar-day-header span:first-child {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .calendar-day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .calendar-lessons {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .calendar-mini {
+      background: var(--card);
+      border-radius: 9px;
+      padding: 3px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      cursor: grab;
+      border: 1px solid var(--border);
+    }
+
+    .calendar-mini.done {
+      border-color: #9FD9BE;
+      background: var(--success-soft);
+    }
+
+    .calendar-mini.cancelled {
+      border-color: #F0BDB8;
+      opacity: 0.6;
+    }
+
+    .calendar-mini .line1 {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+    }
+
+    .calendar-mini .line2 {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .calendar-day.drop-target {
+      outline: 2px dashed var(--accent);
+      outline-offset: 2px;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(255, 122, 61, 0.30);
+    }
+
+    .calendar-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* FORMS */
+
+    .form-section {
+      border-radius: 14px;
+      background: var(--surface);
+      padding: 10px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-row-inline {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .form-row-inline > div {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .form-input, .form-select, textarea {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      background: #FFFFFF;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    /* STUDENTS & SUBSCRIPTIONS */
+
+    .students-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .student-card {
+      border-radius: 14px;
+      background: var(--surface);
+      padding: 7px 9px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      border: 1px solid var(--border);
+      transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
+    }
+
+    .student-card:hover {
+      background: #FFEDE2;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(28, 37, 40, 0.10);
+    }
+
+    .student-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .student-name {
+      font-weight: 600;
+    }
+
+    .subs-table-header,
+    .subs-table-row {
+      display: grid;
+      grid-template-columns: 2fr 1.4fr 1.2fr 1.2fr 1.4fr 1.4fr;
+      column-gap: 6px;
+      align-items: center;
+    }
+
+    .subs-table-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+    }
+
+    .subs-table-row {
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.03);
+    }
+
+    .subs-table-row:nth-child(odd) {
+      background: rgba(255,255,255,0.3);
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">T</div>
+      <div class="sidebar-logo-text">
+        <div class="sidebar-logo-title">Teacher Desk</div>
+        <div class="sidebar-logo-sub">личный кабинет репетитора</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Навигация</div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" data-view="today">
+        <span class="icon">🏠</span>
+        <span>Главная</span>
+      </button>
+      <button class="nav-btn" data-view="calendar">
+        <span class="icon">📆</span>
+        <span>Календарь</span>
+      </button>
+      <button class="nav-btn" data-view="students">
+        <span class="icon">👩‍🎓</span>
+        <span>Ученики</span>
+      </button>
+      <button class="nav-btn" data-view="parents">
+        <span class="icon">👪</span>
+        <span>Родители</span>
+      </button>
+      <button class="nav-btn" data-view="plans">
+        <span class="icon">📚</span>
+        <span>Уроки (КТП)</span>
+      </button>
+      <button class="nav-btn" data-view="subscriptions">
+        <span class="icon">💳</span>
+        <span>Абонементы</span>
+      </button>
+      <button class="nav-btn" data-view="journal">
+        <span class="icon">📒</span>
+        <span>Журнал</span>
+      </button>
+      <button class="nav-btn" data-view="settings">
+        <span class="icon">⚙️</span>
+        <span>Настройки</span>
+      </button>
+      <button class="nav-btn" data-view="logout">
+        <span class="icon">🚪</span>
+        <span>Выход</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      Всё хранится локально в этом браузере.  
+      Не очищай кэш, если не хочешь потерять данные 🙂
+    </div>
+  </aside>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel">
+    <header>
+      <div class="header-left">
+        <div class="clock">
+          <div class="clock-num n12">12</div>
+          <div class="clock-num n3">3</div>
+          <div class="clock-num n6">6</div>
+          <div class="clock-num n9">9</div>
+          <div class="clock-center"></div>
+          <div class="clock-hand hour" id="hourHand"></div>
+          <div class="clock-hand min" id="minHand"></div>
+          <div class="clock-hand sec" id="secHand"></div>
+        </div>
+        <div class="header-date-block">
+          <div id="todayLabel"></div>
+          <div class="header-timezone">
+            Часовой пояс преподавателя:
+            <select id="tutorTZ"></select>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        Домашний кабинет • данные только у тебя
+      </div>
+    </header>
+
+    <main>
+      <div id="mainCol"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = "teacherAppData";
+
+  const daysOfWeek = [
+    { key: "mon", label: "Пн", dow: 1 },
+    { key: "tue", label: "Вт", dow: 2 },
+    { key: "wed", label: "Ср", dow: 3 },
+    { key: "thu", label: "Чт", dow: 4 },
+    { key: "fri", label: "Пт", dow: 5 },
+    { key: "sat", label: "Сб", dow: 6 },
+    { key: "sun", label: "Вс", dow: 0 }
+  ];
+
+  const ALL_TZ = (typeof Intl.supportedValuesOf === "function" &&
+                  Intl.supportedValuesOf("timeZone")) || [
+    "Europe/Moscow","Asia/Irkutsk","Europe/Berlin","UTC"
+  ];
+
+  const defaultData = {
+    tutorTZ: (Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow"),
+    students: [],
+    lessons: [],
+    subscriptions: [],
+    weekNotes: "",
+    completedTasks: [],
+    coursePlans: []   // КТП: учебники/курсы и их уроки
+  };
+
+  function loadData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+      return JSON.parse(JSON.stringify(defaultData));
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed.tutorTZ) parsed.tutorTZ = defaultData.tutorTZ;
+      if (!parsed.students) parsed.students = [];
+      if (!parsed.lessons) parsed.lessons = [];
+      if (!parsed.subscriptions) parsed.subscriptions = [];
+      if (!parsed.weekNotes) parsed.weekNotes = "";
+      if (!parsed.completedTasks) parsed.completedTasks = [];
+      if (!parsed.coursePlans) parsed.coursePlans = [];
+
+      parsed.students.forEach(s => {
+        if (!("parentName" in s)) s.parentName = "";
+        if (!("parentContact" in s)) s.parentContact = "";
+        if (!("parentContactType" in s)) s.parentContactType = "phone";
+      });
+
+      parsed.subscriptions.forEach(s => {
+        if (s.paid === undefined || s.paid === null) {
+          s.paid = s.price || 0;
+        }
+        if (s.doneOffset === undefined || s.doneOffset === null) {
+          s.doneOffset = 0;
+        }
+      });
+
+      if (!Array.isArray(parsed.coursePlans)) parsed.coursePlans = [];
+
+      return parsed;
+    } catch(e) {
+      console.error(e);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+      return JSON.parse(JSON.stringify(defaultData));
+    }
+  }
+
+  let data = loadData();
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    render();
+  }
+
+  function todayISO() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseISO(dateStr) {
+    const [y,m,d] = dateStr.split("-").map(Number);
+    return new Date(y,m-1,d);
+  }
+
+  function dateToISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+
+  const MONTHS_RU = ["января","февраля","марта","апреля","мая","июня",
+    "июля","августа","сентября","октября","ноября","декабря"];
+
+  function formatBirthdayShort(birthday){
+    if(!birthday) return "";
+    const [,m,d] = birthday.split("-").map(Number);
+    return `${d} ${MONTHS_RU[m-1]}`;
+  }
+
+  function daysUntilBirthday(birthday){
+    if(!birthday) return null;
+    const [,bm,bd] = birthday.split("-").map(Number);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let next = new Date(now.getFullYear(), bm-1, bd);
+    if (next < todayStart) next = new Date(now.getFullYear()+1, bm-1, bd);
+    return Math.round((next - todayStart) / 86400000);
+  }
+
+  function getUpcomingBirthdays(withinDays=3){
+    return data.students
+      .filter(s=>s.birthday)
+      .map(s=>({student:s, daysUntil:daysUntilBirthday(s.birthday)}))
+      .filter(x=>x.daysUntil!==null && x.daysUntil>=0 && x.daysUntil<=withinDays)
+      .sort((a,b)=>a.daysUntil-b.daysUntil);
+  }
+
+  function getStudent(id) {
+    return data.students.find(s => s.id === id) || null;
+  }
+
+  function getLessonsByStudent(id) {
+    return data.lessons.filter(l => l.studentId === id);
+  }
+
+  function getSubscription(studentId) {
+    return data.subscriptions.find(s => s.studentId === studentId) || null;
+  }
+
+  function getSubscriptionStats(studentId){
+    const lessons = getLessonsByStudent(studentId);
+    const sub = getSubscription(studentId);
+    const rawDone = lessons.filter(l=>l.status==="done").length;
+    const offset = sub && sub.doneOffset ? sub.doneOffset : 0;
+    const doneCount = rawDone + offset;
+    const total = sub ? sub.total : 0;
+    const remaining = sub ? Math.max(total - doneCount, 0) : 0;
+    const price = sub ? (sub.price || 0) : 0;
+    const paid  = sub ? (sub.paid  || 0) : 0;
+    const debt  = Math.max(price - paid, 0);
+    return {sub,lessons,rawDone,doneCount,total,remaining,price,paid,debt};
+  }
+
+  function createLesson(studentId,date,time) {
+    const id = data.lessons.length ? Math.max(...data.lessons.map(l=>l.id))+1 : 1;
+    const existing = data.lessons.find(l => l.studentId===studentId && l.date===date && l.time===time && l.status!=="cancelled");
+    if (existing) return existing;
+    const lesson = {
+      id,
+      studentId,
+      date,
+      time,
+      status: "scheduled",
+      topic: "",
+      hw: "",
+      gradeLesson: null,
+      gradeHW: null,
+      comment: "",
+      commentLesson: "",
+      commentHW: "",
+      wasMoved: false
+    };
+    data.lessons.push(lesson);
+    return lesson;
+  }
+
+  function autoCreateLessonsForStudent(student,weeks,startDate) {
+    if (!student.schedule || !student.schedule.length) return;
+    const base = startDate ? new Date(startDate) : new Date();
+    base.setHours(0,0,0,0);
+    const msWeek = 7*24*60*60*1000;
+
+    student.schedule.forEach(slot => {
+      if (!slot.time) return;
+      const dow = daysOfWeek.find(d=>d.key===slot.dayKey)?.dow;
+      if (dow == null) return;
+
+      const first = new Date(base);
+      let diff = (dow - first.getDay() + 7) % 7;
+      first.setDate(first.getDate()+diff);
+
+      for(let w=0; w<weeks; w++){
+        const d = new Date(first.getTime() + w*msWeek);
+        createLesson(student.id, dateToISO(d), slot.time);
+      }
+    });
+  }
+
+  function extendScheduleForStudent(studentId,weeks) {
+    const student = getStudent(studentId);
+    if (!student) { alert("Ученик не найден"); return; }
+    if (!student.schedule || !student.schedule.length) {
+      alert("Для ученика не задано расписание.");
+      return;
+    }
+    const lessons = getLessonsByStudent(studentId);
+    let start;
+    if (lessons.length) {
+      const maxDateStr = lessons.reduce((max,l)=> !max || l.date>max ? l.date : max, "");
+      const d = parseISO(maxDateStr);
+      d.setDate(d.getDate()+1);
+      start = d;
+    } else {
+      start = new Date();
+    }
+    autoCreateLessonsForStudent(student,weeks,start);
+    save();
+  }
+
+  const hourHand = document.getElementById("hourHand");
+  const minHand = document.getElementById("minHand");
+  const secHand = document.getElementById("secHand");
+  const tutorTZSelect = document.getElementById("tutorTZ");
+  const todayLabel = document.getElementById("todayLabel");
+
+  function updateClock() {
+    const now = new Date();
+    const s = now.getSeconds();
+    const m = now.getMinutes();
+    const h = now.getHours();
+    secHand.style.transform = `translateX(-50%) rotate(${s*6}deg)`;
+    minHand.style.transform = `translateX(-50%) rotate(${m*6 + s*0.1}deg)`;
+    hourHand.style.transform = `translateX(-50%) rotate(${(h%12)*30 + m*0.5}deg)`;
+  }
+  setInterval(updateClock,1000);
+  updateClock();
+
+  function renderHeaderInfo() {
+    tutorTZSelect.innerHTML="";
+    ALL_TZ.forEach(tz=>{
+      const opt=document.createElement("option");
+      opt.value=tz;
+      opt.textContent=tz;
+      if (tz===data.tutorTZ) opt.selected=true;
+      tutorTZSelect.appendChild(opt);
+    });
+    tutorTZSelect.onchange=()=>{
+      data.tutorTZ=tutorTZSelect.value;
+      save();
+    };
+
+    const now = new Date();
+    const dateStr = new Intl.DateTimeFormat("ru-RU",{
+      weekday:"long", day:"numeric", month:"long", timeZone:data.tutorTZ
+    }).format(now);
+    const timeStr = new Intl.DateTimeFormat("ru-RU",{
+      hour:"2-digit", minute:"2-digit", timeZone:data.tutorTZ
+    }).format(now);
+    todayLabel.textContent = `${dateStr}, ${timeStr}`;
+  }
+
+  /* Вспомогательные: критичные абонементы, темы, чек-лист */
+
+  function computeCriticalSubscriptions() {
+    const result=[];
+    data.students.forEach(st=>{
+      const stats = getSubscriptionStats(st.id);
+      const {sub,remaining,debt} = stats;
+      if(!sub) return;
+      if(remaining<=2 || debt>0){
+        result.push({student:st, stats});
+      }
+    });
+    result.sort((a,b)=>{
+      const debtA = a.stats.debt || 0;
+      const debtB = b.stats.debt || 0;
+      if (debtA !== debtB) return debtB - debtA;
+      return (a.stats.remaining || 0) - (b.stats.remaining || 0);
+    });
+    return result;
+  }
+
+  function getRecentTopics(limit=8) {
+    const lessons = data.lessons
+      .filter(l=>l.topic && l.topic.trim())
+      .sort((a,b)=> (b.date||"").localeCompare(a.date||""));
+    const seen = new Set();
+    const result=[];
+    for(const l of lessons){
+      const t = l.topic.trim();
+      if(!seen.has(t)){
+        seen.add(t);
+        result.push(t);
+        if(result.length>=limit) break;
+      }
+    }
+    return result;
+  }
+
+  function isTaskDone(id) {
+    return data.completedTasks && data.completedTasks.includes(id);
+  }
+
+  function toggleTaskDone(id) {
+    if(!data.completedTasks) data.completedTasks=[];
+    const idx = data.completedTasks.indexOf(id);
+    if(idx>=0) data.completedTasks.splice(idx,1);
+    else data.completedTasks.push(id);
+    save();
+  }
+
+  /* HOME (Главная) */
+
+  function renderToday(main) {
+    const container=document.createElement("div");
+    container.className="home-grid";
+
+    const leftCol=document.createElement("div");
+    leftCol.className="home-left";
+
+    /* Заметки на неделю */
+    const notesCard=document.createElement("section");
+    notesCard.className="card";
+    const nh=document.createElement("div");
+    nh.className="card-header";
+    const nhLeft=document.createElement("div");
+    const ntitle=document.createElement("div");
+    ntitle.className="card-title";
+    ntitle.textContent="Заметки на неделю";
+    const nsub=document.createElement("div");
+    nsub.className="card-subtitle";
+    nsub.textContent="Планы, идеи, что не забыть ученикам и себе";
+    nhLeft.appendChild(ntitle);
+    nhLeft.appendChild(nsub);
+    const nTag=document.createElement("div");
+    nTag.className="tag";
+    nTag.innerHTML='<span class="tag-dot"></span><span>только ты это видишь</span>';
+    nh.appendChild(nhLeft);
+    nh.appendChild(nTag);
+    notesCard.appendChild(nh);
+
+    const notesArea=document.createElement("textarea");
+    notesArea.className="notes-area";
+    notesArea.value=data.weekNotes || "";
+    notesCard.appendChild(notesArea);
+
+    const nActions=document.createElement("div");
+    nActions.className="form-actions";
+    const btnSaveNotes=document.createElement("button");
+    btnSaveNotes.className="btn-secondary";
+    btnSaveNotes.textContent="Сохранить заметки";
+    btnSaveNotes.onclick=()=>{
+      data.weekNotes = notesArea.value;
+      save();
+    };
+    nActions.appendChild(btnSaveNotes);
+    notesCard.appendChild(nActions);
+
+    leftCol.appendChild(notesCard);
+
+    /* Уроки сегодня */
+    const today = todayISO();
+    const todays = data.lessons
+      .filter(l=>l.date===today && l.status!=="cancelled")
+      .sort((a,b)=>a.time.localeCompare(b.time));
+
+    const lessonsCard=document.createElement("section");
+    lessonsCard.className="card";
+    const lHeader=document.createElement("div");
+    lHeader.className="card-header";
+    const lLeft=document.createElement("div");
+    const lTitle=document.createElement("div");
+    lTitle.className="card-title";
+    lTitle.textContent="Уроки сегодня";
+    const lSub=document.createElement("div");
+    lSub.className="card-subtitle";
+    lSub.textContent="Статусы, быстрые действия и переход к карточке урока";
+    lLeft.appendChild(lTitle);
+    lLeft.appendChild(lSub);
+    const lTag=document.createElement("div");
+    lTag.className="tag";
+    lTag.innerHTML='<span class="tag-dot"></span><span>фокус дня</span>';
+    lHeader.appendChild(lLeft);
+    lHeader.appendChild(lTag);
+    lessonsCard.appendChild(lHeader);
+
+    const list=document.createElement("div");
+    list.className="lesson-list";
+
+    if (!todays.length) {
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="На сегодня уроков нет.";
+      list.appendChild(empty);
+    } else {
+      todays.forEach(l=>list.appendChild(renderLessonCard(l)));
+    }
+
+    lessonsCard.appendChild(list);
+    leftCol.appendChild(lessonsCard);
+
+    /* Правая колонка */
+
+    const rightCol=document.createElement("div");
+    rightCol.className="home-right";
+
+    /* Карточка "Сегодня" */
+    const todayCard=document.createElement("section");
+    todayCard.className="card";
+    const tHeader=document.createElement("div");
+    tHeader.className="card-header";
+    const tLeft=document.createElement("div");
+    const tTitle=document.createElement("div");
+    tTitle.className="card-title";
+    tTitle.textContent="Сегодня";
+    const tSub=document.createElement("div");
+    tSub.className="card-subtitle";
+    tSub.textContent="Кратко по урокам на день";
+    tLeft.appendChild(tTitle);
+    tLeft.appendChild(tSub);
+    tHeader.appendChild(tLeft);
+    todayCard.appendChild(tHeader);
+
+    const totalToday = todays.length;
+    const doneToday = data.lessons.filter(l=>l.date===today && l.status==="done").length;
+    const cancelledToday = data.lessons.filter(l=>l.date===today && l.status==="cancelled").length;
+    const plannedToday = data.lessons.filter(l=>l.date===today && l.status==="scheduled").length;
+
+    const number=document.createElement("div");
+    number.className="summary-number";
+    number.textContent=totalToday;
+    todayCard.appendChild(number);
+
+    const sr1=document.createElement("div");
+    sr1.className="summary-row";
+    sr1.innerHTML=`<span>Проведено</span><span>${doneToday}</span>`;
+    const sr2=document.createElement("div");
+    sr2.className="summary-row";
+    sr2.innerHTML=`<span>Запланировано</span><span>${plannedToday}</span>`;
+    const sr3=document.createElement("div");
+    sr3.className="summary-row";
+    sr3.innerHTML=`<span>Отменено</span><span>${cancelledToday}</span>`;
+
+    todayCard.appendChild(sr1);
+    todayCard.appendChild(sr2);
+    todayCard.appendChild(sr3);
+    rightCol.appendChild(todayCard);
+
+    /* Критичные абонементы */
+    const critCard=document.createElement("section");
+    critCard.className="card";
+    const cHeader=document.createElement("div");
+    cHeader.className="card-header";
+    const cLeft=document.createElement("div");
+    const cTitle=document.createElement("div");
+    cTitle.className="card-title";
+    cTitle.textContent="Критичные абонементы";
+    const cSub=document.createElement("div");
+    cSub.className="card-subtitle";
+    cSub.textContent="Долги и абонементы, которые вот-вот закончатся";
+    cLeft.appendChild(cTitle);
+    cLeft.appendChild(cSub);
+    cHeader.appendChild(cLeft);
+    critCard.appendChild(cHeader);
+
+    const critList=document.createElement("div");
+    critList.style.display="flex";
+    critList.style.flexDirection="column";
+    critList.style.gap="4px";
+
+    const critData = computeCriticalSubscriptions();
+    if(!critData.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока всё спокойно: долгов и заканчивающихся абонементов нет.";
+      critList.appendChild(empty);
+    } else {
+      critData.slice(0,5).forEach(({student,stats})=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.justifyContent="space-between";
+        row.style.alignItems="center";
+        row.style.fontSize="11px";
+        row.style.padding="3px 0";
+
+        const left=document.createElement("div");
+        left.innerHTML =
+          `<strong>${student.name}</strong><br>`+
+          `<span class="tiny">Осталось: ${stats.remaining} из ${stats.total}, `+
+          `долг: ${stats.debt} ₽</span>`;
+
+        const right=document.createElement("div");
+        right.style.display="flex";
+        right.style.gap="4px";
+        const btnNotif=document.createElement("button");
+        btnNotif.className="btn-chip small teal";
+        btnNotif.textContent="Оповестить";
+        btnNotif.onclick=()=>notifySubscription(student, stats);
+        const btnEdit=document.createElement("button");
+        btnEdit.className="btn-chip small";
+        btnEdit.textContent="Открыть";
+        btnEdit.onclick=()=>editSubscription(student.id);
+
+        right.appendChild(btnNotif);
+        right.appendChild(btnEdit);
+
+        row.appendChild(left);
+        row.appendChild(right);
+        critList.appendChild(row);
+      });
+    }
+    critCard.appendChild(critList);
+    rightCol.appendChild(critCard);
+
+    /* Дни рождения */
+    const upcomingBirthdays = getUpcomingBirthdays(3);
+    if (upcomingBirthdays.length) {
+      const bdayCard=document.createElement("section");
+      bdayCard.className="card";
+      bdayCard.style.borderColor="var(--accent-soft)";
+      bdayCard.style.background="linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 60%)";
+      const bHeader=document.createElement("div");
+      bHeader.className="card-header";
+      const bLeft=document.createElement("div");
+      const bTitle=document.createElement("div");
+      bTitle.className="card-title";
+      bTitle.textContent="🎂 Дни рождения";
+      const bSub=document.createElement("div");
+      bSub.className="card-subtitle";
+      bSub.textContent="Скоро или сегодня";
+      bLeft.appendChild(bTitle);
+      bLeft.appendChild(bSub);
+      bHeader.appendChild(bLeft);
+      bdayCard.appendChild(bHeader);
+
+      const bList=document.createElement("div");
+      bList.style.display="flex";
+      bList.style.flexDirection="column";
+      bList.style.gap="4px";
+
+      upcomingBirthdays.forEach(({student,daysUntil})=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.justifyContent="space-between";
+        row.style.alignItems="center";
+        row.style.fontSize="12px";
+        row.style.padding="3px 0";
+        const label = daysUntil===0 ? "сегодня! 🎉" : daysUntil===1 ? "завтра" : `через ${daysUntil} дн.`;
+        row.innerHTML = `<strong>${student.name}</strong>`+
+          `<span class="tiny">${formatBirthdayShort(student.birthday)} • ${label}</span>`;
+        bList.appendChild(row);
+      });
+      bdayCard.appendChild(bList);
+      rightCol.appendChild(bdayCard);
+    }
+
+    /* Чек-лист на сегодня */
+    const tasksCard=document.createElement("section");
+    tasksCard.className="card";
+    const chkHeader=document.createElement("div");
+    chkHeader.className="card-header";
+    const chkLeft=document.createElement("div");
+    const chkTitle=document.createElement("div");
+    chkTitle.className="card-title";
+    chkTitle.textContent="Чек-лист на сегодня";
+    const chkSub=document.createElement("div");
+    chkSub.className="card-subtitle";
+    chkSub.textContent="Поставить оценки, отправить Д/з, напомнить о занятиях и абонементах";
+    chkLeft.appendChild(chkTitle);
+    chkLeft.appendChild(chkSub);
+    chkHeader.appendChild(chkLeft);
+    tasksCard.appendChild(chkHeader);
+
+    const tasksContainer=document.createElement("div");
+    tasksContainer.style.display="flex";
+    tasksContainer.style.flexDirection="column";
+    tasksContainer.style.gap="4px";
+
+    const tasks = buildTodayTasks(todays);
+    if(!tasks.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Никаких задач на сегодня — можно выдохнуть.";
+      tasksContainer.appendChild(empty);
+    } else {
+      tasks.forEach(task=>{
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.alignItems="center";
+        row.style.justifyContent="space-between";
+        row.style.gap="6px";
+
+        const left=document.createElement("label");
+        left.style.display="flex";
+        left.style.alignItems="center";
+        left.style.gap="6px";
+        left.style.flex="1";
+
+        const cb=document.createElement("input");
+        cb.type="checkbox";
+        cb.checked=isTaskDone(task.id);
+        cb.onchange=()=>toggleTaskDone(task.id);
+
+        const text=document.createElement("span");
+        text.className="tiny";
+        text.textContent=task.text;
+
+        left.appendChild(cb);
+        left.appendChild(text);
+
+        const btnDo=document.createElement("button");
+        btnDo.className="btn-chip small";
+        btnDo.textContent="Сделать";
+        btnDo.onclick=()=>task.action();
+
+        row.appendChild(left);
+        row.appendChild(btnDo);
+        tasksContainer.appendChild(row);
+      });
+    }
+    tasksCard.appendChild(tasksContainer);
+    rightCol.appendChild(tasksCard);
+
+    /* Темы сегодня */
+    const topicsCard=document.createElement("section");
+    topicsCard.className="card";
+    const h=document.createElement("div");
+    h.className="card-header";
+    const hLeft=document.createElement("div");
+    const tt=document.createElement("div");
+    tt.className="card-title";
+    tt.textContent="Темы сегодня";
+    const ts=document.createElement("div");
+    ts.className="card-subtitle";
+    ts.textContent="Кто и что проходит на занятии";
+    hLeft.appendChild(tt);
+    hLeft.appendChild(ts);
+    h.appendChild(hLeft);
+    topicsCard.appendChild(h);
+
+    const topicsList=document.createElement("div");
+    topicsList.className="topics-list";
+
+    if (!todays.length) {
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Сегодня тем нет — уроков нет.";
+      topicsList.appendChild(empty);
+    } else {
+      todays.forEach(l=>{
+        const st=getStudent(l.studentId);
+        const item=document.createElement("div");
+        item.className="topics-item";
+        const topicText = l.topic && l.topic.trim() ? l.topic.trim() : "Тема ещё не заполнена";
+        item.innerHTML =
+          `<strong>${l.time}</strong> • ${st?st.name:"—"}<br>`+
+          `<span class="tiny">${topicText}</span>`;
+        topicsList.appendChild(item);
+      });
+    }
+
+    topicsCard.appendChild(topicsList);
+    rightCol.appendChild(topicsCard);
+
+    container.appendChild(leftCol);
+    container.appendChild(rightCol);
+    main.appendChild(container);
+  }
+
+  function buildTodayTasks(todays) {
+    const tasks=[];
+    todays.forEach(l=>{
+      const st=getStudent(l.studentId);
+      const name = st ? st.name : "—";
+      const labelBase = `${name} (${l.time})`;
+
+      const idRem = `reminder|${l.id}`;
+      tasks.push({
+        id:idRem,
+        text:`Напомнить о занятии: ${labelBase}`,
+        action:()=>sendLessonReminder(l,st)
+      });
+
+      if(l.hw && l.hw.trim()){
+        const idHW=`homework|${l.id}`;
+        tasks.push({
+          id:idHW,
+          text:`Отправить домашнее задание: ${name}`,
+          action:()=>sendHomework(l,st)
+        });
+      }
+
+      if(l.gradeLesson==null || l.gradeHW==null){
+        const idGr=`grade|${l.id}`;
+        tasks.push({
+          id:idGr,
+          text:`Поставить оценку: ${name}`,
+          action:()=>openLessonView(l.id)
+        });
+      }
+    });
+
+    computeCriticalSubscriptions().forEach(({student,stats})=>{
+      const idSub=`subNotify|${student.id}`;
+      const base = stats.remaining<=0
+        ? "Оповестить об окончании абонемента"
+        : "Оповестить о скором окончании абонемента";
+      tasks.push({
+        id:idSub,
+        text:`${base}: ${student.name}`,
+        action:()=>notifySubscription(student,stats)
+      });
+    });
+
+    return tasks;
+  }
+
+  /* УРОКИ СЕГОДНЯ: карточка + быстрые действия */
+
+  function renderLessonCard(lesson) {
+    const st=getStudent(lesson.studentId);
+    const el=document.createElement("div");
+    el.className="lesson-card";
+    el.onclick=()=>openLessonView(lesson.id);
+
+    const top=document.createElement("div");
+    top.className="lesson-top";
+    const name=document.createElement("div");
+    name.className="lesson-name";
+    name.textContent = st ? st.name : "—";
+    const time=document.createElement("div");
+    time.className="lesson-time";
+    time.textContent=lesson.time;
+    top.appendChild(name);
+    top.appendChild(time);
+
+    const meta=document.createElement("div");
+    meta.className="lesson-meta";
+    const statusSpan=document.createElement("span");
+    statusSpan.className="status-label";
+    if (lesson.status==="done"){
+      statusSpan.classList.add("status-done");
+      statusSpan.textContent="проведён";
+    } else if (lesson.status==="cancelled"){
+      statusSpan.classList.add("status-cancelled");
+      statusSpan.textContent="отменён";
+    } else statusSpan.textContent="запланирован";
+
+    const hwSpan=document.createElement("span");
+    hwSpan.textContent = (lesson.hw && lesson.hw.trim()) ? "Домашка есть" : "Домашка не задана";
+
+    meta.appendChild(hwSpan);
+    meta.appendChild(statusSpan);
+
+    const grades=document.createElement("div");
+    grades.className="lesson-grades";
+    const gl = lesson.gradeLesson!=null?lesson.gradeLesson:"—";
+    const gh = lesson.gradeHW!=null?lesson.gradeHW:"—";
+    const glSpan=document.createElement("span");
+    glSpan.textContent = "Урок: "+gl;
+    const ghSpan=document.createElement("span");
+    ghSpan.textContent = "Домашка: "+gh;
+    grades.appendChild(glSpan);
+    grades.appendChild(ghSpan);
+
+    const actions=document.createElement("div");
+    actions.className="lesson-actions";
+
+    const btnDone=document.createElement("button");
+    btnDone.className="btn-chip primary";
+    btnDone.textContent="✅ Был урок";
+    btnDone.onclick=(e)=>{e.stopPropagation(); setLessonStatus(lesson.id,"done");};
+
+    const btnCancel=document.createElement("button");
+    btnCancel.className="btn-chip danger";
+    btnCancel.textContent="✖ Отменён";
+    btnCancel.onclick=(e)=>{e.stopPropagation(); setLessonStatus(lesson.id,"cancelled");};
+
+    const btnOpen=document.createElement("button");
+    btnOpen.className="btn-chip small";
+    btnOpen.textContent="📖 Открыть";
+    btnOpen.onclick=(e)=>{e.stopPropagation(); openLessonView(lesson.id);};
+
+    const btnRem=document.createElement("button");
+    btnRem.className="btn-chip small";
+    btnRem.textContent="🔔 Напомнить";
+    btnRem.onclick=(e)=>{e.stopPropagation(); sendLessonReminder(lesson,st);};
+
+    const btnHW=document.createElement("button");
+    btnHW.className="btn-chip small";
+    btnHW.textContent="📩 Д/з";
+    btnHW.onclick=(e)=>{e.stopPropagation(); sendHomework(lesson,st);};
+
+    actions.appendChild(btnDone);
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnOpen);
+    actions.appendChild(btnRem);
+    actions.appendChild(btnHW);
+
+    el.appendChild(top);
+    el.appendChild(meta);
+    el.appendChild(grades);
+    el.appendChild(actions);
+    return el;
+  }
+
+  function setLessonStatus(id,status){
+    const l=data.lessons.find(x=>x.id===id);
+    if(!l) return;
+    l.status=status;
+    save();
+  }
+
+  /* КАЛЕНДАРЬ */
+
+  let currentMonthDate = new Date();
+
+  function renderCalendar(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Календарь";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Перетаскивай уроки для переноса. Клик по уроку — карточка.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const controls=document.createElement("div");
+    controls.className="calendar-controls";
+    const btnPrev=document.createElement("button");
+    btnPrev.className="btn-secondary";
+    btnPrev.textContent="◀";
+    btnPrev.onclick=()=>{currentMonthDate.setMonth(currentMonthDate.getMonth()-1);render();};
+    const btnNext=document.createElement("button");
+    btnNext.className="btn-secondary";
+    btnNext.textContent="▶";
+    btnNext.onclick=()=>{currentMonthDate.setMonth(currentMonthDate.getMonth()+1);render();};
+    const label=document.createElement("span");
+    label.textContent=currentMonthDate.toLocaleDateString("ru-RU",{month:"long",year:"numeric"});
+    controls.appendChild(btnPrev);
+    controls.appendChild(label);
+    controls.appendChild(btnNext);
+
+    header.appendChild(left);
+    header.appendChild(controls);
+    card.appendChild(header);
+
+    const grid=document.createElement("div");
+    grid.className="calendar-grid";
+
+    const first = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth(),1);
+    const startDay = (first.getDay()+6)%7;
+    let d = new Date(first);
+    d.setDate(d.getDate()-startDay);
+
+    for(let i=0;i<35;i++){
+      const iso=dateToISO(d);
+      const col=document.createElement("div");
+      col.className="calendar-day";
+      if (iso===todayISO()) col.classList.add("is-today");
+      col.dataset.date=iso;
+
+      col.addEventListener("dragover",e=>{
+        e.preventDefault();
+        col.classList.add("drop-target");
+      });
+      col.addEventListener("dragleave",()=>col.classList.remove("drop-target"));
+      col.addEventListener("drop",e=>{
+        e.preventDefault();
+        col.classList.remove("drop-target");
+        const idStr=e.dataTransfer.getData("text/plain");
+        const id=parseInt(idStr,10);
+        if(!id) return;
+        moveLessonDate(id,iso);
+      });
+
+      const head=document.createElement("div");
+      head.className="calendar-day-header";
+      const dayNum=document.createElement("span");
+      dayNum.textContent=d.getDate();
+      const dMonth=d.getMonth()+1, dDay=d.getDate();
+      const hasBirthday = data.students.some(s=>{
+        if(!s.birthday) return false;
+        const [,bm,bd]=s.birthday.split("-").map(Number);
+        return bm===dMonth && bd===dDay;
+      });
+      if (hasBirthday) dayNum.textContent += " 🎂";
+      const short=document.createElement("span");
+      short.className="tiny";
+      short.textContent=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][(d.getDay()+6)%7];
+      head.appendChild(dayNum);
+      head.appendChild(short);
+      col.appendChild(head);
+
+      const list=document.createElement("div");
+      list.className="calendar-lessons";
+      const lessons=data.lessons
+        .filter(l=>l.date===iso && l.status!=="cancelled")
+        .sort((a,b)=>a.time.localeCompare(b.time));
+      if (!lessons.length){
+        const tiny=document.createElement("div");
+        tiny.className="tiny";
+        tiny.textContent="—";
+        list.appendChild(tiny);
+      } else {
+        lessons.forEach(l=>{
+          const st=getStudent(l.studentId);
+          const mini=document.createElement("div");
+          mini.className="calendar-mini";
+          if(l.status==="done") mini.classList.add("done");
+          if(l.status==="cancelled") mini.classList.add("cancelled");
+          mini.draggable=true;
+          mini.addEventListener("dragstart",e=>{
+            e.dataTransfer.setData("text/plain",String(l.id));
+          });
+          mini.onclick=()=>openLessonView(l.id);
+
+          const line1=document.createElement("div");
+          line1.className="line1";
+          const tSpan=document.createElement("span");
+          tSpan.textContent=l.time;
+          const nSpan=document.createElement("span");
+          nSpan.textContent=st?st.name:"—";
+          line1.appendChild(tSpan);
+          line1.appendChild(nSpan);
+
+          const line2=document.createElement("div");
+          line2.className="line2";
+          line2.textContent=l.topic || "";
+
+          mini.appendChild(line1);
+          mini.appendChild(line2);
+          list.appendChild(mini);
+        });
+      }
+
+      col.appendChild(list);
+
+      const addBtn=document.createElement("button");
+      addBtn.className="btn-chip small";
+      addBtn.textContent="+ урок";
+      addBtn.onclick=()=>openAddLessonForDate(iso);
+      col.appendChild(addBtn);
+
+      grid.appendChild(col);
+      d.setDate(d.getDate()+1);
+    }
+
+    card.appendChild(grid);
+    main.appendChild(card);
+  }
+
+  function moveLessonDate(lessonId,newDate){
+    const l=data.lessons.find(x=>x.id===lessonId);
+    if(!l) return;
+    l.date=newDate;
+    l.wasMoved=true;
+    save();
+  }
+
+  function openAddLessonForDate(dateStr){
+    const name = prompt("Имя ученика (как в списке)", "");
+    if(!name) return;
+    const student = data.students.find(s=>s.name.trim()===name.trim());
+    if(!student){alert("Ученик не найден.");return;}
+    const time=prompt("Время (ЧЧ:ММ)", "18:00");
+    if(!time) return;
+    createLesson(student.id,dateStr,time);
+    save();
+  }
+
+  /* УЧЕНИКИ */
+
+  let showAddStudentForm = false;
+
+  function renderStudents(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Ученики";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Карточки учеников, расписание и абонементы";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    const btnToggle=document.createElement("button");
+    btnToggle.className="btn-main";
+    btnToggle.textContent = showAddStudentForm ? "Скрыть форму" : "Добавить ученика";
+    btnToggle.onclick=()=>{showAddStudentForm=!showAddStudentForm;render();};
+    header.appendChild(left);
+    header.appendChild(btnToggle);
+    card.appendChild(header);
+
+    if (showAddStudentForm) {
+      card.appendChild(renderAddStudentForm());
+    }
+
+    const list=document.createElement("div");
+    list.className="students-list";
+    if (!data.students.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет учеников.";
+      list.appendChild(empty);
+    } else {
+      data.students.forEach(st=>{
+        const {doneCount,total,remaining} = getSubscriptionStats(st.id);
+        const lessons=getLessonsByStudent(st.id);
+
+        const el=document.createElement("div");
+        el.className="student-card";
+        el.onclick=()=>openStudentView(st.id);
+
+        const top=document.createElement("div");
+        top.className="student-top";
+        const name=document.createElement("div");
+        name.className="student-name";
+        name.textContent=st.name;
+        const tz=document.createElement("div");
+        tz.className="tiny";
+        tz.textContent=st.tz || data.tutorTZ;
+        top.appendChild(name);
+        top.appendChild(tz);
+
+        const contact=document.createElement("div");
+        contact.className="tiny";
+        if (st.contact) contact.textContent=`Уч.: ${st.contactType||"phone"}: ${st.contact}`;
+        else contact.textContent="Контакт ученика не указан";
+
+        const pContact=document.createElement("div");
+        pContact.className="tiny";
+        if(st.parentName || st.parentContact){
+          pContact.textContent =
+            `Родитель: ${st.parentName || "не указано"} `+
+            (st.parentContact ? `(${st.parentContactType||"phone"}: ${st.parentContact})` : "");
+        } else {
+          pContact.textContent="Родитель не указан";
+        }
+
+        const birthdayRow=document.createElement("div");
+        birthdayRow.className="tiny";
+        if(st.birthday){
+          const daysU = daysUntilBirthday(st.birthday);
+          birthdayRow.textContent = `Др: ${formatBirthdayShort(st.birthday)}`+
+            (daysU===0 ? " — сегодня! 🎉" : daysU<=3 ? ` (через ${daysU} дн.)` : "");
+          if(daysU<=3){
+            birthdayRow.style.color="var(--accent)";
+            birthdayRow.style.fontWeight="600";
+          }
+        } else {
+          birthdayRow.textContent="Дата рождения не указана";
+        }
+
+        const sch=document.createElement("div");
+        sch.className="tiny";
+        if (st.schedule && st.schedule.length){
+          const text = st.schedule.map(s=>{
+            const d=daysOfWeek.find(x=>x.key===s.dayKey)?.label || "?";
+            return `${d} ${s.time||""}`;
+          }).join(", ");
+          sch.textContent="Расписание: "+text;
+        } else sch.textContent="Расписание не задано";
+
+        const subInfo=document.createElement("div");
+        subInfo.className="tiny";
+        if (remaining || remaining===0){
+          subInfo.textContent = `Осталось занятий по абонементу: ${remaining}`;
+        } else {
+          subInfo.textContent = "Абонемент не настроен";
+        }
+
+        const info=document.createElement("div");
+        info.className="tiny";
+        info.textContent=`Уроков в системе: ${lessons.length}`;
+
+        const rowBtns=document.createElement("div");
+        rowBtns.style.display="flex";
+        rowBtns.style.gap="4px";
+        rowBtns.style.marginTop="4px";
+        rowBtns.style.justifyContent="flex-end";
+
+        const btnLessons=document.createElement("button");
+        btnLessons.className="btn-chip small";
+        btnLessons.textContent="Уроки";
+        btnLessons.onclick=(e)=>{e.stopPropagation(); openStudentView(st.id);};
+
+        const btnEdit=document.createElement("button");
+        btnEdit.className="btn-chip small";
+        btnEdit.textContent="Изменить";
+        btnEdit.onclick=(e)=>{e.stopPropagation(); openEditStudent(st.id);};
+
+        const btnDel=document.createElement("button");
+        btnDel.className="btn-chip small danger";
+        btnDel.textContent="Удалить";
+        btnDel.onclick=(e)=>{e.stopPropagation(); deleteStudent(st.id);};
+
+        rowBtns.appendChild(btnLessons);
+        rowBtns.appendChild(btnEdit);
+        rowBtns.appendChild(btnDel);
+
+        el.appendChild(top);
+        el.appendChild(contact);
+        el.appendChild(pContact);
+        el.appendChild(birthdayRow);
+        el.appendChild(sch);
+        el.appendChild(subInfo);
+        el.appendChild(info);
+        if (st.notes) {
+          const notes=document.createElement("div");
+          notes.className="tiny";
+          notes.textContent=st.notes;
+          el.appendChild(notes);
+        }
+        el.appendChild(rowBtns);
+
+        list.appendChild(el);
+      });
+    }
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  function renderAddStudentForm(){
+    const form=document.createElement("div");
+    form.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+
+    const colName=document.createElement("div");
+    const lblName=document.createElement("div");
+    lblName.className="form-label";
+    lblName.textContent="ФИ ученика";
+    const inName=document.createElement("input");
+    inName.className="form-input";
+    colName.appendChild(lblName);
+    colName.appendChild(inName);
+
+    const colContact=document.createElement("div");
+    const lblContact=document.createElement("div");
+    lblContact.className="form-label";
+    lblContact.textContent="Контакт ученика (телефон или @username)";
+    const inContact=document.createElement("input");
+    inContact.className="form-input";
+    colContact.appendChild(lblContact);
+    colContact.appendChild(inContact);
+
+    row1.appendChild(colName);
+    row1.appendChild(colContact);
+
+    const rowParent=document.createElement("div");
+    rowParent.className="form-row-inline";
+
+    const colPName=document.createElement("div");
+    const lblPName=document.createElement("div");
+    lblPName.className="form-label";
+    lblPName.textContent="ФИ родителя";
+    const inPName=document.createElement("input");
+    inPName.className="form-input";
+    colPName.appendChild(lblPName);
+    colPName.appendChild(inPName);
+
+    const colPContact=document.createElement("div");
+    const lblPContact=document.createElement("div");
+    lblPContact.className="form-label";
+    lblPContact.textContent="Контакт родителя (телефон или @username)";
+    const inPContact=document.createElement("input");
+    inPContact.className="form-input";
+    colPContact.appendChild(lblPContact);
+    colPContact.appendChild(inPContact);
+
+    const colBirthday=document.createElement("div");
+    const lblBirthday=document.createElement("div");
+    lblBirthday.className="form-label";
+    lblBirthday.textContent="Дата рождения ученика";
+    const inBirthday=document.createElement("input");
+    inBirthday.className="form-input";
+    inBirthday.type="date";
+    colBirthday.appendChild(lblBirthday);
+    colBirthday.appendChild(inBirthday);
+
+    rowParent.appendChild(colPName);
+    rowParent.appendChild(colPContact);
+    rowParent.appendChild(colBirthday);
+
+    const row2=document.createElement("div");
+    row2.className="form-row-inline";
+
+    const colCT=document.createElement("div");
+    const lblCT=document.createElement("div");
+    lblCT.className="form-label";
+    lblCT.textContent="Тип контакта ученика";
+    const selCT=document.createElement("select");
+    selCT.className="form-select";
+    [["phone","просто телефон"],["whatsapp","WhatsApp"],["telegram","Telegram"]]
+      .forEach(([val,txt])=>{
+        const opt=document.createElement("option");
+        opt.value=val;
+        opt.textContent=txt;
+        selCT.appendChild(opt);
+      });
+    colCT.appendChild(lblCT);
+    colCT.appendChild(selCT);
+
+    const colPCT=document.createElement("div");
+    const lblPCT=document.createElement("div");
+    lblPCT.className="form-label";
+    lblPCT.textContent="Тип контакта родителя";
+    const selPCT=document.createElement("select");
+    selPCT.className="form-select";
+    [["phone","просто телефон"],["whatsapp","WhatsApp"],["telegram","Telegram"]]
+      .forEach(([val,txt])=>{
+        const opt=document.createElement("option");
+        opt.value=val;
+        opt.textContent=txt;
+        selPCT.appendChild(opt);
+      });
+    colPCT.appendChild(lblPCT);
+    colPCT.appendChild(selPCT);
+
+    const colTZ=document.createElement("div");
+    const lblTZ=document.createElement("div");
+    lblTZ.className="form-label";
+    lblTZ.textContent="Часовой пояс ученика";
+    const selTZ=document.createElement("select");
+    selTZ.className="form-select";
+    ALL_TZ.forEach(tz=>{
+      const opt=document.createElement("option");
+      opt.value=tz;
+      opt.textContent=tz;
+      if (tz===data.tutorTZ) opt.selected=true;
+      selTZ.appendChild(opt);
+    });
+    colTZ.appendChild(lblTZ);
+    colTZ.appendChild(selTZ);
+
+    row2.appendChild(colCT);
+    row2.appendChild(colPCT);
+    row2.appendChild(colTZ);
+
+    const rowSchedule=document.createElement("div");
+    rowSchedule.className="form-row";
+    const lblSch=document.createElement("div");
+    lblSch.className="form-label";
+    lblSch.textContent="Дни недели и время (для автогенерации уроков)";
+    const daysWrap=document.createElement("div");
+    daysWrap.style.display="flex";
+    daysWrap.style.flexWrap="wrap";
+    daysWrap.style.gap="6px";
+
+    const schedControls=[];
+    daysOfWeek.forEach(d=>{
+      const box=document.createElement("div");
+      box.style.display="flex";
+      box.style.alignItems="center";
+      box.style.gap="4px";
+      box.style.fontSize="11px";
+      const cb=document.createElement("input");
+      cb.type="checkbox";
+      const label=document.createElement("span");
+      label.textContent=d.label;
+      const time=document.createElement("input");
+      time.type="time";
+      time.style.width="80px";
+      box.appendChild(cb);
+      box.appendChild(label);
+      box.appendChild(time);
+      daysWrap.appendChild(box);
+      schedControls.push({dayKey:d.key, cb, time});
+    });
+
+    rowSchedule.appendChild(lblSch);
+    rowSchedule.appendChild(daysWrap);
+
+    const rowSub=document.createElement("div");
+    rowSub.className="form-row-inline";
+
+    const colPrice=document.createElement("div");
+    const lblPrice=document.createElement("div");
+    lblPrice.className="form-label";
+    lblPrice.textContent="Стоимость абонемента";
+    const inPrice=document.createElement("input");
+    inPrice.className="form-input";
+    inPrice.type="number";
+    inPrice.min="0";
+    inPrice.placeholder="например, 4000";
+    colPrice.appendChild(lblPrice);
+    colPrice.appendChild(inPrice);
+
+    const colTotal=document.createElement("div");
+    const lblTotal=document.createElement("div");
+    lblTotal.className="form-label";
+    lblTotal.textContent="Занятий в абонементе";
+    const inTotal=document.createElement("input");
+    inTotal.className="form-input";
+    inTotal.type="number";
+    inTotal.min="1";
+    inTotal.placeholder="например, 8";
+    colTotal.appendChild(lblTotal);
+    colTotal.appendChild(inTotal);
+
+    const colNextPay=document.createElement("div");
+    const lblNextPay=document.createElement("div");
+    lblNextPay.className="form-label";
+    lblNextPay.textContent="Следующая оплата (дата)";
+    const inNextPay=document.createElement("input");
+    inNextPay.className="form-input";
+    inNextPay.type="date";
+    colNextPay.appendChild(lblNextPay);
+    colNextPay.appendChild(inNextPay);
+
+    rowSub.appendChild(colPrice);
+    rowSub.appendChild(colTotal);
+    rowSub.appendChild(colNextPay);
+
+    const rowDur=document.createElement("div");
+    rowDur.className="form-row-inline";
+
+    const colDur=document.createElement("div");
+    const lblDur=document.createElement("div");
+    lblDur.className="form-label";
+    lblDur.textContent="Создать расписание на период";
+    const selDur=document.createElement("select");
+    selDur.className="form-select";
+    [
+      {val:"month",txt:"1 месяц"},
+      {val:"halfyear",txt:"Полгода"},
+      {val:"year",txt:"Год"}
+    ].forEach(o=>{
+      const opt=document.createElement("option");
+      opt.value=o.val;
+      opt.textContent=o.txt;
+      selDur.appendChild(opt);
+    });
+    colDur.appendChild(lblDur);
+    colDur.appendChild(selDur);
+    rowDur.appendChild(colDur);
+
+    const actions=document.createElement("div");
+    actions.className="form-actions";
+    const btnSave=document.createElement("button");
+    btnSave.className="btn-main";
+    btnSave.textContent="Сохранить ученика";
+    btnSave.onclick=()=>{
+      const name=inName.value.trim();
+      const contact=inContact.value.trim();
+      if(!name){alert("Введите имя ученика");return;}
+      if(!contact){alert("Введите контакт ученика");return;}
+
+      const schedule=[];
+      schedControls.forEach(s=>{
+        if(s.cb.checked){
+          schedule.push({dayKey:s.dayKey,time:s.time.value||"18:00"});
+        }
+      });
+
+      const id=data.students.length?Math.max(...data.students.map(s=>s.id))+1:1;
+      const student={
+        id,
+        name,
+        contactType: selCT.value,
+        contact,
+        parentName: inPName.value.trim() || "",
+        parentContactType: selPCT.value,
+        parentContact: inPContact.value.trim() || "",
+        birthday: inBirthday.value || "",
+        tz: selTZ.value,
+        schedule: schedule.length?schedule:null,
+        notes:""
+      };
+      data.students.push(student);
+
+      const priceVal = inPrice.value ? parseFloat(inPrice.value) : 0;
+      const totalVal = inTotal.value ? parseInt(inTotal.value,10) : 0;
+      const nextPayVal = inNextPay.value || "";
+
+      if (totalVal>0 || priceVal>0 || nextPayVal) {
+        const subId = data.subscriptions.length
+          ? Math.max(...data.subscriptions.map(s=>s.id))+1
+          : 1;
+        data.subscriptions.push({
+          id: subId,
+          studentId: id,
+          total: totalVal,
+          price: priceVal,
+          paid: priceVal,
+          nextPaymentDate: nextPayVal,
+          doneOffset: 0
+        });
+      }
+
+      let weeks=4;
+      if (selDur.value==="halfyear") weeks=26;
+      else if (selDur.value==="year") weeks=52;
+      if (student.schedule) autoCreateLessonsForStudent(student,weeks);
+
+      save();
+      showAddStudentForm=false;
+      alert("Ученик и абонемент добавлены, расписание создано.");
+    };
+
+    const btnClear=document.createElement("button");
+    btnClear.className="btn-secondary";
+    btnClear.textContent="Очистить";
+    btnClear.onclick=()=>{
+      inName.value="";
+      inContact.value="";
+      inPName.value="";
+      inPContact.value="";
+      inBirthday.value="";
+      inPrice.value="";
+      inTotal.value="";
+      inNextPay.value="";
+      schedControls.forEach(s=>{s.cb.checked=false; s.time.value="";});
+    };
+
+    actions.appendChild(btnSave);
+    actions.appendChild(btnClear);
+
+    form.appendChild(row1);
+    form.appendChild(rowParent);
+    form.appendChild(row2);
+    form.appendChild(rowSchedule);
+    form.appendChild(rowSub);
+    form.appendChild(rowDur);
+    form.appendChild(actions);
+    return form;
+  }
+
+  function deleteStudent(id){
+    if(!confirm("Удалить ученика и все его уроки и абонемент?")) return;
+    data.students = data.students.filter(s=>s.id!==id);
+    data.lessons = data.lessons.filter(l=>l.studentId!==id);
+    data.subscriptions = data.subscriptions.filter(s=>s.studentId!==id);
+    save();
+  }
+
+  /* PARENTS VIEW */
+
+  function renderParents(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Родители";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Контакты родителей и быстрый переход к ребёнку";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    header.appendChild(left);
+    card.appendChild(header);
+
+    const list=document.createElement("div");
+    list.className="students-list";
+
+    const withParent = data.students.filter(s=>s.parentName || s.parentContact);
+
+    if (!withParent.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет родителей с указанными контактами. Добавьте их в карточке ученика.";
+      list.appendChild(empty);
+    } else {
+      withParent.forEach(st=>{
+        const el=document.createElement("div");
+        el.className="student-card";
+        el.style.cursor="default";
+
+        const top=document.createElement("div");
+        top.className="student-top";
+        const name=document.createElement("div");
+        name.className="student-name";
+        name.textContent = st.parentName || "ФИО не указано";
+        top.appendChild(name);
+
+        const phone=document.createElement("div");
+        phone.className="tiny";
+        phone.textContent = st.parentContact
+          ? `${st.parentContactType||"phone"}: ${st.parentContact}`
+          : "Контакт не указан";
+
+        const childRow=document.createElement("div");
+        childRow.className="tiny";
+        childRow.style.display="flex";
+        childRow.style.alignItems="center";
+        childRow.style.gap="6px";
+        const childLabel=document.createElement("span");
+        childLabel.textContent="Ребёнок: ";
+        const childLink=document.createElement("button");
+        childLink.className="btn-chip small primary";
+        childLink.textContent=st.name;
+        childLink.onclick=(e)=>{e.stopPropagation(); openStudentView(st.id);};
+        childRow.appendChild(childLabel);
+        childRow.appendChild(childLink);
+
+        el.appendChild(top);
+        el.appendChild(phone);
+        el.appendChild(childRow);
+
+        if (st.notes){
+          const notes=document.createElement("div");
+          notes.className="tiny";
+          notes.textContent="Заметка: "+st.notes;
+          el.appendChild(notes);
+        }
+
+        list.appendChild(el);
+      });
+    }
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  /* STUDENT VIEW + EDIT */
+
+  let currentView="today";
+  let currentStudentId=null;
+  let currentLessonId=null;
+  let currentSubscriptionStudentId=null;
+  let journalFilterStudentId="all";
+  let currentPlanId=null; // для КТП
+
+  function openStudentView(studentId){
+    currentView="student";
+    currentStudentId=studentId;
+    render();
+  }
+
+  function editSubscription(studentId){
+    currentView="subscriptionEdit";
+    currentSubscriptionStudentId=studentId;
+    render();
+  }
+
+  function openPlansList(){
+    currentView="plans";
+    render();
+  }
+
+  function openPlanDetail(planId){
+    currentView="planDetail";
+    currentPlanId=planId;
+    render();
+  }
+
+  function renderStudent(main,studentId){
+    const st=getStudent(studentId);
+    if(!st){
+      const card=document.createElement("section");
+      card.className="card";
+      card.textContent="Ученик не найден.";
+      main.appendChild(card);
+      return;
+    }
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent=st.name;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent = st.tz ? `Часовой пояс: ${st.tz}` : "";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnRow=document.createElement("div");
+    btnRow.style.display="flex";
+    btnRow.style.gap="6px";
+    btnRow.style.flexWrap="wrap";
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← К ученикам";
+    btnBack.onclick=()=>{currentView="students";render();};
+
+    const btnExtend=document.createElement("button");
+    btnExtend.className="btn-main";
+    btnExtend.textContent="Продлить расписание";
+    btnExtend.onclick=()=>{
+      const choice=prompt("Продлить на: 1 — месяц, 2 — полгода, 3 — год","1");
+      let weeks=4;
+      if(choice==="2") weeks=26;
+      else if(choice==="3") weeks=52;
+      extendScheduleForStudent(studentId,weeks);
+    };
+
+    const btnAdd=document.createElement("button");
+    btnAdd.className="btn-secondary";
+    btnAdd.textContent="Добавить урок";
+    btnAdd.onclick=()=>{
+      const date=prompt("Дата (ГГГГ-ММ-ДД)", todayISO());
+      if(!date) return;
+      const time=prompt("Время (ЧЧ:ММ)", "18:00");
+      if(!time) return;
+      createLesson(studentId,date,time);
+      save();
+    };
+
+    const btnEdit=document.createElement("button");
+    btnEdit.className="btn-secondary";
+    btnEdit.textContent="Изменить";
+    btnEdit.onclick=()=>openEditStudent(studentId);
+
+    btnRow.appendChild(btnBack);
+    btnRow.appendChild(btnExtend);
+    btnRow.appendChild(btnAdd);
+    btnRow.appendChild(btnEdit);
+
+    header.appendChild(left);
+    header.appendChild(btnRow);
+    card.appendChild(header);
+
+    const contactInfo=document.createElement("div");
+    contactInfo.className="tiny";
+    contactInfo.innerHTML =
+      `Ученик: ${st.contact ? `${st.contactType||"телефон"}: ${st.contact}` : "контакт не указан"}<br>`+
+      `Родитель: ${
+        st.parentName || st.parentContact
+          ? (st.parentName || "не указано") +
+            (st.parentContact ? ` (${st.parentContactType||"телефон"}: ${st.parentContact})` : "")
+          : "не указан"
+      }`;
+    card.appendChild(contactInfo);
+
+    const {sub,lessons,doneCount,total,remaining,price,paid,debt} = getSubscriptionStats(studentId);
+
+    const info=document.createElement("div");
+    info.className="tiny";
+    info.textContent = st.schedule && st.schedule.length
+      ? "Расписание: " + st.schedule.map(s=>{
+          const d = daysOfWeek.find(x=>x.key===s.dayKey)?.label || "?";
+          return `${d} ${s.time||""}`;
+        }).join(", ")
+      : "Расписание не задано.";
+    card.appendChild(info);
+
+    const subBlock=document.createElement("div");
+    subBlock.className="form-section";
+    const subTitle=document.createElement("div");
+    subTitle.className="card-title";
+    subTitle.style.fontSize="13px";
+    subTitle.textContent="Абонемент";
+    const subText=document.createElement("div");
+    subText.className="tiny";
+    if(sub){
+      subText.innerHTML =
+        `<strong>Осталось занятий: ${remaining}</strong> (прошли ${doneCount} из ${total})<br>`+
+        `Стоимость абонемента: <strong>${price}</strong> ₽<br>`+
+        `Оплачено: <strong>${paid}</strong> ₽`+
+        (debt>0?` (долг: <strong>${debt}</strong> ₽)`:"")+
+        `<br>Следующая оплата: <strong>${sub.nextPaymentDate || "не указана"}</strong>`;
+    } else {
+      subText.textContent="Абонемент ещё не настроен.";
+    }
+    const subBtn=document.createElement("button");
+    subBtn.className="btn-secondary";
+    subBtn.textContent="Изменить абонемент";
+    subBtn.style.marginTop="6px";
+    subBtn.onclick=()=>editSubscription(studentId);
+
+    subBlock.appendChild(subTitle);
+    subBlock.appendChild(subText);
+    subBlock.appendChild(subBtn);
+    card.appendChild(subBlock);
+
+    const list=document.createElement("div");
+    list.className="lesson-list";
+
+    if(!lessons.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="У этого ученика пока нет уроков.";
+      list.appendChild(empty);
+    } else {
+      lessons
+        .sort((a,b)=> a.date===b.date ? a.time.localeCompare(b.time) : a.date.localeCompare(b.date))
+        .forEach(l=>{
+          const item=document.createElement("div");
+          item.className="lesson-card";
+          item.onclick=()=>openLessonView(l.id);
+          const top=document.createElement("div");
+          top.className="lesson-top";
+          const dSpan=document.createElement("span");
+          dSpan.textContent=`${l.date} ${l.time}`;
+          const status=document.createElement("span");
+          status.className="status-label";
+          if(l.status==="done"){status.classList.add("status-done");status.textContent="проведён";}
+          else if(l.status==="cancelled"){status.classList.add("status-cancelled");status.textContent="отменён";}
+          else status.textContent="запланирован";
+          top.appendChild(dSpan);
+          top.appendChild(status);
+
+          const meta=document.createElement("div");
+          meta.className="lesson-meta";
+          meta.textContent=l.topic || "Тема не указана";
+
+          item.appendChild(top);
+          item.appendChild(meta);
+          list.appendChild(item);
+        });
+    }
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  function openEditStudent(id){
+    currentView="editStudent";
+    currentStudentId=id;
+    render();
+  }
+
+  function renderEditStudent(main,id){
+    const st=getStudent(id);
+    if(!st){
+      const card=document.createElement("section");
+      card.className="card";card.textContent="Ученик не найден.";main.appendChild(card);return;
+    }
+    const card=document.createElement("section");
+    card.className="card";
+    const header=document.createElement("div");
+    header.className="card-header";
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Изменить ученика";
+    header.appendChild(title);
+    card.appendChild(header);
+
+    const form=document.createElement("div");
+    form.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+    const colName=document.createElement("div");
+    const lblName=document.createElement("div");
+    lblName.className="form-label";lblName.textContent="ФИ ученика";
+    const inName=document.createElement("input");
+    inName.className="form-input";inName.value=st.name;
+    colName.appendChild(lblName);colName.appendChild(inName);
+    const colContact=document.createElement("div");
+    const lblC=document.createElement("div");
+    lblC.className="form-label";lblC.textContent="Контакт ученика";
+    const inContact=document.createElement("input");
+    inContact.className="form-input";inContact.value=st.contact||"";
+    colContact.appendChild(lblC);colContact.appendChild(inContact);
+    row1.appendChild(colName);row1.appendChild(colContact);
+
+    const rowParent=document.createElement("div");
+    rowParent.className="form-row-inline";
+    const colPName=document.createElement("div");
+    const lblPName=document.createElement("div");
+    lblPName.className="form-label";lblPName.textContent="ФИ родителя";
+    const inPName=document.createElement("input");
+    inPName.className="form-input";inPName.value=st.parentName||"";
+    colPName.appendChild(lblPName);colPName.appendChild(inPName);
+    const colPContact=document.createElement("div");
+    const lblPContact=document.createElement("div");
+    lblPContact.className="form-label";lblPContact.textContent="Контакт родителя";
+    const inPContact=document.createElement("input");
+    inPContact.className="form-input";inPContact.value=st.parentContact||"";
+    colPContact.appendChild(lblPContact);colPContact.appendChild(inPContact);
+    const colBirthday=document.createElement("div");
+    const lblBirthday=document.createElement("div");
+    lblBirthday.className="form-label";lblBirthday.textContent="Дата рождения ученика";
+    const inBirthday=document.createElement("input");
+    inBirthday.className="form-input";inBirthday.type="date";inBirthday.value=st.birthday||"";
+    colBirthday.appendChild(lblBirthday);colBirthday.appendChild(inBirthday);
+    rowParent.appendChild(colPName);rowParent.appendChild(colPContact);rowParent.appendChild(colBirthday);
+
+    const row2=document.createElement("div");
+    row2.className="form-row-inline";
+    const colCT=document.createElement("div");
+    const lblCT=document.createElement("div");
+    lblCT.className="form-label";lblCT.textContent="Тип контакта ученика";
+    const selCT=document.createElement("select");
+    selCT.className="form-select";
+    [["phone","телефон"],["whatsapp","WhatsApp"],["telegram","Telegram"]].forEach(([val,txt])=>{
+      const opt=document.createElement("option");
+      opt.value=val;opt.textContent=txt;
+      if(val===st.contactType) opt.selected=true;
+      selCT.appendChild(opt);
+    });
+    colCT.appendChild(lblCT);colCT.appendChild(selCT);
+
+    const colPCT=document.createElement("div");
+    const lblPCT=document.createElement("div");
+    lblPCT.className="form-label";lblPCT.textContent="Тип контакта родителя";
+    const selPCT=document.createElement("select");
+    selPCT.className="form-select";
+    [["phone","телефон"],["whatsapp","WhatsApp"],["telegram","Telegram"]].forEach(([val,txt])=>{
+      const opt=document.createElement("option");
+      opt.value=val;opt.textContent=txt;
+      if(val===st.parentContactType) opt.selected=true;
+      selPCT.appendChild(opt);
+    });
+    colPCT.appendChild(lblPCT);colPCT.appendChild(selPCT);
+
+    const colTZ=document.createElement("div");
+    const lblTZ=document.createElement("div");
+    lblTZ.className="form-label";lblTZ.textContent="Часовой пояс ученика";
+    const selTZ=document.createElement("select");
+    selTZ.className="form-select";
+    ALL_TZ.forEach(tz=>{
+      const opt=document.createElement("option");
+      opt.value=tz;opt.textContent=tz;
+      if(tz===st.tz) opt.selected=true;
+      selTZ.appendChild(opt);
+    });
+    colTZ.appendChild(lblTZ);colTZ.appendChild(selTZ);
+
+    row2.appendChild(colCT);row2.appendChild(colPCT);row2.appendChild(colTZ);
+
+    const rowNotes=document.createElement("div");
+    rowNotes.className="form-row";
+    const lblN=document.createElement("div");
+    lblN.className="form-label";lblN.textContent="Заметки";
+    const inNotes=document.createElement("textarea");
+    inNotes.value=st.notes||"";
+    rowNotes.appendChild(lblN);rowNotes.appendChild(inNotes);
+
+    const actions=document.createElement("div");
+    actions.className="form-actions";
+    const btnSave=document.createElement("button");
+    btnSave.className="btn-main";
+    btnSave.textContent="Сохранить";
+    btnSave.onclick=()=>{
+      st.name=inName.value.trim();
+      st.contact=inContact.value.trim();
+      st.contactType=selCT.value;
+      st.parentName=inPName.value.trim();
+      st.parentContact=inPContact.value.trim();
+      st.parentContactType=selPCT.value;
+      st.birthday=inBirthday.value||"";
+      st.tz=selTZ.value;
+      st.notes=inNotes.value;
+      save();
+      currentView="student";
+      render();
+    };
+
+    const btnCancel=document.createElement("button");
+    btnCancel.className="btn-secondary";
+    btnCancel.textContent="Отмена";
+    btnCancel.onclick=()=>{
+      currentView="student";
+      render();
+    };
+    actions.appendChild(btnSave);actions.appendChild(btnCancel);
+
+    form.appendChild(row1);
+    form.appendChild(rowParent);
+    form.appendChild(row2);
+    form.appendChild(rowNotes);
+    form.appendChild(actions);
+
+    card.appendChild(form);
+    main.appendChild(card);
+  }
+
+  /* LESSON VIEW + ШАБЛОНЫ ТЕМ + КТП */
+
+  function openLessonView(id){
+    currentView="lesson";
+    currentLessonId=id;
+    render();
+  }
+
+  function renderLesson(main,id){
+    const l=data.lessons.find(x=>x.id===id);
+    if(!l){
+      const card=document.createElement("section");
+      card.className="card";card.textContent="Урок не найден.";main.appendChild(card);return;
+    }
+    const st=getStudent(l.studentId);
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent = st? st.name : "Ученик";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent = `${l.date} • ${l.time}`;
+    left.appendChild(title);left.appendChild(subtitle);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← Назад";
+    btnBack.onclick=()=>{currentView="today";render();};
+
+    header.appendChild(left);
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    const form=document.createElement("div");
+    form.className="form-section";
+
+    const rowTopic=document.createElement("div");
+    rowTopic.className="form-row";
+    const lblTopic=document.createElement("div");
+    lblTopic.className="form-label";lblTopic.textContent="Тема занятия";
+    const inTopic=document.createElement("input");
+    inTopic.className="form-input";inTopic.value=l.topic||"";
+    rowTopic.appendChild(lblTopic);rowTopic.appendChild(inTopic);
+
+    /* Шаблоны тем */
+    const rowTemplates=document.createElement("div");
+    rowTemplates.className="form-row";
+    const lblTpl=document.createElement("div");
+    lblTpl.className="form-label";
+    lblTpl.textContent="Шаблоны тем (последние темы)";
+    const tplWrap=document.createElement("div");
+    tplWrap.style.display="flex";
+    tplWrap.style.flexWrap="wrap";
+    tplWrap.style.gap="4px";
+    const recentTopics = getRecentTopics(8);
+    if(!recentTopics.length){
+      const tiny=document.createElement("div");
+      tiny.className="tiny";
+      tiny.textContent="Пока нет сохранённых тем — они появятся после того, как начнёшь заполнять.";
+      tplWrap.appendChild(tiny);
+    } else {
+      recentTopics.forEach(t=>{
+        const btn=document.createElement("button");
+        btn.type="button";
+        btn.className="btn-chip small";
+        btn.textContent=t;
+        btn.onclick=()=>{inTopic.value=t;};
+        tplWrap.appendChild(btn);
+      });
+    }
+    rowTemplates.appendChild(lblTpl);
+    rowTemplates.appendChild(tplWrap);
+
+    /* КТП: подставить тему и домашку из учебника */
+    const rowKTP=document.createElement("div");
+    rowKTP.className="form-row-inline";
+
+    const colPlan=document.createElement("div");
+    const lblPlan=document.createElement("div");
+    lblPlan.className="form-label";
+    lblPlan.textContent="Учебник / курс (КТП)";
+    const selPlan=document.createElement("select");
+    selPlan.className="form-select";
+    const plans = data.coursePlans || [];
+    const optNonePlan=document.createElement("option");
+    optNonePlan.value="none";
+    optNonePlan.textContent="— не выбрано —";
+    selPlan.appendChild(optNonePlan);
+    plans.forEach(p=>{
+      const opt=document.createElement("option");
+      opt.value=String(p.id);
+      opt.textContent=p.title || `Учебник #${p.id}`;
+      selPlan.appendChild(opt);
+    });
+    colPlan.appendChild(lblPlan);
+    colPlan.appendChild(selPlan);
+
+    const colLesson=document.createElement("div");
+    const lblLes=document.createElement("div");
+    lblLes.className="form-label";
+    lblLes.textContent="Урок из КТП";
+    const selLes=document.createElement("select");
+    selLes.className="form-select";
+    const optNoneLes=document.createElement("option");
+    optNoneLes.value="none";
+    optNoneLes.textContent="Сначала выбери учебник";
+    selLes.appendChild(optNoneLes);
+    colLesson.appendChild(lblLes);
+    colLesson.appendChild(selLes);
+
+    function refillLessons(){
+      selLes.innerHTML="";
+      const opt0=document.createElement("option");
+      const planId=selPlan.value==="none"?null:Number(selPlan.value);
+      if(!planId){
+        opt0.value="none";
+        opt0.textContent="Сначала выбери учебник";
+        selLes.appendChild(opt0);
+        return;
+      }
+      const plan = plans.find(p=>p.id===planId);
+      if(!plan || !plan.lessons || !plan.lessons.length){
+        opt0.value="none";
+        opt0.textContent="В этом учебнике пока нет уроков";
+        selLes.appendChild(opt0);
+        return;
+      }
+      opt0.value="none";
+      opt0.textContent="Выбери урок";
+      selLes.appendChild(opt0);
+      plan.lessons.forEach((ktpLesson,index)=>{
+        const opt=document.createElement("option");
+        opt.value=String(ktpLesson.id);
+        opt.textContent=`${index+1}. ${ktpLesson.title || ktpLesson.topic || "Урок"}`;
+        selLes.appendChild(opt);
+      });
+      selLes.value="none";
+    }
+
+    selPlan.onchange=refillLessons;
+
+    const colBtn=document.createElement("div");
+    const lblBtn=document.createElement("div");
+    lblBtn.className="form-label";
+    lblBtn.textContent="Подстановка из КТП";
+    const btnApply=document.createElement("button");
+    btnApply.type="button";
+    btnApply.className="btn-secondary";
+    btnApply.textContent="Подставить тему и Д/з";
+    btnApply.onclick=()=>{
+      const planId=selPlan.value==="none"?null:Number(selPlan.value);
+      const lesId=selLes.value==="none"?null:Number(selLes.value);
+      if(!planId || !lesId){
+        alert("Выбери учебник и урок из КТП.");
+        return;
+      }
+      const plan = plans.find(p=>p.id===planId);
+      if(!plan) return;
+      const ktpLesson = (plan.lessons||[]).find(x=>x.id===lesId);
+      if(!ktpLesson){
+        alert("Урок не найден в КТП.");
+        return;
+      }
+      if(ktpLesson.topic || ktpLesson.title){
+        inTopic.value = ktpLesson.topic || ktpLesson.title;
+      }
+      if(ktpLesson.homework){
+        inHW.value = ktpLesson.homework;
+      }
+    };
+    colBtn.appendChild(lblBtn);
+    colBtn.appendChild(btnApply);
+
+    rowKTP.appendChild(colPlan);
+    rowKTP.appendChild(colLesson);
+    rowKTP.appendChild(colBtn);
+
+    const rowHW=document.createElement("div");
+    rowHW.className="form-row";
+    const lblHW=document.createElement("div");
+    lblHW.className="form-label";lblHW.textContent="Домашнее задание";
+    const inHW=document.createElement("textarea");
+    inHW.value=l.hw||"";
+    rowHW.appendChild(lblHW);rowHW.appendChild(inHW);
+
+    let gradeLessonVal = l.gradeLesson;
+    let gradeHWVal = l.gradeHW;
+
+    function setLessonGrade(v){ gradeLessonVal = v; }
+    function setHWGrade(v){ gradeHWVal = v; }
+
+    function makeGradeSelector(label,isLesson){
+      const wrap=document.createElement("div");
+      wrap.className="form-row";
+      const lbl=document.createElement("div");
+      lbl.className="form-label";
+      lbl.textContent=label;
+      const row=document.createElement("div");
+      row.style.display="flex";
+      row.style.gap="4px";
+      const values=[2,3,4,5];
+      const buttons=[];
+      const btnNone=document.createElement("button");
+      btnNone.type="button";
+      btnNone.className="btn-chip small";
+      btnNone.textContent="—";
+
+      function currentValue(){
+        return isLesson ? gradeLessonVal : gradeHWVal;
+      }
+
+      function setValue(v){
+        if(isLesson) setLessonGrade(v);
+        else setHWGrade(v);
+        updateActive();
+      }
+
+      values.forEach(v=>{
+        const btn=document.createElement("button");
+        btn.type="button";
+        btn.className="btn-chip small";
+        btn.textContent=String(v);
+        btn.onclick=()=>setValue(v);
+        buttons.push(btn);
+        row.appendChild(btn);
+      });
+
+      btnNone.onclick=()=>setValue(null);
+      row.appendChild(btnNone);
+
+      function updateActive(){
+        buttons.forEach(b=>{
+          b.style.background="var(--card)";
+          b.style.color="var(--text)";
+        });
+        btnNone.style.background="var(--card)";
+        btnNone.style.color="var(--text)";
+        const val=currentValue();
+        if(val==null){
+          btnNone.style.background="var(--accent-soft)";
+        } else {
+          const idx=values.indexOf(val);
+          if(idx>=0){
+            buttons[idx].style.background="var(--accent)";
+            buttons[idx].style.color="#fff";
+          }
+        }
+      }
+      setTimeout(updateActive,0);
+
+      wrap.appendChild(lbl);
+      wrap.appendChild(row);
+      return wrap;
+    }
+
+    const rowGradesWrap=document.createElement("div");
+    rowGradesWrap.className="form-row-inline";
+    const colGL=document.createElement("div");
+    const colGH=document.createElement("div");
+    colGL.appendChild(makeGradeSelector("Оценка за урок",true));
+    colGH.appendChild(makeGradeSelector("Оценка за домашнюю работу",false));
+    rowGradesWrap.appendChild(colGL);
+    rowGradesWrap.appendChild(colGH);
+
+    const rowGradeComments=document.createElement("div");
+    rowGradeComments.className="form-row-inline";
+
+    const colCL=document.createElement("div");
+    const lblCL=document.createElement("div");
+    lblCL.className="form-label";lblCL.textContent="Комментарий к оценке за урок";
+    const inCL=document.createElement("textarea");
+    inCL.value=l.commentLesson || "";
+    colCL.appendChild(lblCL);colCL.appendChild(inCL);
+
+    const colCH=document.createElement("div");
+    const lblCH=document.createElement("div");
+    lblCH.className="form-label";lblCH.textContent="Комментарий к оценке за домашнюю работу";
+    const inCH=document.createElement("textarea");
+    inCH.value=l.commentHW || "";
+    colCH.appendChild(lblCH);colCH.appendChild(inCH);
+
+    rowGradeComments.appendChild(colCL);
+    rowGradeComments.appendChild(colCH);
+
+    const rowComment=document.createElement("div");
+    rowComment.className="form-row";
+    const lblComment=document.createElement("div");
+    lblComment.className="form-label";lblComment.textContent="Общий комментарий для себя/родителей";
+    const inComment=document.createElement("textarea");
+    inComment.value=l.comment||"";
+    rowComment.appendChild(lblComment);rowComment.appendChild(inComment);
+
+    const actions=document.createElement("div");
+    actions.className="form-actions";
+
+    const btnSave=document.createElement("button");
+    btnSave.className="btn-main";
+    btnSave.textContent="Сохранить";
+    btnSave.onclick=()=>{
+      l.topic=inTopic.value;
+      l.hw=inHW.value;
+      l.gradeLesson = gradeLessonVal;
+      l.gradeHW = gradeHWVal;
+      l.commentLesson = inCL.value;
+      l.commentHW = inCH.value;
+      l.comment=inComment.value;
+      save();
+    };
+
+    const btnDone=document.createElement("button");
+    btnDone.className="btn-secondary";
+    btnDone.textContent="Отметить как проведён";
+    btnDone.onclick=()=>{l.status="done";save();};
+
+    const btnCancel=document.createElement("button");
+    btnCancel.className="btn-danger";
+    btnCancel.textContent="Отменить урок";
+    btnCancel.onclick=()=>{l.status="cancelled";save();};
+
+    const btnRem=document.createElement("button");
+    btnRem.className="btn-secondary";
+    btnRem.textContent="Напомнить о занятии";
+    btnRem.onclick=()=>sendLessonReminder(l,st);
+
+    const btnHW=document.createElement("button");
+    btnHW.className="btn-secondary";
+    btnHW.textContent="Отправить домашку";
+    btnHW.onclick=()=>sendHomework(l,st);
+
+    actions.appendChild(btnSave);
+    actions.appendChild(btnDone);
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnRem);
+    actions.appendChild(btnHW);
+
+    form.appendChild(rowTopic);
+    form.appendChild(rowTemplates);
+    form.appendChild(rowKTP);
+    form.appendChild(rowHW);
+    form.appendChild(rowGradesWrap);
+    form.appendChild(rowGradeComments);
+    form.appendChild(rowComment);
+    form.appendChild(actions);
+
+    card.appendChild(form);
+    main.appendChild(card);
+
+    // после создания формы заполним список уроков КТП (если выберешь учебник)
+    refillLessons();
+  }
+
+  /* MESSENGERS: напоминания и домашка */
+
+  function sendLessonReminder(lesson,student){
+    if(!student){alert("Ученик не найден");return;}
+    const text=`Напоминание 🌿\nСегодня занятие в ${lesson.time}.\nТема: ${lesson.topic||"(уточним на уроке)"}`;
+    openMessenger(student,text);
+  }
+
+  function sendHomework(lesson,student){
+    if(!student){alert("Ученик не найден");return;}
+    const text=`Домашнее задание 📚\n${lesson.hw||"Скоро пришлю задание."}`;
+    openMessenger(student,text);
+  }
+
+  function notifySubscription(student, stats){
+    const {remaining,total,price,paid,doneCount} = stats;
+    let text;
+    if(total>0 && remaining<=0){
+      text =
+        `Добрый день! У ${student.name} закончился абонемент `+
+        `(${total} занятий, проведено ${doneCount}). `+
+        `Пожалуйста, обновите оплату. Стоимость: ${price} ₽, оплачено: ${paid} ₽.`;
+    } else if(total>0 && remaining<=2){
+      text =
+        `Добрый день! У ${student.name} скоро заканчивается абонемент. `+
+        `Осталось ${remaining} занятий из ${total}.`;
+    } else {
+      text =
+        `Информация по абонементу ${student.name}: проведено ${doneCount} из ${total} занятий.`;
+    }
+    openParentMessenger(student,text);
+  }
+
+  function openMessenger(student,text){
+    if(!student.contact){
+      alert("У ученика не указан контакт.");
+      return;
+    }
+    openMessengerBy(student.contactType || "phone", student.contact, text);
+  }
+
+  function openParentMessenger(student,text){
+    let type = student.parentContactType || "phone";
+    let contact = (student.parentContact || "").trim();
+    if(!contact){
+      type = student.contactType || "phone";
+      contact = (student.contact || "").trim();
+    }
+    if(!contact){
+      alert("Не указан контакт родителя или ученика.");
+      return;
+    }
+    openMessengerBy(type, contact, text);
+  }
+
+  function openMessengerBy(type, contact, text){
+    const c = (contact || "").trim();
+    if(!c){
+      alert("Контакт не указан.");
+      return;
+    }
+    const msg = encodeURIComponent(text);
+    if(type==="whatsapp"){
+      const phone=c.replace(/^\+/,"");
+      window.open(`https://wa.me/${phone}?text=${msg}`,"_blank");
+    } else if(type==="telegram"){
+      const uname=c.startsWith("@")?c.substring(1):c;
+      window.open(`https://t.me/${uname}?text=${msg}`,"_blank");
+    } else {
+      alert("Тип контакта — просто телефон. Можно вручную отправить сообщение:\n\n"+text);
+    }
+  }
+
+  /* АБОНЕМЕНТЫ */
+
+  function renderSubscriptions(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Абонементы";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Сколько уроков осталось, кто оплатил и когда следующая оплата.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="К ученикам";
+    btnBack.onclick=()=>{currentView="students";render();};
+
+    header.appendChild(left);
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    if (!data.students.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет учеников и абонементов.";
+      card.appendChild(empty);
+      main.appendChild(card);
+      return;
+    }
+
+    const headerRow=document.createElement("div");
+    headerRow.className="subs-table-header";
+    headerRow.innerHTML=
+      "<span>Ученик</span>"+
+      "<span>Оплачено / цена</span>"+
+      "<span>Прошли / всего</span>"+
+      "<span>Осталось занятий</span>"+
+      "<span>Следующая оплата</span>"+
+      "<span>Статус / действия</span>";
+    card.appendChild(headerRow);
+
+    data.students.forEach(st=>{
+      const stats = getSubscriptionStats(st.id);
+      const {sub,doneCount,total,remaining,price,paid,debt} = stats;
+
+      let statusText="";
+      if(!sub){
+        statusText="нет абонемента";
+      } else if (debt>0){
+        statusText=`долг ${debt} ₽`;
+      } else if (remaining<=2 && total>0){
+        statusText="скоро кончится";
+      } else {
+        statusText="OK";
+      }
+
+      const row=document.createElement("div");
+      row.className="subs-table-row";
+
+      if(sub){
+        if(debt>0 || remaining<=0){
+          row.style.background="var(--danger-soft)";
+        } else if(remaining<=2){
+          row.style.background="var(--accent-soft)";
+        }
+      }
+
+      const c1=document.createElement("div");
+      c1.textContent=st.name;
+
+      const c2=document.createElement("div");
+      c2.textContent=sub?`${paid}/${price} ₽`:"—";
+
+      const c3=document.createElement("div");
+      c3.textContent=sub?`${doneCount}/${total}`:"—";
+
+      const c4=document.createElement("div");
+      c4.textContent=sub?remaining:"—";
+
+      const c5=document.createElement("div");
+      c5.textContent=sub && sub.nextPaymentDate ? sub.nextPaymentDate : "—";
+
+      const c6=document.createElement("div");
+      c6.style.display="flex";
+      c6.style.alignItems="center";
+      c6.style.gap="4px";
+      const statusSpan=document.createElement("span");
+      statusSpan.className="tiny";
+      statusSpan.textContent=statusText;
+
+      const btnEdit=document.createElement("button");
+      btnEdit.className="btn-chip small";
+      btnEdit.textContent="Изменить";
+      btnEdit.onclick=()=>editSubscription(st.id);
+
+      const btnNotify=document.createElement("button");
+      btnNotify.className="btn-chip small teal";
+      btnNotify.textContent="Оповестить";
+      btnNotify.onclick=()=>notifySubscription(st, stats);
+
+      c6.appendChild(statusSpan);
+      c6.appendChild(btnEdit);
+      c6.appendChild(btnNotify);
+
+      row.appendChild(c1);
+      row.appendChild(c2);
+      row.appendChild(c3);
+      row.appendChild(c4);
+      row.appendChild(c5);
+      row.appendChild(c6);
+
+      card.appendChild(row);
+    });
+
+    main.appendChild(card);
+  }
+
+  function renderSubscriptionEdit(main,studentId){
+    const st=getStudent(studentId);
+    if(!st){
+      const card=document.createElement("section");
+      card.className="card";
+      card.textContent="Ученик не найден.";
+      main.appendChild(card);
+      return;
+    }
+    let stats = getSubscriptionStats(studentId);
+    let sub = stats.sub;
+    if(!sub){
+      const newId=data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1;
+      sub={id:newId,studentId,total:0,price:0,paid:0,nextPaymentDate:"",doneOffset:0};
+      data.subscriptions.push(sub);
+      save();
+      stats = getSubscriptionStats(studentId);
+      sub = stats.sub;
+    }
+
+    const {rawDone,doneCount,total,price,paid} = stats;
+
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent=`Абонемент: ${st.name}`;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Редактирование оплаты и количества занятий.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← К ученику";
+    btnBack.onclick=()=>{currentView="student";currentStudentId=studentId;render();};
+
+    header.appendChild(left);
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    const form=document.createElement("div");
+    form.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+
+    const colPrice=document.createElement("div");
+    const lblPrice=document.createElement("div");
+    lblPrice.className="form-label";
+    lblPrice.textContent="Стоимость абонемента (₽)";
+    const inPrice=document.createElement("input");
+    inPrice.className="form-input";
+    inPrice.type="number";
+    inPrice.min="0";
+    inPrice.value=price || 0;
+    colPrice.appendChild(lblPrice);
+    colPrice.appendChild(inPrice);
+
+    const colPaid=document.createElement("div");
+    const lblPaid=document.createElement("div");
+    lblPaid.className="form-label";
+    lblPaid.textContent="Оплачено (₽)";
+    const inPaid=document.createElement("input");
+    inPaid.className="form-input";
+    inPaid.type="number";
+    inPaid.min="0";
+    inPaid.value=paid || 0;
+    colPaid.appendChild(lblPaid);
+    colPaid.appendChild(inPaid);
+
+    row1.appendChild(colPrice);
+    row1.appendChild(colPaid);
+
+    const row2=document.createElement("div");
+    row2.className="form-row-inline";
+
+    const colTotal=document.createElement("div");
+    const lblTotal=document.createElement("div");
+    lblTotal.className="form-label";
+    lblTotal.textContent="Занятий в абонементе";
+    const inTotal=document.createElement("input");
+    inTotal.className="form-input";
+    inTotal.type="number";
+    inTotal.min="0";
+    inTotal.value=total || 0;
+    colTotal.appendChild(lblTotal);
+    colTotal.appendChild(inTotal);
+
+    const colNext=document.createElement("div");
+    const lblNext=document.createElement("div");
+    lblNext.className="form-label";
+    lblNext.textContent="Следующая оплата (дата)";
+    const inNext=document.createElement("input");
+    inNext.className="form-input";
+    inNext.type="date";
+    inNext.value=sub.nextPaymentDate || "";
+    colNext.appendChild(lblNext);
+    colNext.appendChild(inNext);
+
+    row2.appendChild(colTotal);
+    row2.appendChild(colNext);
+
+    const rowDone=document.createElement("div");
+    rowDone.className="form-row";
+    const lblDone=document.createElement("div");
+    lblDone.className="form-label";
+    lblDone.textContent="Проведено занятий (всего, включая прошлые)";
+    const inDone=document.createElement("input");
+    inDone.className="form-input";
+    inDone.type="number";
+    inDone.min="0";
+    inDone.value=doneCount;
+    const hint=document.createElement("div");
+    hint.className="tiny";
+    hint.textContent=`Сейчас по урокам проведено ${rawDone}. Остальное можно досчитать руками для старых занятий.`;
+    rowDone.appendChild(lblDone);
+    rowDone.appendChild(inDone);
+    rowDone.appendChild(hint);
+
+    const actions=document.createElement("div");
+    actions.className="form-actions";
+    const btnSave=document.createElement("button");
+    btnSave.className="btn-main";
+    btnSave.textContent="Сохранить";
+    btnSave.onclick=()=>{
+      sub.price = inPrice.value ? parseFloat(inPrice.value) : 0;
+      sub.paid = inPaid.value ? parseFloat(inPaid.value) : 0;
+      sub.total = inTotal.value ? parseInt(inTotal.value,10) : 0;
+      sub.nextPaymentDate = inNext.value || "";
+
+      const manualDone = inDone.value !== "" ? parseInt(inDone.value,10) : 0;
+      sub.doneOffset = manualDone - rawDone;
+
+      save();
+      currentView="student";
+      currentStudentId=studentId;
+      render();
+    };
+
+    const btnCancel=document.createElement("button");
+    btnCancel.className="btn-secondary";
+    btnCancel.textContent="Отмена";
+    btnCancel.onclick=()=>{
+      currentView="student";
+      currentStudentId=studentId;
+      render();
+    };
+
+    actions.appendChild(btnSave);
+    actions.appendChild(btnCancel);
+
+    form.appendChild(row1);
+    form.appendChild(row2);
+    form.appendChild(rowDone);
+    form.appendChild(actions);
+
+    card.appendChild(form);
+    main.appendChild(card);
+  }
+
+  /* ЖУРНАЛ */
+
+  function renderJournal(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Журнал";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Статистика по занятиям: даты, оценки, комментарии.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    header.appendChild(left);
+    card.appendChild(header);
+
+    if(!data.students.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Сначала добавьте учеников.";
+      card.appendChild(empty);
+      main.appendChild(card);
+      return;
+    }
+
+    const filterRow=document.createElement("div");
+    filterRow.className="form-row-inline";
+    const colSel=document.createElement("div");
+    const lblSel=document.createElement("div");
+    lblSel.className="form-label";
+    lblSel.textContent="Ученик";
+    const sel=document.createElement("select");
+    sel.className="form-select";
+    const optAll=document.createElement("option");
+    optAll.value="all";
+    optAll.textContent="Все ученики";
+    sel.appendChild(optAll);
+    data.students.forEach(st=>{
+      const opt=document.createElement("option");
+      opt.value=String(st.id);
+      opt.textContent=st.name;
+      sel.appendChild(opt);
+    });
+    sel.value = journalFilterStudentId;
+    sel.onchange=()=>{
+      journalFilterStudentId = sel.value;
+      render();
+    };
+    colSel.appendChild(lblSel);
+    colSel.appendChild(sel);
+    filterRow.appendChild(colSel);
+    card.appendChild(filterRow);
+
+    const container=document.createElement("div");
+    container.style.display="flex";
+    container.style.flexDirection="column";
+    container.style.gap="8px";
+    container.style.marginTop="8px";
+
+    const studentsToShow = journalFilterStudentId==="all"
+      ? data.students
+      : data.students.filter(s=>String(s.id)===journalFilterStudentId);
+
+    studentsToShow.forEach(st=>{
+      const lessons = getLessonsByStudent(st.id)
+        .slice()
+        .sort((a,b)=> a.date===b.date ? a.time.localeCompare(b.time) : a.date.localeCompare(b.date));
+
+      const block=document.createElement("div");
+      block.className="form-section";
+
+      const t=document.createElement("div");
+      t.className="card-title";
+      t.style.fontSize="13px";
+      t.textContent=st.name;
+      block.appendChild(t);
+
+      if(!lessons.length){
+        const empty=document.createElement("div");
+        empty.className="tiny";
+        empty.textContent="Уроков пока нет.";
+        block.appendChild(empty);
+      } else {
+        const headerRow=document.createElement("div");
+        headerRow.style.display="grid";
+        headerRow.style.gridTemplateColumns="1.4fr 1fr 1fr 2fr";
+        headerRow.style.columnGap="4px";
+        headerRow.style.fontSize="11px";
+        headerRow.style.fontWeight="600";
+        headerRow.style.color="var(--muted)";
+        headerRow.style.borderBottom="1px solid var(--border)";
+        headerRow.style.paddingBottom="2px";
+        headerRow.innerHTML="<span>Дата и тема</span><span>Оценки</span><span>Статус</span><span>Комментарии</span>";
+        block.appendChild(headerRow);
+
+        lessons.forEach(l=>{
+          const row=document.createElement("div");
+          row.style.display="grid";
+          row.style.gridTemplateColumns="1.4fr 1fr 1fr 2fr";
+          row.style.columnGap="4px";
+          row.style.fontSize="11px";
+          row.style.padding="2px 0";
+          row.style.borderBottom="1px solid rgba(0,0,0,0.03)";
+
+          const c1=document.createElement("div");
+          c1.innerHTML = `<strong>${l.date}</strong> ${l.time}<br><span class="tiny">${l.topic || "—"}</span>`;
+
+          const c2=document.createElement("div");
+          const gl = l.gradeLesson!=null ? l.gradeLesson : "—";
+          const gh = l.gradeHW!=null ? l.gradeHW : "—";
+          c2.innerHTML = `Урок: ${gl}<br>Д/з: ${gh}`;
+
+          const c3=document.createElement("div");
+          let stText="";
+          if(l.status==="done") stText="проведён";
+          else if(l.status==="cancelled") stText="отменён";
+          else stText="запланирован";
+          c3.textContent=stText;
+
+          const c4=document.createElement("div");
+          const parts=[];
+          if(l.commentLesson) parts.push(`Урок: ${l.commentLesson}`);
+          if(l.commentHW) parts.push(`Д/з: ${l.commentHW}`);
+          if(l.comment && !l.commentLesson && !l.commentHW) parts.push(l.comment);
+          c4.textContent = parts.join(" | ") || "—";
+
+          row.appendChild(c1);
+          row.appendChild(c2);
+          row.appendChild(c3);
+          row.appendChild(c4);
+
+          block.appendChild(row);
+        });
+      }
+
+      container.appendChild(block);
+    });
+
+    card.appendChild(container);
+    main.appendChild(card);
+  }
+
+  /* КТП: учебники и их уроки */
+
+  function renderPlans(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Уроки (КТП)";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Учебники и календарно-тематическое планирование.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnAdd=document.createElement("button");
+    btnAdd.className="btn-main";
+    btnAdd.textContent="Добавить учебник / курс";
+    btnAdd.onclick=()=>{
+      const name=prompt("Название учебника или курса","Forward 3 класс");
+      if(!name) return;
+      const id = data.coursePlans.length
+        ? Math.max(...data.coursePlans.map(p=>p.id))+1
+        : 1;
+      data.coursePlans.push({
+        id,
+        title:name.trim(),
+        description:"",
+        lessons:[]
+      });
+      save();
+      currentPlanId=id;
+      currentView="planDetail";
+      render();
+    };
+
+    header.appendChild(left);
+    header.appendChild(btnAdd);
+    card.appendChild(header);
+
+    if(!data.coursePlans.length){
+      const empty=document.createElement("div");
+      empty.className="empty-state";
+      empty.textContent="Пока нет учебников. Добавь первый — и начнёшь заполнять КТП.";
+      card.appendChild(empty);
+      main.appendChild(card);
+      return;
+    }
+
+    const list=document.createElement("div");
+    list.className="students-list";
+
+    data.coursePlans.forEach(plan=>{
+      const item=document.createElement("div");
+      item.className="student-card";
+      item.onclick=()=>openPlanDetail(plan.id);
+
+      const top=document.createElement("div");
+      top.className="student-top";
+      const name=document.createElement("div");
+      name.className="student-name";
+      name.textContent=plan.title || `Учебник #${plan.id}`;
+      const count=document.createElement("div");
+      count.className="tiny";
+      const len=(plan.lessons||[]).length;
+      count.textContent=`Уроков в КТП: ${len}`;
+      top.appendChild(name);
+      top.appendChild(count);
+
+      const desc=document.createElement("div");
+      desc.className="tiny";
+      desc.textContent=plan.description || "Описание не задано";
+
+      const btnRow=document.createElement("div");
+      btnRow.style.display="flex";
+      btnRow.style.gap="4px";
+      btnRow.style.justifyContent="flex-end";
+      btnRow.style.marginTop="4px";
+
+      const btnOpen=document.createElement("button");
+      btnOpen.className="btn-chip small";
+      btnOpen.textContent="Открыть";
+      btnOpen.onclick=(e)=>{e.stopPropagation();openPlanDetail(plan.id);};
+
+      const btnDel=document.createElement("button");
+      btnDel.className="btn-chip small danger";
+      btnDel.textContent="Удалить";
+      btnDel.onclick=(e)=>{
+        e.stopPropagation();
+        if(!confirm("Удалить этот учебник и его КТП? Уроки учеников не трогаем.")) return;
+        data.coursePlans = data.coursePlans.filter(p=>p.id!==plan.id);
+        save();
+      };
+
+      btnRow.appendChild(btnOpen);
+      btnRow.appendChild(btnDel);
+
+      item.appendChild(top);
+      item.appendChild(desc);
+      item.appendChild(btnRow);
+      list.appendChild(item);
+    });
+
+    card.appendChild(list);
+    main.appendChild(card);
+  }
+
+  function renderPlanDetail(main,planId){
+    const plan = (data.coursePlans||[]).find(p=>p.id===planId);
+    if(!plan){
+      const card=document.createElement("section");
+      card.className="card";
+      card.textContent="Учебник не найден.";
+      main.appendChild(card);
+      return;
+    }
+
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent=`КТП: ${plan.title || "Учебник"}`;
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Здесь ты прописываешь общий план по учебнику.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+
+    const btnBack=document.createElement("button");
+    btnBack.className="btn-secondary";
+    btnBack.textContent="← Ко всем учебникам";
+    btnBack.onclick=()=>{currentView="plans";render();};
+
+    header.appendChild(left);
+    header.appendChild(btnBack);
+    card.appendChild(header);
+
+    /* Общее про учебник */
+    const info=document.createElement("div");
+    info.className="form-section";
+
+    const row1=document.createElement("div");
+    row1.className="form-row-inline";
+
+    const colTitle=document.createElement("div");
+    const lblTitle=document.createElement("div");
+    lblTitle.className="form-label";
+    lblTitle.textContent="Название учебника / курса";
+    const inTitle=document.createElement("input");
+    inTitle.className="form-input";
+    inTitle.value=plan.title || "";
+    colTitle.appendChild(lblTitle);
+    colTitle.appendChild(inTitle);
+
+    const colDesc=document.createElement("div");
+    const lblDesc=document.createElement("div");
+    lblDesc.className="form-label";
+    lblDesc.textContent="Краткое описание";
+    const inDesc=document.createElement("input");
+    inDesc.className="form-input";
+    inDesc.value=plan.description || "";
+    colDesc.appendChild(lblDesc);
+    colDesc.appendChild(inDesc);
+
+    row1.appendChild(colTitle);
+    row1.appendChild(colDesc);
+
+    const actionsInfo=document.createElement("div");
+    actionsInfo.className="form-actions";
+    const btnSaveInfo=document.createElement("button");
+    btnSaveInfo.className="btn-main";
+    btnSaveInfo.textContent="Сохранить учебник";
+    btnSaveInfo.onclick=()=>{
+      plan.title = inTitle.value.trim() || plan.title;
+      plan.description = inDesc.value.trim();
+      save();
+    };
+    actionsInfo.appendChild(btnSaveInfo);
+
+    info.appendChild(row1);
+    info.appendChild(actionsInfo);
+    card.appendChild(info);
+
+    /* Добавление урока в КТП */
+    const addBlock=document.createElement("div");
+    addBlock.className="form-section";
+    const addTitle=document.createElement("div");
+    addTitle.className="card-title";
+    addTitle.style.fontSize="13px";
+    addTitle.textContent="Добавить урок в КТП";
+    addBlock.appendChild(addTitle);
+
+    const rowL=document.createElement("div");
+    rowL.className="form-row-inline";
+
+    const colName=document.createElement("div");
+    const lblLName=document.createElement("div");
+    lblLName.className="form-label";
+    lblLName.textContent="Название урока";
+    const inLName=document.createElement("input");
+    inLName.className="form-input";
+    inLName.placeholder="например, Unit 3 Lesson 1";
+    colName.appendChild(lblLName);
+    colName.appendChild(inLName);
+
+    const colTopic=document.createElement("div");
+    const lblLTopic=document.createElement("div");
+    lblLTopic.className="form-label";
+    lblLTopic.textContent="Тема (подробнее)";
+    const inLTopic=document.createElement("input");
+    inLTopic.className="form-input";
+    inLTopic.placeholder="Past Simple, чтение текста про ...";
+    colTopic.appendChild(lblLTopic);
+    colTopic.appendChild(inLTopic);
+
+    rowL.appendChild(colName);
+    rowL.appendChild(colTopic);
+
+    const rowHW=document.createElement("div");
+    rowHW.className="form-row";
+    const lblLHW=document.createElement("div");
+    lblLHW.className="form-label";
+    lblLHW.textContent="Рекомендованное домашнее задание";
+    const inLHW=document.createElement("textarea");
+    inLHW.placeholder="SB p.34 ex.3, WB p.18 ex.1-2";
+    rowHW.appendChild(lblLHW);
+    rowHW.appendChild(inLHW);
+
+    const actionsAdd=document.createElement("div");
+    actionsAdd.className="form-actions";
+    const btnAddLesson=document.createElement("button");
+    btnAddLesson.className="btn-secondary";
+    btnAddLesson.textContent="Добавить урок в конец КТП";
+    btnAddLesson.onclick=()=>{
+      const tName=inLName.value.trim();
+      const tTopic=inLTopic.value.trim();
+      const tHW=inLHW.value.trim();
+      if(!tName && !tTopic){
+        alert("Нужно хотя бы название урока или тему.");
+        return;
+      }
+      const newId = (plan.lessons && plan.lessons.length)
+        ? Math.max(...plan.lessons.map(x=>x.id))+1
+        : 1;
+      if(!plan.lessons) plan.lessons=[];
+      plan.lessons.push({
+        id:newId,
+        title:tName,
+        topic:tTopic,
+        homework:tHW
+      });
+      save();
+      inLName.value="";
+      inLTopic.value="";
+      inLHW.value="";
+    };
+
+    actionsAdd.appendChild(btnAddLesson);
+
+    addBlock.appendChild(rowL);
+    addBlock.appendChild(rowHW);
+    addBlock.appendChild(actionsAdd);
+    card.appendChild(addBlock);
+
+    /* Список уроков КТП */
+    const listBlock=document.createElement("div");
+    listBlock.className="form-section";
+    const listTitle=document.createElement("div");
+    listTitle.className="card-title";
+    listTitle.style.fontSize="13px";
+    listTitle.textContent="Уроки в КТП (по порядку)";
+    listBlock.appendChild(listTitle);
+
+    if(!plan.lessons || !plan.lessons.length){
+      const empty=document.createElement("div");
+      empty.className="tiny";
+      empty.textContent="Пока уроков нет. Добавляй выше.";
+      listBlock.appendChild(empty);
+    } else {
+      const list=document.createElement("div");
+      list.className="lesson-list";
+      plan.lessons.forEach((les,index)=>{
+        const item=document.createElement("div");
+        item.className="lesson-card";
+        item.style.cursor="default";
+
+        const top=document.createElement("div");
+        top.className="lesson-top";
+        const left=document.createElement("div");
+        left.textContent=`${index+1}. ${les.title || les.topic || "Урок"}`;
+        const right=document.createElement("div");
+        right.className="tiny";
+        right.textContent=`ID: ${les.id}`;
+        top.appendChild(left);
+        top.appendChild(right);
+
+        const meta=document.createElement("div");
+        meta.className="tiny";
+        meta.innerHTML =
+          `<strong>Тема:</strong> ${les.topic || "—"}<br>`+
+          `<strong>Домашка:</strong> ${les.homework || "—"}`;
+
+        const btnRow=document.createElement("div");
+        btnRow.style.display="flex";
+        btnRow.style.gap="4px";
+        btnRow.style.marginTop="4px";
+        btnRow.style.justifyContent="flex-end";
+
+        const btnEdit=document.createElement("button");
+        btnEdit.className="btn-chip small";
+        btnEdit.textContent="Изменить";
+        btnEdit.onclick=(e)=>{
+          e.stopPropagation();
+          const newTitle=prompt("Название урока",les.title||"") ?? les.title;
+          const newTopic=prompt("Тема (подробнее)",les.topic||"") ?? les.topic;
+          const newHW=prompt("Домашка",les.homework||"") ?? les.homework;
+          les.title=newTitle.trim();
+          les.topic=newTopic.trim();
+          les.homework=newHW.trim();
+          save();
+        };
+
+        const btnDel=document.createElement("button");
+        btnDel.className="btn-chip small danger";
+        btnDel.textContent="Удалить";
+        btnDel.onclick=(e)=>{
+          e.stopPropagation();
+          if(!confirm("Удалить этот урок из КТП?")) return;
+          plan.lessons = plan.lessons.filter(x=>x.id!==les.id);
+          save();
+        };
+
+        btnRow.appendChild(btnEdit);
+        btnRow.appendChild(btnDel);
+
+        item.appendChild(top);
+        item.appendChild(meta);
+        item.appendChild(btnRow);
+
+        list.appendChild(item);
+      });
+      listBlock.appendChild(list);
+    }
+
+    card.appendChild(listBlock);
+    main.appendChild(card);
+  }
+
+  /* НАСТРОЙКИ + ВЫХОД */
+
+    function renderSettings(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const left=document.createElement("div");
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Настройки";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="Часовой пояс и управление данными.";
+    left.appendChild(title);
+    left.appendChild(subtitle);
+    header.appendChild(left);
+    card.appendChild(header);
+
+    /* Блок: часовой пояс */
+    const block=document.createElement("div");
+    block.className="form-section";
+
+    const tzRow=document.createElement("div");
+    tzRow.className="form-row";
+    const lbl=document.createElement("div");
+    lbl.className="form-label";
+    lbl.textContent="Часовой пояс преподавателя";
+    const sel=document.createElement("select");
+    sel.className="form-select";
+    ALL_TZ.forEach(tz=>{
+      const opt=document.createElement("option");
+      opt.value=tz;opt.textContent=tz;
+      if(tz===data.tutorTZ) opt.selected=true;
+      sel.appendChild(opt);
+    });
+    sel.onchange=()=>{
+      data.tutorTZ=sel.value;
+      save();
+    };
+    tzRow.appendChild(lbl);
+    tzRow.appendChild(sel);
+
+    block.appendChild(tzRow);
+    card.appendChild(block);
+
+    /* Блок: резервное копирование */
+    const backup=document.createElement("div");
+    backup.className="form-section";
+
+    const bTitle=document.createElement("div");
+    bTitle.className="card-title";
+    bTitle.style.fontSize="13px";
+    bTitle.textContent="Резервное копирование (экспорт / импорт)";
+    const bText=document.createElement("div");
+    bText.className="tiny";
+    bText.innerHTML =
+      "Экспорт создаёт текст с данными (ученики, уроки, абонементы, КТП). " +
+      "Сохрани этот текст в файл/заметки. При импорте вставь его обратно и нажми «Импортировать».";
+
+    const bRow=document.createElement("div");
+    bRow.className="form-row";
+    const bLbl=document.createElement("div");
+    bLbl.className="form-label";
+    bLbl.textContent="Текст резервной копии (JSON)";
+    const backupArea=document.createElement("textarea");
+    backupArea.placeholder = "Нажми «Экспортировать данные» — здесь появится текст.\n" +
+                              "Скопируй его и сохрани. Чтобы восстановить — вставь сюда сохранённый текст и нажми «Импортировать данные».";
+    bRow.appendChild(bLbl);
+    bRow.appendChild(backupArea);
+
+    const bActions=document.createElement("div");
+    bActions.className="form-actions";
+    const btnExport=document.createElement("button");
+    btnExport.className="btn-secondary";
+    btnExport.textContent="Экспортировать данные в текст ниже";
+    btnExport.onclick=()=>{
+      try{
+        const json = JSON.stringify(data,null,2);
+        backupArea.value = json;
+        backupArea.focus();
+        backupArea.select();
+        alert("Данные выгружены. Скопируй текст и сохрани его в безопасном месте.");
+      }catch(e){
+        console.error(e);
+        alert("Не удалось экспортировать данные.");
+      }
+    };
+
+    const btnImport=document.createElement("button");
+    btnImport.className="btn-main";
+    btnImport.textContent="Импортировать данные из текста";
+    btnImport.onclick=()=>{
+      const text = backupArea.value.trim();
+      if(!text){
+        alert("Вставь сюда текст резервной копии.");
+        return;
+      }
+      if(!confirm("Текущие данные будут заменены данными из текста. Продолжить?")){
+        return;
+      }
+      try{
+        const parsed = JSON.parse(text);
+        if(!parsed || typeof parsed!=="object" || !Array.isArray(parsed.students)){
+          alert("Похоже, это не резервная копия этого кабинета (нет поля students).");
+          return;
+        }
+        // Сохраняем сырые данные и заново инициализируем через loadData(),
+        // чтобы добавить недостающие поля/структуру.
+        localStorage.setItem(STORAGE_KEY, text);
+        data = loadData();
+        render();
+        alert("Данные успешно импортированы.");
+      }catch(e){
+        console.error(e);
+        alert("Ошибка при разборе JSON. Проверь, что текст не повреждён.");
+      }
+    };
+
+    bActions.appendChild(btnExport);
+    bActions.appendChild(btnImport);
+
+    backup.appendChild(bTitle);
+    backup.appendChild(bText);
+    backup.appendChild(bRow);
+    backup.appendChild(bActions);
+
+    card.appendChild(backup);
+
+    /* Блок: полный сброс */
+    const danger=document.createElement("div");
+    danger.className="form-section";
+    danger.style.background="var(--danger-soft)";
+    danger.style.borderColor="#F0BDB8";
+
+    const dTitle=document.createElement("div");
+    dTitle.className="card-title";
+    dTitle.style.fontSize="13px";
+    dTitle.textContent="Сбросить кабинет";
+    const dText=document.createElement("div");
+    dText.className="tiny";
+    dText.textContent="Удалит всех учеников, уроки и абонементы из этого браузера. Назад вернуть нельзя (если нет резервной копии).";
+    const btnReset=document.createElement("button");
+    btnReset.className="btn-danger";
+    btnReset.textContent="Удалить все данные";
+    btnReset.onclick=()=>{
+      if(confirm("Точно удалить ВСЕ данные (учеников, уроки, абонементы, КТП)?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        data = loadData();
+        render();
+      }
+    };
+
+    danger.appendChild(dTitle);
+    danger.appendChild(dText);
+    danger.appendChild(btnReset);
+
+    card.appendChild(danger);
+
+    main.appendChild(card);
+  }
+
+  function renderLogout(main){
+    const card=document.createElement("section");
+    card.className="card";
+
+    const header=document.createElement("div");
+    header.className="card-header";
+    const title=document.createElement("div");
+    title.className="card-title";
+    title.textContent="Выход";
+    const subtitle=document.createElement("div");
+    subtitle.className="card-subtitle";
+    subtitle.textContent="В офлайн-версии логина нет — это только твой кабинет.";
+    header.appendChild(title);
+    header.appendChild(subtitle);
+    card.appendChild(header);
+
+    const text=document.createElement("div");
+    text.className="tiny";
+    text.innerHTML =
+      "Сейчас кабинет работает как личное приложение в этом браузере. "+
+      "Чтобы никто больше не видел данные, просто не давай доступ к компьютеру/браузеру. "+
+      "Когда появится онлайн-авторизация, здесь будет настоящая кнопка выхода.";
+
+    card.appendChild(text);
+    main.appendChild(card);
+  }
+
+  /* ROOT RENDER */
+
+  const mainCol=document.getElementById("mainCol");
+  const navBtns=document.querySelectorAll(".nav-btn");
+
+  navBtns.forEach(btn=>{
+    btn.onclick=()=>{
+      navBtns.forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      currentView=btn.dataset.view;
+      render();
+    };
+  });
+
+  function render(){
+    renderHeaderInfo();
+    mainCol.innerHTML="";
+    if(currentView==="today") renderToday(mainCol);
+    else if(currentView==="calendar") renderCalendar(mainCol);
+    else if(currentView==="students") renderStudents(mainCol);
+    else if(currentView==="parents") renderParents(mainCol);
+    else if(currentView==="student") renderStudent(mainCol,currentStudentId);
+    else if(currentView==="editStudent") renderEditStudent(mainCol,currentStudentId);
+    else if(currentView==="lesson") renderLesson(mainCol,currentLessonId);
+    else if(currentView==="subscriptions") renderSubscriptions(mainCol);
+    else if(currentView==="subscriptionEdit") renderSubscriptionEdit(mainCol,currentSubscriptionStudentId);
+    else if(currentView==="journal") renderJournal(mainCol);
+    else if(currentView==="plans") renderPlans(mainCol);
+    else if(currentView==="planDetail") renderPlanDetail(mainCol,currentPlanId);
+    else if(currentView==="settings") renderSettings(mainCol);
+    else if(currentView==="logout") renderLogout(mainCol);
+  }
+
+  render();
+</script>
+</body>
+</html>
