@@ -314,6 +314,41 @@
       box-shadow: var(--shadow);
       padding: 16px;
       border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+    }
+
+    .card.accent-orange { border-left-color: var(--accent); }
+    .card.accent-teal { border-left-color: var(--teal); }
+    .card.accent-quiet { border-left-color: var(--border); }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+      display: block;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+
+    .status-dot.done { background: var(--success); }
+    .status-dot.scheduled { background: var(--accent); }
+    .status-dot.cancelled { background: var(--danger); }
+    .status-dot.muted { background: var(--muted); opacity: 0.4; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
     }
 
     .card-header {
@@ -458,6 +493,76 @@
     }
 
     /* HOME LAYOUT */
+
+    .day-hero {
+      background: linear-gradient(135deg, #FFF6F0 0%, #FFFFFF 60%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .day-hero-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      text-transform: capitalize;
+    }
+
+    .day-hero-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .day-timeline {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+      height: 36px;
+      margin-top: 4px;
+    }
+
+    .day-timeline-track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--border);
+    }
+
+    .day-timeline-dot {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%,-50%);
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 2px solid var(--card);
+      cursor: pointer;
+    }
+
+    .day-timeline-dot.done { background: var(--success); }
+    .day-timeline-dot.scheduled { background: var(--accent); }
+    .day-timeline-dot.cancelled { background: var(--muted); opacity: 0.5; }
+
+    .day-timeline-label {
+      position: absolute;
+      top: 100%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-top: 2px;
+    }
 
     .home-grid {
       display: grid;
@@ -677,6 +782,12 @@
       opacity: 0.6;
     }
 
+    .calendar-mini.group {
+      border-color: var(--teal);
+      background: var(--teal-soft);
+      cursor: pointer;
+    }
+
     .calendar-mini .line1 {
       display: flex;
       justify-content: space-between;
@@ -804,7 +915,7 @@
     .subs-table-header,
     .subs-table-row {
       display: grid;
-      grid-template-columns: 2fr 1.4fr 1.2fr 1.2fr 1.4fr 1.4fr;
+      grid-template-columns: 2fr 1.4fr 1.2fr 1.2fr 1.6fr;
       column-gap: 6px;
       align-items: center;
     }
@@ -1376,6 +1487,79 @@
   /* HOME (Главная) */
 
   function renderToday(main) {
+    const today = todayISO();
+    const todaysAll = data.lessons
+      .filter(l=>l.date===today)
+      .sort((a,b)=>a.time.localeCompare(b.time));
+    const todaysGroupAll = data.groupLessons
+      .filter(gl=>gl.date===today)
+      .sort((a,b)=>a.time.localeCompare(b.time));
+
+    const hero=document.createElement("div");
+    hero.className="day-hero";
+
+    const heroLeft=document.createElement("div");
+    const heroTitle=document.createElement("div");
+    heroTitle.className="day-hero-title";
+    heroTitle.textContent=new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
+    const heroSub=document.createElement("div");
+    heroSub.className="day-hero-sub";
+    const totalEventsToday = todaysAll.filter(l=>l.status!=="cancelled").length + todaysGroupAll.length;
+    const doneEventsToday = todaysAll.filter(l=>l.status==="done").length;
+    heroSub.textContent = totalEventsToday
+      ? `${totalEventsToday} занятий сегодня · ${doneEventsToday} уже прошло`
+      : "Сегодня занятий нет";
+    heroLeft.appendChild(heroTitle);
+    heroLeft.appendChild(heroSub);
+    hero.appendChild(heroLeft);
+
+    if (totalEventsToday) {
+      const timeline=document.createElement("div");
+      timeline.className="day-timeline";
+      const track=document.createElement("div");
+      track.className="day-timeline-track";
+      timeline.appendChild(track);
+
+      const allEvents = [
+        ...todaysAll.map(l=>({time:l.time, status:l.status, name:getStudent(l.studentId)?.name||"?", kind:"lesson", id:l.id})),
+        ...todaysGroupAll.map(gl=>({time:gl.time, status:"scheduled", name:getGroup(gl.groupId)?.name||"Группа", kind:"group", id:gl.id}))
+      ].filter(e=>e.status!=="cancelled" || true)
+       .sort((a,b)=>a.time.localeCompare(b.time));
+
+      const toMinutes = t => { const [h,m]=t.split(":").map(Number); return h*60+m; };
+      const minTime = Math.min(...allEvents.map(e=>toMinutes(e.time)), 8*60);
+      const maxTime = Math.max(...allEvents.map(e=>toMinutes(e.time)), 20*60);
+      const span = Math.max(maxTime-minTime, 60);
+
+      allEvents.forEach(e=>{
+        const pct = ((toMinutes(e.time)-minTime)/span)*100;
+        const dot=document.createElement("div");
+        dot.className="day-timeline-dot "+(e.status==="cancelled"?"cancelled":e.status);
+        dot.style.left=`${Math.min(Math.max(pct,2),98)}%`;
+        dot.title=`${e.time} — ${e.name}`;
+        dot.onclick = e.kind==="group"
+          ? ()=>{currentView="groupLessonDetail";currentGroupLessonId=e.id;render();}
+          : ()=>openLessonView(e.id);
+        timeline.appendChild(dot);
+      });
+
+      const firstLabel=document.createElement("div");
+      firstLabel.className="day-timeline-label";
+      firstLabel.style.left="2%";
+      firstLabel.textContent=allEvents[0].time;
+      const lastLabel=document.createElement("div");
+      lastLabel.className="day-timeline-label";
+      lastLabel.style.left="98%";
+      lastLabel.style.transform="translateX(-100%)";
+      lastLabel.textContent=allEvents[allEvents.length-1].time;
+      timeline.appendChild(firstLabel);
+      if (allEvents.length>1) timeline.appendChild(lastLabel);
+
+      hero.appendChild(timeline);
+    }
+
+    main.appendChild(hero);
+
     const container=document.createElement("div");
     container.className="home-grid";
 
@@ -1384,7 +1568,7 @@
 
     /* Заметки на неделю */
     const notesCard=document.createElement("section");
-    notesCard.className="card";
+    notesCard.className="card accent-quiet";
     const nh=document.createElement("div");
     nh.className="card-header";
     const nhLeft=document.createElement("div");
@@ -1423,22 +1607,25 @@
     leftCol.appendChild(notesCard);
 
     /* Уроки сегодня */
-    const today = todayISO();
     const todays = data.lessons
       .filter(l=>l.date===today && l.status!=="cancelled")
       .sort((a,b)=>a.time.localeCompare(b.time));
 
     const lessonsCard=document.createElement("section");
-    lessonsCard.className="card";
+    lessonsCard.className="card accent-orange";
     const lHeader=document.createElement("div");
     lHeader.className="card-header";
     const lLeft=document.createElement("div");
+    const lEyebrow=document.createElement("span");
+    lEyebrow.className="eyebrow";
+    lEyebrow.textContent="СЕГОДНЯ";
     const lTitle=document.createElement("div");
     lTitle.className="card-title";
     lTitle.textContent="Уроки сегодня";
     const lSub=document.createElement("div");
     lSub.className="card-subtitle";
     lSub.textContent="Статусы, быстрые действия и переход к карточке урока";
+    lLeft.appendChild(lEyebrow);
     lLeft.appendChild(lTitle);
     lLeft.appendChild(lSub);
     const lTag=document.createElement("div");
@@ -1451,12 +1638,31 @@
     const list=document.createElement("div");
     list.className="lesson-list";
 
-    if (!todays.length) {
+    if (!todays.length && !todaysGroupAll.length) {
       const empty=document.createElement("div");
       empty.className="empty-state";
       empty.textContent="На сегодня уроков нет.";
       list.appendChild(empty);
     } else {
+      todaysGroupAll.forEach(gl=>{
+        const grp=getGroup(gl.groupId);
+        const row=document.createElement("div");
+        row.className="lesson-card";
+        row.style.cursor="pointer";
+        row.onclick=()=>{currentView="groupLessonDetail";currentGroupLessonId=gl.id;render();};
+        const top=document.createElement("div");
+        top.className="lesson-top";
+        const nameSpan=document.createElement("span");
+        nameSpan.className="lesson-name";
+        nameSpan.textContent="👪 "+(grp?grp.name:"Группа");
+        const timeSpan=document.createElement("span");
+        timeSpan.className="lesson-time";
+        timeSpan.textContent=gl.time;
+        top.appendChild(nameSpan);
+        top.appendChild(timeSpan);
+        row.appendChild(top);
+        list.appendChild(row);
+      });
       todays.forEach(l=>list.appendChild(renderLessonCard(l)));
     }
 
@@ -1470,7 +1676,7 @@
 
     /* Карточка "Сегодня" */
     const todayCard=document.createElement("section");
-    todayCard.className="card";
+    todayCard.className="card accent-quiet";
     const tHeader=document.createElement("div");
     tHeader.className="card-header";
     const tLeft=document.createElement("div");
@@ -1496,14 +1702,14 @@
     todayCard.appendChild(number);
 
     const sr1=document.createElement("div");
-    sr1.className="summary-row";
-    sr1.innerHTML=`<span>Проведено</span><span>${doneToday}</span>`;
+    sr1.className="status-row summary-row";
+    sr1.innerHTML=`<span><span class="status-dot done"></span>Проведено</span><span>${doneToday}</span>`;
     const sr2=document.createElement("div");
-    sr2.className="summary-row";
-    sr2.innerHTML=`<span>Запланировано</span><span>${plannedToday}</span>`;
+    sr2.className="status-row summary-row";
+    sr2.innerHTML=`<span><span class="status-dot scheduled"></span>Запланировано</span><span>${plannedToday}</span>`;
     const sr3=document.createElement("div");
-    sr3.className="summary-row";
-    sr3.innerHTML=`<span>Отменено</span><span>${cancelledToday}</span>`;
+    sr3.className="status-row summary-row";
+    sr3.innerHTML=`<span><span class="status-dot cancelled"></span>Отменено</span><span>${cancelledToday}</span>`;
 
     todayCard.appendChild(sr1);
     todayCard.appendChild(sr2);
@@ -1512,7 +1718,7 @@
 
     /* Критичные абонементы */
     const critCard=document.createElement("section");
-    critCard.className="card";
+    critCard.className="card accent-orange";
     const cHeader=document.createElement("div");
     cHeader.className="card-header";
     const cLeft=document.createElement("div");
@@ -1580,7 +1786,7 @@
     const upcomingBirthdays = getUpcomingBirthdays(3);
     if (upcomingBirthdays.length) {
       const bdayCard=document.createElement("section");
-      bdayCard.className="card";
+      bdayCard.className="card accent-orange";
       bdayCard.style.borderColor="var(--accent-soft)";
       bdayCard.style.background="linear-gradient(180deg, var(--accent-soft) 0%, var(--card) 60%)";
       const bHeader=document.createElement("div");
@@ -1620,7 +1826,7 @@
 
     /* Чек-лист на сегодня */
     const tasksCard=document.createElement("section");
-    tasksCard.className="card";
+    tasksCard.className="card accent-quiet";
     const chkHeader=document.createElement("div");
     chkHeader.className="card-header";
     const chkLeft=document.createElement("div");
@@ -1687,7 +1893,7 @@
 
     /* Темы сегодня */
     const topicsCard=document.createElement("section");
-    topicsCard.className="card";
+    topicsCard.className="card accent-teal";
     const h=document.createElement("div");
     h.className="card-header";
     const hLeft=document.createElement("div");
@@ -1881,17 +2087,21 @@
 
   function renderCalendar(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-teal";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="РАСПИСАНИЕ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Календарь";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Перетаскивай уроки для переноса. Клик по уроку — карточка.";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
 
@@ -1967,12 +2177,40 @@
       const lessons=data.lessons
         .filter(l=>l.date===iso && l.status!=="cancelled")
         .sort((a,b)=>a.time.localeCompare(b.time));
-      if (!lessons.length){
+      const grpLessons=data.groupLessons
+        .filter(gl=>gl.date===iso)
+        .sort((a,b)=>a.time.localeCompare(b.time));
+
+      if (!lessons.length && !grpLessons.length){
         const tiny=document.createElement("div");
         tiny.className="tiny";
         tiny.textContent="—";
         list.appendChild(tiny);
       } else {
+        grpLessons.forEach(gl=>{
+          const grp=getGroup(gl.groupId);
+          const mini=document.createElement("div");
+          mini.className="calendar-mini group";
+          mini.onclick=()=>{currentView="groupLessonDetail";currentGroupLessonId=gl.id;render();};
+
+          const line1=document.createElement("div");
+          line1.className="line1";
+          const tSpan=document.createElement("span");
+          tSpan.textContent=gl.time;
+          const nSpan=document.createElement("span");
+          nSpan.textContent="👪 "+(grp?grp.name:"Группа");
+          line1.appendChild(tSpan);
+          line1.appendChild(nSpan);
+
+          const line2=document.createElement("div");
+          line2.className="line2";
+          line2.textContent=gl.topic || `${gl.attendance.length} детей`;
+
+          mini.appendChild(line1);
+          mini.appendChild(line2);
+          list.appendChild(mini);
+        });
+
         lessons.forEach(l=>{
           const st=getStudent(l.studentId);
           const mini=document.createElement("div");
@@ -2045,17 +2283,21 @@
 
   function renderStudents(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-orange";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="БАЗА УЧЕНИКОВ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Ученики";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Карточки учеников, расписание и абонементы";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
     const btnToggle=document.createElement("button");
@@ -2371,6 +2613,21 @@
     rowGroup.appendChild(groupHint);
     rowGroup.appendChild(selGroup);
 
+    const rowMode=document.createElement("div");
+    rowMode.className="form-row";
+    const lblMode=document.createElement("div");
+    lblMode.className="form-label";
+    lblMode.textContent="Режим оплаты";
+    const selMode=document.createElement("select");
+    selMode.className="form-select";
+    [["subscription","Абонемент"],["perLesson","По занятиям"]].forEach(([val,txt])=>{
+      const opt=document.createElement("option");
+      opt.value=val;opt.textContent=txt;
+      selMode.appendChild(opt);
+    });
+    rowMode.appendChild(lblMode);
+    rowMode.appendChild(selMode);
+
     const rowSub=document.createElement("div");
     rowSub.className="form-row-inline";
 
@@ -2398,19 +2655,34 @@
     colTotal.appendChild(lblTotal);
     colTotal.appendChild(inTotal);
 
-    const colNextPay=document.createElement("div");
-    const lblNextPay=document.createElement("div");
-    lblNextPay.className="form-label";
-    lblNextPay.textContent="Следующая оплата (дата)";
-    const inNextPay=document.createElement("input");
-    inNextPay.className="form-input";
-    inNextPay.type="date";
-    colNextPay.appendChild(lblNextPay);
-    colNextPay.appendChild(inNextPay);
+    const colPaid=document.createElement("div");
+    const lblPaid=document.createElement("div");
+    lblPaid.className="form-label";
+    lblPaid.textContent="Оплачено?";
+    const paidWrap=document.createElement("div");
+    paidWrap.style.display="flex";
+    paidWrap.style.alignItems="center";
+    paidWrap.style.gap="6px";
+    paidWrap.style.height="38px";
+    const cbPaid=document.createElement("input");
+    cbPaid.type="checkbox";
+    const cbPaidLabel=document.createElement("span");
+    cbPaidLabel.className="tiny";
+    cbPaidLabel.textContent="Абонемент оплачен";
+    paidWrap.appendChild(cbPaid);
+    paidWrap.appendChild(cbPaidLabel);
+    colPaid.appendChild(lblPaid);
+    colPaid.appendChild(paidWrap);
 
     rowSub.appendChild(colPrice);
     rowSub.appendChild(colTotal);
-    rowSub.appendChild(colNextPay);
+    rowSub.appendChild(colPaid);
+
+    function updateSubRowVisibility(){
+      rowSub.style.display = selMode.value==="perLesson" ? "none" : "flex";
+    }
+    selMode.onchange=updateSubRowVisibility;
+    updateSubRowVisibility();
 
     const rowDur=document.createElement("div");
     rowDur.className="form-row-inline";
@@ -2484,23 +2756,26 @@
         }
       }
 
-      const priceVal = inPrice.value ? parseFloat(inPrice.value) : 0;
-      const totalVal = inTotal.value ? parseInt(inTotal.value,10) : 0;
-      const nextPayVal = inNextPay.value || "";
+      student.paymentMode = selMode.value;
 
-      if (totalVal>0 || priceVal>0 || nextPayVal) {
-        const subId = data.subscriptions.length
-          ? Math.max(...data.subscriptions.map(s=>s.id))+1
-          : 1;
-        data.subscriptions.push({
-          id: subId,
-          studentId: id,
-          total: totalVal,
-          price: priceVal,
-          paid: priceVal,
-          nextPaymentDate: nextPayVal,
-          doneOffset: 0
-        });
+      if (selMode.value !== "perLesson") {
+        const priceVal = inPrice.value ? parseFloat(inPrice.value) : 0;
+        const totalVal = inTotal.value ? parseInt(inTotal.value,10) : 0;
+
+        if (totalVal>0 || priceVal>0) {
+          const subId = data.subscriptions.length
+            ? Math.max(...data.subscriptions.map(s=>s.id))+1
+            : 1;
+          data.subscriptions.push({
+            id: subId,
+            studentId: id,
+            total: totalVal,
+            price: priceVal,
+            paid: cbPaid.checked ? priceVal : 0,
+            nextPaymentDate: "",
+            doneOffset: 0
+          });
+        }
       }
 
       const monthsMap={m1:1,m2:2,m3:3,m4:4,m5:5,m6:6,m9:9,year:12};
@@ -2510,7 +2785,7 @@
 
       save();
       showAddStudentForm=false;
-      alert("Ученик и абонемент добавлены, расписание создано.");
+      alert("Ученик добавлен, расписание создано.");
     };
 
     const btnClear=document.createElement("button");
@@ -2524,7 +2799,9 @@
       inBirthday.value="";
       inPrice.value="";
       inTotal.value="";
-      inNextPay.value="";
+      cbPaid.checked=false;
+      selMode.value="subscription";
+      updateSubRowVisibility();
       schedControls.forEach(s=>{s.cb.checked=false; s.time.value="";});
     };
 
@@ -2536,6 +2813,7 @@
     form.appendChild(row2);
     form.appendChild(rowSchedule);
     form.appendChild(rowGroup);
+    form.appendChild(rowMode);
     form.appendChild(rowSub);
     form.appendChild(rowDur);
     form.appendChild(actions);
@@ -2554,17 +2832,21 @@
 
   function renderParents(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-quiet";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="СВЯЗЬ С СЕМЬЁЙ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Родители";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Контакты родителей и быстрый переход к ребёнку";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
     header.appendChild(left);
@@ -2638,17 +2920,21 @@
 
   function renderGroups(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-teal";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ГРУППОВЫЕ ЗАНЯТИЯ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Группы";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Билингвальные и другие группы: расписание, состав, посещаемость";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
     header.appendChild(left);
@@ -3396,13 +3682,13 @@
       subTitle.textContent="Абонемент";
       const subText=document.createElement("div");
       subText.className="tiny";
-      if(sub){
+      if(sub && sub.total>0){
         subText.innerHTML =
           `<strong>Осталось занятий: ${remaining}</strong> (прошли ${doneCount} из ${total})<br>`+
           `Стоимость абонемента: <strong>${price}</strong> ₽<br>`+
-          `Оплачено: <strong>${paid}</strong> ₽`+
-          (debt>0?` (долг: <strong>${debt}</strong> ₽)`:"")+
-          `<br>Следующая оплата: <strong>${sub.nextPaymentDate || "не указана"}</strong>`;
+          (paid>0 && paid>=price
+            ? `Оплачен ✓`
+            : `<span style="color:var(--danger)">Не оплачен</span>`);
       } else {
         subText.textContent="Абонемент ещё не настроен.";
       }
@@ -4173,17 +4459,21 @@
 
   function renderSubscriptions(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-orange";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ФИНАНСЫ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Абонементы";
+    left.appendChild(eyebrow);
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
-    subtitle.textContent="Сколько уроков осталось, кто оплатил и когда следующая оплата.";
+    subtitle.textContent="Сколько уроков осталось и кто оплатил абонемент.";
     left.appendChild(title);
     left.appendChild(subtitle);
 
@@ -4224,20 +4514,21 @@
       "<span>Оплачено / цена</span>"+
       "<span>Прошли / всего</span>"+
       "<span>Осталось занятий</span>"+
-      "<span>Следующая оплата</span>"+
       "<span>Статус / действия</span>";
     card.appendChild(headerRow);
 
     data.students.forEach(st=>{
+      if (st.paymentMode==="perLesson") return; // показывается отдельно, не как абонемент
       const stats = getSubscriptionStats(st.id);
       const {sub,doneCount,total,remaining,price,paid,debt} = stats;
 
       let statusText="";
-      if(!sub){
-        statusText="нет абонемента";
+      const isConfigured = sub && total>0;
+      if(!isConfigured){
+        statusText="абонемент не настроен";
       } else if (debt>0){
         statusText=`долг ${debt} ₽`;
-      } else if (remaining<=2 && total>0){
+      } else if (remaining<=2) {
         statusText="скоро кончится";
       } else {
         statusText="OK";
@@ -4246,7 +4537,7 @@
       const row=document.createElement("div");
       row.className="subs-table-row";
 
-      if(sub){
+      if(isConfigured){
         if(debt>0 || remaining<=0){
           row.style.background="var(--danger-soft)";
         } else if(remaining<=2){
@@ -4258,16 +4549,13 @@
       c1.textContent=st.name;
 
       const c2=document.createElement("div");
-      c2.textContent=sub?`${paid}/${price} ₽`:"—";
+      c2.textContent=isConfigured?`${paid}/${price} ₽`:"—";
 
       const c3=document.createElement("div");
-      c3.textContent=sub?`${doneCount}/${total}`:"—";
+      c3.textContent=isConfigured?`${doneCount}/${total}`:"—";
 
       const c4=document.createElement("div");
-      c4.textContent=sub?remaining:"—";
-
-      const c5=document.createElement("div");
-      c5.textContent=sub && sub.nextPaymentDate ? sub.nextPaymentDate : "—";
+      c4.textContent=isConfigured?remaining:"—";
 
       const c6=document.createElement("div");
       c6.style.display="flex";
@@ -4295,7 +4583,6 @@
       row.appendChild(c2);
       row.appendChild(c3);
       row.appendChild(c4);
-      row.appendChild(c5);
       row.appendChild(c6);
 
       card.appendChild(row);
@@ -4371,14 +4658,22 @@
     const colPaid=document.createElement("div");
     const lblPaid=document.createElement("div");
     lblPaid.className="form-label";
-    lblPaid.textContent="Оплачено (₽)";
-    const inPaid=document.createElement("input");
-    inPaid.className="form-input";
-    inPaid.type="number";
-    inPaid.min="0";
-    inPaid.value=paid || 0;
+    lblPaid.textContent="Оплачено?";
+    const paidWrap=document.createElement("div");
+    paidWrap.style.display="flex";
+    paidWrap.style.alignItems="center";
+    paidWrap.style.gap="6px";
+    paidWrap.style.height="38px";
+    const cbPaid=document.createElement("input");
+    cbPaid.type="checkbox";
+    cbPaid.checked = (paid>0 && paid>=price && price>0);
+    const cbPaidLabel=document.createElement("span");
+    cbPaidLabel.className="tiny";
+    cbPaidLabel.textContent="Абонемент оплачен";
+    paidWrap.appendChild(cbPaid);
+    paidWrap.appendChild(cbPaidLabel);
     colPaid.appendChild(lblPaid);
-    colPaid.appendChild(inPaid);
+    colPaid.appendChild(paidWrap);
 
     row1.appendChild(colPrice);
     row1.appendChild(colPaid);
@@ -4398,19 +4693,7 @@
     colTotal.appendChild(lblTotal);
     colTotal.appendChild(inTotal);
 
-    const colNext=document.createElement("div");
-    const lblNext=document.createElement("div");
-    lblNext.className="form-label";
-    lblNext.textContent="Следующая оплата (дата)";
-    const inNext=document.createElement("input");
-    inNext.className="form-input";
-    inNext.type="date";
-    inNext.value=sub.nextPaymentDate || "";
-    colNext.appendChild(lblNext);
-    colNext.appendChild(inNext);
-
     row2.appendChild(colTotal);
-    row2.appendChild(colNext);
 
     const rowDone=document.createElement("div");
     rowDone.className="form-row";
@@ -4436,9 +4719,8 @@
     btnSave.textContent="Сохранить";
     btnSave.onclick=()=>{
       sub.price = inPrice.value ? parseFloat(inPrice.value) : 0;
-      sub.paid = inPaid.value ? parseFloat(inPaid.value) : 0;
+      sub.paid = cbPaid.checked ? sub.price : 0;
       sub.total = inTotal.value ? parseInt(inTotal.value,10) : 0;
-      sub.nextPaymentDate = inNext.value || "";
 
       const manualDone = inDone.value !== "" ? parseInt(inDone.value,10) : 0;
       sub.doneOffset = manualDone - rawDone;
@@ -4474,17 +4756,21 @@
 
   function renderJournal(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-quiet";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ИСТОРИЯ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Журнал";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Статистика по занятиям: даты, оценки, комментарии.";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
     header.appendChild(left);
@@ -4620,17 +4906,21 @@
 
   function renderPlans(main){
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-teal";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="МЕТОДИКА";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Уроки (КТП)";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Учебники и календарно-тематическое планирование.";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
 
