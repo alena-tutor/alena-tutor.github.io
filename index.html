@@ -381,7 +381,7 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      border: 1px solid rgba(199, 146, 75, 0.3);
+      border: 1px solid rgba(255, 122, 61, 0.25);
     }
 
     .tag-dot {
@@ -400,11 +400,12 @@
     .btn-main {
       border: none;
       border-radius: 999px;
-      padding: 7px 16px;
+      padding: 8px 18px;
       background: linear-gradient(135deg, #FF8F5C, #FF7A3D);
       color: #fff;
       cursor: pointer;
       font-size: 13px;
+      font-weight: 600;
       box-shadow: 0 8px 18px rgba(255, 122, 61, 0.35);
       transition: transform 0.08s ease, box-shadow 0.12s ease;
     }
@@ -416,26 +417,30 @@
 
     .btn-secondary {
       border-radius: 999px;
-      padding: 7px 14px;
+      padding: 8px 16px;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--text);
       cursor: pointer;
       font-size: 13px;
+      font-weight: 500;
+      transition: background 0.1s ease, transform 0.08s ease;
     }
 
     .btn-secondary:hover {
       background: #ECECEC;
+      transform: translateY(-1px);
     }
 
     .btn-danger {
       border-radius: 999px;
-      padding: 7px 14px;
+      padding: 8px 16px;
       background: var(--danger-soft);
       border: 1px solid #F0BDB8;
       color: var(--danger);
       cursor: pointer;
       font-size: 13px;
+      font-weight: 500;
     }
 
     .btn-chip {
@@ -467,24 +472,6 @@
     .btn-chip.small {
       font-size: 10px;
       padding: 2px 7px;
-    }
-
-    .status-label {
-      padding: 2px 6px;
-      border-radius: 999px;
-      background: var(--card);
-      border: 1px solid rgba(0,0,0,0.04);
-      font-size: 10px;
-    }
-
-    .status-done {
-      background: var(--success-soft);
-      border-color: #AEDFC8;
-    }
-
-    .status-cancelled {
-      background: var(--danger-soft);
-      border-color: #F0BDB8;
     }
 
     .tiny {
@@ -818,45 +805,61 @@
     /* FORMS */
 
     .form-section {
-      border-radius: 14px;
-      background: var(--surface);
-      padding: 10px;
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: 16px;
       margin-bottom: 8px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
       border: 1px solid var(--border);
+      box-shadow: 0 4px 14px rgba(28, 37, 40, 0.04);
     }
 
     .form-row {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 5px;
     }
 
     .form-row-inline {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
     .form-row-inline > div {
       flex: 1;
       min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
     }
 
     .form-label {
-      font-size: 11px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
       color: var(--muted);
+      font-weight: 600;
     }
 
     .form-input, .form-select, textarea {
       width: 100%;
-      padding: 6px 8px;
-      border-radius: 9px;
-      border: 1px solid var(--border);
-      font-size: 12px;
+      padding: 9px 11px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      font-size: 13px;
       background: #FFFFFF;
+      color: var(--text);
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .form-input:focus, .form-select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
 
     textarea {
@@ -1144,6 +1147,16 @@
 
   const MONTHS_RU = ["января","февраля","марта","апреля","мая","июня",
     "июля","августа","сентября","октября","ноября","декабря"];
+
+  function pluralizeChildren(n){
+    const mod10 = n%10, mod100 = n%100;
+    let word;
+    if (mod100>=11 && mod100<=14) word="детей";
+    else if (mod10===1) word="ребёнок";
+    else if (mod10>=2 && mod10<=4) word="ребёнка";
+    else word="детей";
+    return `${n} ${word}`;
+  }
 
   function formatBirthdayShort(birthday){
     if(!birthday) return "";
@@ -2007,14 +2020,14 @@
     const meta=document.createElement("div");
     meta.className="lesson-meta";
     const statusSpan=document.createElement("span");
-    statusSpan.className="status-label";
+    statusSpan.className="status-row";
     if (lesson.status==="done"){
-      statusSpan.classList.add("status-done");
-      statusSpan.textContent="проведён";
+      statusSpan.innerHTML='<span class="status-dot done"></span>проведён';
     } else if (lesson.status==="cancelled"){
-      statusSpan.classList.add("status-cancelled");
-      statusSpan.textContent="отменён";
-    } else statusSpan.textContent="запланирован";
+      statusSpan.innerHTML='<span class="status-dot cancelled"></span>отменён';
+    } else {
+      statusSpan.innerHTML='<span class="status-dot scheduled"></span>запланирован';
+    }
 
     const hwSpan=document.createElement("span");
     hwSpan.textContent = (lesson.hw && lesson.hw.trim()) ? "Домашка есть" : "Домашка не задана";
@@ -2038,27 +2051,27 @@
 
     const btnDone=document.createElement("button");
     btnDone.className="btn-chip primary";
-    btnDone.textContent="✅ Был урок";
+    btnDone.textContent="Был урок";
     btnDone.onclick=(e)=>{e.stopPropagation(); setLessonStatus(lesson.id,"done");};
 
     const btnCancel=document.createElement("button");
     btnCancel.className="btn-chip danger";
-    btnCancel.textContent="✖ Отменён";
+    btnCancel.textContent="Отменён";
     btnCancel.onclick=(e)=>{e.stopPropagation(); setLessonStatus(lesson.id,"cancelled");};
 
     const btnOpen=document.createElement("button");
     btnOpen.className="btn-chip small";
-    btnOpen.textContent="📖 Открыть";
+    btnOpen.textContent="Открыть";
     btnOpen.onclick=(e)=>{e.stopPropagation(); openLessonView(lesson.id);};
 
     const btnRem=document.createElement("button");
     btnRem.className="btn-chip small";
-    btnRem.textContent="🔔 Напомнить";
+    btnRem.textContent="Напомнить";
     btnRem.onclick=(e)=>{e.stopPropagation(); sendLessonReminder(lesson,st);};
 
     const btnHW=document.createElement("button");
     btnHW.className="btn-chip small";
-    btnHW.textContent="📩 Д/з";
+    btnHW.textContent="Д/з";
     btnHW.onclick=(e)=>{e.stopPropagation(); sendHomework(lesson,st);};
 
     actions.appendChild(btnDone);
@@ -2204,7 +2217,7 @@
 
           const line2=document.createElement("div");
           line2.className="line2";
-          line2.textContent=gl.topic || `${gl.attendance.length} детей`;
+          line2.textContent=gl.topic || pluralizeChildren(gl.attendance.length);
 
           mini.appendChild(line1);
           mini.appendChild(line2);
@@ -3146,10 +3159,13 @@
     }
 
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-teal";
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ГРУППА";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent=g.name;
@@ -3158,6 +3174,7 @@
     subtitle.textContent = g.buildinLink
       ? "План занятий: ссылка ниже"
       : "Ссылка на план не добавлена";
+    left.appendChild(eyebrow);
     left.appendChild(title);left.appendChild(subtitle);
     header.appendChild(left);
 
@@ -3280,6 +3297,14 @@
       const sid=parseInt(selStudent.value,10);
       if(!sid){alert("Выберите ученика");return;}
       g.memberIds.push(sid);
+      const addedStudent = getStudent(sid);
+      if (addedStudent && addedStudent.schedule) {
+        const today = todayISO();
+        data.lessons = data.lessons.filter(l =>
+          !(l.studentId===sid && l.status==="scheduled" && l.date>=today)
+        );
+        addedStudent.schedule = null;
+      }
       syncGroupLessonsAttendance(g.id);
       save();
     };
@@ -3373,16 +3398,20 @@
     const g = getGroup(gl.groupId);
 
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-teal";
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ЗАНЯТИЕ ГРУППЫ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent = `${g?g.name:"Группа"} — ${gl.date} ${gl.time}`;
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Отметь присутствие и оставь комментарий по каждому ребёнку";
+    left.appendChild(eyebrow);
     left.appendChild(title);left.appendChild(subtitle);
     header.appendChild(left);
 
@@ -3525,18 +3554,23 @@
       main.appendChild(card);
       return;
     }
+    const studentGroupForHeader = getGroupForStudent(studentId);
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card "+(studentGroupForHeader ? "accent-teal" : "accent-orange");
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent = studentGroupForHeader ? "УЧЕНИК ГРУППЫ" : "КАРТОЧКА УЧЕНИКА";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent=st.name;
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent = st.tz ? `Часовой пояс: ${st.tz}` : "";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
 
@@ -3549,44 +3583,52 @@
     btnBack.className="btn-secondary";
     btnBack.textContent="← К ученикам";
     btnBack.onclick=()=>{currentView="students";render();};
+    btnRow.appendChild(btnBack);
 
-    const btnExtend=document.createElement("button");
-    btnExtend.className="btn-main";
-    btnExtend.textContent="Продлить расписание";
-    btnExtend.onclick=()=>{
-      const choice=prompt(
-        "На сколько месяцев продлить расписание?\nВведите число от 1 до 9, или 12 — на год.",
-        "1"
-      );
-      const months = parseFloat(choice);
-      if(!months || months<=0){ if(choice!==null) alert("Введите число месяцев."); return; }
-      const weeks = Math.round(months * 4.345);
-      extendScheduleForStudent(studentId,weeks);
-    };
+    if (!studentGroupForHeader) {
+      const btnExtend=document.createElement("button");
+      btnExtend.className="btn-main";
+      btnExtend.textContent="Продлить расписание";
+      btnExtend.onclick=()=>{
+        const choice=prompt(
+          "На сколько месяцев продлить расписание?\nВведите число от 1 до 9, или 12 — на год.",
+          "1"
+        );
+        const months = parseFloat(choice);
+        if(!months || months<=0){ if(choice!==null) alert("Введите число месяцев."); return; }
+        const weeks = Math.round(months * 4.345);
+        extendScheduleForStudent(studentId,weeks);
+      };
 
-    const btnAdd=document.createElement("button");
-    btnAdd.className="btn-secondary";
-    btnAdd.textContent="Добавить урок";
-    btnAdd.onclick=()=>{
-      const date=prompt("Дата (ГГГГ-ММ-ДД)", todayISO());
-      if(!date) return;
-      const time=prompt("Время (ЧЧ:ММ)", "18:00");
-      if(!time) return;
-      createLesson(studentId,date,time);
-      save();
-    };
+      const btnAdd=document.createElement("button");
+      btnAdd.className="btn-secondary";
+      btnAdd.textContent="Добавить урок";
+      btnAdd.onclick=()=>{
+        const date=prompt("Дата (ГГГГ-ММ-ДД)", todayISO());
+        if(!date) return;
+        const time=prompt("Время (ЧЧ:ММ)", "18:00");
+        if(!time) return;
+        createLesson(studentId,date,time);
+        save();
+      };
+
+      btnRow.appendChild(btnExtend);
+      btnRow.appendChild(btnAdd);
+    } else {
+      const btnGoGroup=document.createElement("button");
+      btnGoGroup.className="btn-main";
+      btnGoGroup.textContent="К группе «"+studentGroupForHeader.name+"»";
+      btnGoGroup.onclick=()=>{currentView="groupDetail";currentGroupId=studentGroupForHeader.id;render();};
+      btnRow.appendChild(btnGoGroup);
+    }
 
     const btnEdit=document.createElement("button");
     btnEdit.className="btn-secondary";
     btnEdit.textContent="Изменить";
     btnEdit.onclick=()=>openEditStudent(studentId);
-
-    btnRow.appendChild(btnBack);
-    btnRow.appendChild(btnExtend);
-    btnRow.appendChild(btnAdd);
     btnRow.appendChild(btnEdit);
 
-    const studentGroup = getGroupForStudent(studentId);
+    const studentGroup = studentGroupForHeader;
     if (studentGroup) {
       const btnCopyComments=document.createElement("button");
       btnCopyComments.className="btn-chip small teal";
@@ -3623,12 +3665,22 @@
 
     const info=document.createElement("div");
     info.className="tiny";
-    info.textContent = st.schedule && st.schedule.length
-      ? "Расписание: " + st.schedule.map(s=>{
-          const d = daysOfWeek.find(x=>x.key===s.dayKey)?.label || "?";
-          return `${d} ${s.time||""}`;
-        }).join(", ")
-      : "Расписание не задано.";
+    if (studentGroup) {
+      info.innerHTML = `Расписание: общее для группы «${studentGroup.name}»`+
+        (studentGroup.schedule && studentGroup.schedule.length
+          ? " — " + studentGroup.schedule.map(s=>{
+              const d = daysOfWeek.find(x=>x.key===s.dayKey)?.label || "?";
+              return `${d} ${s.time||""}`;
+            }).join(", ")
+          : "");
+    } else {
+      info.textContent = st.schedule && st.schedule.length
+        ? "Расписание: " + st.schedule.map(s=>{
+            const d = daysOfWeek.find(x=>x.key===s.dayKey)?.label || "?";
+            return `${d} ${s.time||""}`;
+          }).join(", ")
+        : "Расписание не задано.";
+    }
     card.appendChild(info);
 
     const subBlock=document.createElement("div");
@@ -3724,10 +3776,10 @@
           const dSpan=document.createElement("span");
           dSpan.textContent=`${l.date} ${l.time}`;
           const status=document.createElement("span");
-          status.className="status-label";
-          if(l.status==="done"){status.classList.add("status-done");status.textContent="проведён";}
-          else if(l.status==="cancelled"){status.classList.add("status-cancelled");status.textContent="отменён";}
-          else status.textContent="запланирован";
+          status.className="status-row";
+          if(l.status==="done"){status.innerHTML='<span class="status-dot done"></span>проведён';}
+          else if(l.status==="cancelled"){status.innerHTML='<span class="status-dot cancelled"></span>отменён';}
+          else status.innerHTML='<span class="status-dot scheduled"></span>запланирован';
           top.appendChild(dSpan);
           top.appendChild(status);
 
@@ -3758,13 +3810,19 @@
       card.className="card";card.textContent="Ученик не найден.";main.appendChild(card);return;
     }
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-orange";
     const header=document.createElement("div");
     header.className="card-header";
+    const headerLeft=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="РЕДАКТИРОВАНИЕ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent="Изменить ученика";
-    header.appendChild(title);
+    headerLeft.appendChild(eyebrow);
+    headerLeft.appendChild(title);
+    header.appendChild(headerLeft);
     card.appendChild(header);
 
     const form=document.createElement("div");
@@ -4021,17 +4079,22 @@
     }
     const st=getStudent(l.studentId);
     const card=document.createElement("section");
-    card.className="card";
+    const accentByStatus = l.status==="done" ? "" : l.status==="cancelled" ? "accent-quiet" : "accent-orange";
+    card.className="card "+accentByStatus;
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent = l.status==="done" ? "ПРОВЕДЁННОЕ ЗАНЯТИЕ" : l.status==="cancelled" ? "ОТМЕНЁННОЕ ЗАНЯТИЕ" : "ЗАПЛАНИРОВАННОЕ ЗАНЯТИЕ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent = st? st.name : "Ученик";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
-    subtitle.textContent = `${l.date} • ${l.time}`;
+    subtitle.innerHTML = `<span class="status-dot ${l.status==='cancelled'?'cancelled':l.status}"></span>${l.date} • ${l.time}`;
+    left.appendChild(eyebrow);
     left.appendChild(title);left.appendChild(subtitle);
 
     const btnBack=document.createElement("button");
@@ -4614,17 +4677,21 @@
     const {rawDone,doneCount,total,price,paid} = stats;
 
     const card=document.createElement("section");
-    card.className="card";
+    card.className="card accent-orange";
 
     const header=document.createElement("div");
     header.className="card-header";
     const left=document.createElement("div");
+    const eyebrow=document.createElement("span");
+    eyebrow.className="eyebrow";
+    eyebrow.textContent="ФИНАНСЫ";
     const title=document.createElement("div");
     title.className="card-title";
     title.textContent=`Абонемент: ${st.name}`;
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.textContent="Редактирование оплаты и количества занятий.";
+    left.appendChild(eyebrow);
     left.appendChild(title);
     left.appendChild(subtitle);
 
@@ -4873,11 +4940,10 @@
           c2.innerHTML = `Урок: ${gl}<br>Д/з: ${gh}`;
 
           const c3=document.createElement("div");
-          let stText="";
-          if(l.status==="done") stText="проведён";
-          else if(l.status==="cancelled") stText="отменён";
-          else stText="запланирован";
-          c3.textContent=stText;
+          c3.className="status-row";
+          if(l.status==="done") c3.innerHTML='<span class="status-dot done"></span>проведён';
+          else if(l.status==="cancelled") c3.innerHTML='<span class="status-dot cancelled"></span>отменён';
+          else c3.innerHTML='<span class="status-dot scheduled"></span>запланирован';
 
           const c4=document.createElement("div");
           const parts=[];
