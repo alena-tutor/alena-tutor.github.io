@@ -1120,6 +1120,17 @@
 
   let data = loadData();
 
+  // One-time-per-load safety net: if any student is in a group but still has
+  // a leftover individual schedule or future individual lessons (e.g. from
+  // before group support existed, or from manual data edits), clean it up so
+  // they don't show up duplicated on the calendar/home screen.
+  (function repairOnLoad(){
+    const result = repairGroupMembersStaleSchedules();
+    if (result.studentsFixed>0 || result.lessonsRemoved>0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  })();
+
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     render();
@@ -1259,6 +1270,37 @@
       });
       gl.attendance = gl.attendance.filter(a=>g.memberIds.includes(a.studentId));
     });
+  }
+
+  function repairGroupMembersStaleSchedules() {
+    // For every student currently in a group, clear their individual schedule
+    // and remove their future (not-yet-happened) individual lessons.
+    // Past/done/cancelled lessons are preserved as history.
+    const today = todayISO();
+    let studentsFixed = 0;
+    let lessonsRemoved = 0;
+
+    data.students.forEach(st=>{
+      const grp = getGroupForStudent(st.id);
+      if (!grp) return;
+
+      const hadSchedule = !!(st.schedule && st.schedule.length);
+      const futureLessons = data.lessons.filter(l =>
+        l.studentId===st.id && l.status==="scheduled" && l.date>=today
+      );
+
+      if (hadSchedule || futureLessons.length) {
+        if (hadSchedule) { st.schedule = null; studentsFixed++; }
+        if (futureLessons.length) {
+          lessonsRemoved += futureLessons.length;
+          data.lessons = data.lessons.filter(l =>
+            !(l.studentId===st.id && l.status==="scheduled" && l.date>=today)
+          );
+        }
+      }
+    });
+
+    return {studentsFixed, lessonsRemoved};
   }
 
   function getLessonsByStudent(id) {
@@ -1774,10 +1816,13 @@
         row.style.padding="3px 0";
 
         const left=document.createElement("div");
+        const debtPart = stats.debt>0
+          ? `<span style="color:var(--danger)">долг: ${stats.debt} ₽</span>`
+          : `оплачено`;
         left.innerHTML =
           `<strong>${student.name}</strong><br>`+
           `<span class="tiny">Осталось: ${stats.remaining} из ${stats.total}, `+
-          `долг: ${stats.debt} ₽</span>`;
+          `${debtPart}</span>`;
 
         const right=document.createElement("div");
         right.style.display="flex";
