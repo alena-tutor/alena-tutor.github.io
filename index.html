@@ -1200,6 +1200,15 @@
     return data.groups.find(g => g.memberIds.includes(studentId)) || null;
   }
 
+  function getIndividualLessons(extraFilterFn) {
+    // Returns lessons for students who are NOT in a group (avoids duplicating
+    // a child's schedule once they belong to a group with its own groupLessons).
+    return data.lessons.filter(l => {
+      if (getGroupForStudent(l.studentId)) return false;
+      return extraFilterFn ? extraFilterFn(l) : true;
+    });
+  }
+
   function createGroupLesson(groupId, date, time) {
     const g = getGroup(groupId);
     if (!g) return null;
@@ -1501,8 +1510,7 @@
 
   function renderToday(main) {
     const today = todayISO();
-    const todaysAll = data.lessons
-      .filter(l=>l.date===today)
+    const todaysAll = getIndividualLessons(l=>l.date===today)
       .sort((a,b)=>a.time.localeCompare(b.time));
     const todaysGroupAll = data.groupLessons
       .filter(gl=>gl.date===today)
@@ -1620,8 +1628,7 @@
     leftCol.appendChild(notesCard);
 
     /* Уроки сегодня */
-    const todays = data.lessons
-      .filter(l=>l.date===today && l.status!=="cancelled")
+    const todays = getIndividualLessons(l=>l.date===today && l.status!=="cancelled")
       .sort((a,b)=>a.time.localeCompare(b.time));
 
     const lessonsCard=document.createElement("section");
@@ -1705,9 +1712,9 @@
     todayCard.appendChild(tHeader);
 
     const totalToday = todays.length;
-    const doneToday = data.lessons.filter(l=>l.date===today && l.status==="done").length;
-    const cancelledToday = data.lessons.filter(l=>l.date===today && l.status==="cancelled").length;
-    const plannedToday = data.lessons.filter(l=>l.date===today && l.status==="scheduled").length;
+    const doneToday = getIndividualLessons(l=>l.date===today && l.status==="done").length;
+    const cancelledToday = getIndividualLessons(l=>l.date===today && l.status==="cancelled").length;
+    const plannedToday = getIndividualLessons(l=>l.date===today && l.status==="scheduled").length;
 
     const number=document.createElement("div");
     number.className="summary-number";
@@ -2162,9 +2169,15 @@
         e.preventDefault();
         col.classList.remove("drop-target");
         const idStr=e.dataTransfer.getData("text/plain");
-        const id=parseInt(idStr,10);
-        if(!id) return;
-        moveLessonDate(id,iso);
+        if (idStr.startsWith("group:")) {
+          const glId=parseInt(idStr.slice(6),10);
+          if(!glId) return;
+          moveGroupLessonDate(glId,iso);
+        } else {
+          const id=parseInt(idStr,10);
+          if(!id) return;
+          moveLessonDate(id,iso);
+        }
       });
 
       const head=document.createElement("div");
@@ -2188,7 +2201,7 @@
       const list=document.createElement("div");
       list.className="calendar-lessons";
       const lessons=data.lessons
-        .filter(l=>l.date===iso && l.status!=="cancelled")
+        .filter(l=>l.date===iso && l.status!=="cancelled" && !getGroupForStudent(l.studentId))
         .sort((a,b)=>a.time.localeCompare(b.time));
       const grpLessons=data.groupLessons
         .filter(gl=>gl.date===iso)
@@ -2204,6 +2217,10 @@
           const grp=getGroup(gl.groupId);
           const mini=document.createElement("div");
           mini.className="calendar-mini group";
+          mini.draggable=true;
+          mini.addEventListener("dragstart",e=>{
+            e.dataTransfer.setData("text/plain","group:"+String(gl.id));
+          });
           mini.onclick=()=>{currentView="groupLessonDetail";currentGroupLessonId=gl.id;render();};
 
           const line1=document.createElement("div");
@@ -2276,6 +2293,13 @@
     if(!l) return;
     l.date=newDate;
     l.wasMoved=true;
+    save();
+  }
+
+  function moveGroupLessonDate(groupLessonId,newDate){
+    const gl=data.groupLessons.find(x=>x.id===groupLessonId);
+    if(!gl) return;
+    gl.date=newDate;
     save();
   }
 
@@ -3422,6 +3446,87 @@
     header.appendChild(btnBack);
     card.appendChild(header);
 
+    const rowDateTime=document.createElement("div");
+    rowDateTime.className="form-row-inline";
+
+    const colDate=document.createElement("div");
+    const lblDate=document.createElement("div");
+    lblDate.className="form-label";lblDate.textContent="Дата занятия";
+    const inDate=document.createElement("input");
+    inDate.className="form-input";
+    inDate.type="date";
+    inDate.value=gl.date;
+    colDate.appendChild(lblDate);colDate.appendChild(inDate);
+
+    const colTime=document.createElement("div");
+    const lblTime=document.createElement("div");
+    lblTime.className="form-label";lblTime.textContent="Время занятия";
+    const inTime=document.createElement("input");
+    inTime.className="form-input";
+    inTime.type="time";
+    inTime.value=gl.time;
+    colTime.appendChild(lblTime);colTime.appendChild(inTime);
+
+    rowDateTime.appendChild(colDate);
+    rowDateTime.appendChild(colTime);
+
+    const rowApplyScope=document.createElement("div");
+    rowApplyScope.className="form-row";
+    const lblScope=document.createElement("div");
+    lblScope.className="form-label";lblScope.textContent="Применить изменение к";
+    const scopeHint=document.createElement("div");
+    scopeHint.className="tiny";
+    scopeHint.style.marginBottom="4px";
+    scopeHint.textContent="«Только это занятие» — изменится дата и время именно этого занятия группы. «Все будущие» — поменяется время на всех будущих занятиях этой группы с прежним временем; дата меняется только у этого занятия.";
+    const selScope=document.createElement("select");
+    selScope.className="form-select";
+    [["only","Только это занятие"],["future","Это и все будущие занятия группы (то же время)"]]
+      .forEach(([val,txt])=>{
+        const opt=document.createElement("option");
+        opt.value=val;opt.textContent=txt;
+        selScope.appendChild(opt);
+      });
+    const btnApplyDateTime=document.createElement("button");
+    btnApplyDateTime.className="btn-secondary";
+    btnApplyDateTime.textContent="Сохранить дату и время";
+    btnApplyDateTime.style.marginTop="6px";
+    btnApplyDateTime.onclick=()=>{
+      const newDate=inDate.value;
+      const newTime=inTime.value;
+      if(!newDate || !newTime){alert("Укажите дату и время.");return;}
+
+      if (selScope.value==="future") {
+        const oldTime = gl.time;
+        const today = todayISO();
+        let count=0;
+        data.groupLessons.forEach(other=>{
+          if (other.groupId===gl.groupId &&
+              other.time===oldTime &&
+              other.date>=today) {
+            other.time = newTime;
+            count++;
+          }
+        });
+        gl.date = newDate;
+        gl.time = newTime;
+        save();
+        alert(`Время обновлено для этого занятия и ещё ${count-1>0?count-1:0} будущих занятий группы с тем же временем.`);
+      } else {
+        gl.date = newDate;
+        gl.time = newTime;
+        save();
+      }
+      render();
+    };
+
+    rowApplyScope.appendChild(lblScope);
+    rowApplyScope.appendChild(scopeHint);
+    rowApplyScope.appendChild(selScope);
+    rowApplyScope.appendChild(btnApplyDateTime);
+
+    card.appendChild(rowDateTime);
+    card.appendChild(rowApplyScope);
+
     const topicRow=document.createElement("div");
     topicRow.className="form-row";
     const topicLbl=document.createElement("div");
@@ -4109,6 +4214,91 @@
     const form=document.createElement("div");
     form.className="form-section";
 
+    const rowDateTime=document.createElement("div");
+    rowDateTime.className="form-row-inline";
+
+    const colDate=document.createElement("div");
+    const lblDate=document.createElement("div");
+    lblDate.className="form-label";lblDate.textContent="Дата занятия";
+    const inDate=document.createElement("input");
+    inDate.className="form-input";
+    inDate.type="date";
+    inDate.value=l.date;
+    colDate.appendChild(lblDate);colDate.appendChild(inDate);
+
+    const colTime=document.createElement("div");
+    const lblTime=document.createElement("div");
+    lblTime.className="form-label";lblTime.textContent="Время занятия";
+    const inTime=document.createElement("input");
+    inTime.className="form-input";
+    inTime.type="time";
+    inTime.value=l.time;
+    colTime.appendChild(lblTime);colTime.appendChild(inTime);
+
+    rowDateTime.appendChild(colDate);
+    rowDateTime.appendChild(colTime);
+
+    const rowApplyScope=document.createElement("div");
+    rowApplyScope.className="form-row";
+    const lblScope=document.createElement("div");
+    lblScope.className="form-label";lblScope.textContent="Применить изменение к";
+    const scopeHint=document.createElement("div");
+    scopeHint.className="tiny";
+    scopeHint.style.marginBottom="4px";
+    scopeHint.textContent="«Только это занятие» — изменится и дата, и время именно этого урока. «Все будущие» — поменяется только время (на всех будущих занятиях с прежним временем), а дата меняется только у этого урока.";
+    const selScope=document.createElement("select");
+    selScope.className="form-select";
+    [["only","Только это занятие"],["future","Это и все будущие занятия (тот же день недели и время)"]]
+      .forEach(([val,txt])=>{
+        const opt=document.createElement("option");
+        opt.value=val;opt.textContent=txt;
+        selScope.appendChild(opt);
+      });
+    const btnApplyDateTime=document.createElement("button");
+    btnApplyDateTime.className="btn-secondary";
+    btnApplyDateTime.textContent="Сохранить дату и время";
+    btnApplyDateTime.style.marginTop="6px";
+    btnApplyDateTime.onclick=()=>{
+      const newDate=inDate.value;
+      const newTime=inTime.value;
+      if(!newDate || !newTime){alert("Укажите дату и время.");return;}
+
+      if (selScope.value==="future") {
+        const oldTime = l.time;
+        const today = todayISO();
+        let count=0;
+        data.lessons.forEach(other=>{
+          if (other.studentId===l.studentId &&
+              other.status==="scheduled" &&
+              other.time===oldTime &&
+              other.date>=today) {
+            other.time = newTime;
+            // shift each lesson's date by the same day-of-week offset as the edited one,
+            // keeping their own original date but applying the new time only —
+            // changing the date for a whole series would be ambiguous, so we only
+            // propagate the time change across the series.
+            count++;
+          }
+        });
+        l.date = newDate;
+        l.time = newTime;
+        l.wasMoved=true;
+        save();
+        alert(`Время обновлено для этого занятия и ещё ${count-1>0?count-1:0} будущих занятий с тем же временем.`);
+      } else {
+        l.date = newDate;
+        l.time = newTime;
+        l.wasMoved=true;
+        save();
+      }
+      render();
+    };
+
+    rowApplyScope.appendChild(lblScope);
+    rowApplyScope.appendChild(scopeHint);
+    rowApplyScope.appendChild(selScope);
+    rowApplyScope.appendChild(btnApplyDateTime);
+
     const rowTopic=document.createElement("div");
     rowTopic.className="form-row";
     const lblTopic=document.createElement("div");
@@ -4428,6 +4618,8 @@
     actions.appendChild(btnRem);
     actions.appendChild(btnHW);
 
+    form.appendChild(rowDateTime);
+    form.appendChild(rowApplyScope);
     form.appendChild(rowTopic);
     form.appendChild(rowTemplates);
     form.appendChild(rowKTP);
