@@ -963,6 +963,11 @@
 .teacher-cloud-dialog [role=alert]{color:#994d38;overflow-wrap:anywhere;}
 @media(max-width:760px){#teacher-cloud-status{width:auto;margin:8px 12px;max-width:calc(100% - 24px);font-size:11px;}.teacher-cloud-dialog{padding:20px;}}
 </style>
+<style>
+.bil-controls{display:flex;align-items:center;gap:20px;margin-bottom:18px;flex-wrap:wrap}.bil-controls .form-row{min-width:200px;max-width:300px;margin:0}.bil-panel{padding-top:8px}.bil-check{display:flex;gap:10px;align-items:center;padding:8px 0}.bil-check input{accent-color:var(--accent);width:18px;height:18px}.bil-pre{white-space:pre-wrap}.bil-form-head{display:grid;grid-template-columns:1fr 1fr 1.5fr}.bil-assessment{display:flex;flex-direction:column;gap:14px}.bil-assessment .form-section{margin:0}.bil-skill-block{min-width:0;border:1px solid var(--border);border-radius:14px}.bil-skill-block legend{padding:0 8px;font-weight:700;color:#86533c;font-size:16px}.bil-skill{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,300px);gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}.bil-skill:last-child{border-bottom:0}.bil-skill-title{font-weight:600;margin-bottom:4px}.bil-skill .form-select{width:100%;min-width:0}.bil-legend summary{cursor:pointer;font-weight:600}.bil-legend .tiny{margin-top:8px}.bil-error{color:var(--danger);padding:8px 0}.bil-history{display:grid;gap:16px}.bil-history .desk-toolbar{margin-bottom:0}.bil-panel>.desk-toolbar{margin-top:8px}.bil-panel>.form-row{max-width:320px}.bil-assessment>.desk-toolbar{position:sticky;bottom:0;padding:12px;background:var(--bg);border-top:1px solid var(--border);z-index:2}
+@media(max-width:700px){.bil-form-head{grid-template-columns:1fr}.bil-skill{grid-template-columns:1fr;gap:10px}.bil-skill-block{padding:16px}.bil-controls{gap:10px}.bil-controls .form-row{max-width:none;width:100%}.bil-assessment>.desk-toolbar{position:static;padding:0;border:0}.bil-assessment>.desk-toolbar button{width:100%}.bil-skill-block legend{font-size:14px}.bil-panel .desk-toolbar{flex-wrap:wrap}}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -998,6 +1003,7 @@
         <span class="icon">🐣</span>
         <span>Группы</span>
       </button>
+      <button class="nav-btn" data-view="bilingual"><span class="icon">🌱</span><span>Билингвы</span></button>
       <button class="nav-btn" data-view="plans">
         <span class="icon">📚</span>
         <span>Планы уроков</span>
@@ -4893,6 +4899,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     else if(currentView==="students") renderStudents(mainCol);
     else if(currentView==="parents") renderParents(mainCol);
     else if(currentView==="groups") renderGroups(mainCol);
+    else if(currentView==="bilingual") renderBilingual(mainCol);
     else if(currentView==="groupDetail") renderGroupDetail(mainCol, currentGroupId);
     else if(currentView==="groupLessonDetail") renderGroupLessonDetail(mainCol, currentGroupLessonId);
     else if(currentView==="student") renderStudent(mainCol,currentStudentId);
@@ -4998,6 +5005,156 @@ function deskPaymentEnhance(){
 }
 
 // Teacher Desk cloud sync. Only the publishable key is used in the browser.
+/* Bilingual development journal. Ratings are observations, not school grades. */
+document.querySelector('.nav-btn[data-view="bilingual"] .icon')?.replaceChildren(deskIcon('sprout'));
+const bilScale = [
+ 'Нет реакции', 'Реакция только с физическим касанием', 'Реакция по жесту педагога',
+ 'Эхо — повторяет за педагогом сразу', 'Самостоятельный ответ после паузы в 2–3 секунды',
+ 'Инициатива — сам использует слово или действие без запроса'
+];
+const bilSkills = [
+ {id:'actions',area:'Аудирование · понимание',title:'Базовые глаголы-действия',detail:'Реагирует на jump, sleep, run в игре без жестов.',parent:'понимать слова-действия в игре'},
+ {id:'objects',area:'Аудирование · понимание',title:'Найти названный предмет',detail:'Находит названный предмет среди 3–4 других: apple, ball, car.',parent:'находить предмет по его английскому названию'},
+ {id:'routine',area:'Аудирование · понимание',title:'Рутинные инструкции',detail:'Выполняет wash hands, sit down, give me please…',parent:'выполнять привычные инструкции на английском'},
+ {id:'greeting',area:'Говорение',title:'Приветствие и прощание',detail:'Самостоятельно произносит hello / bye-bye.',parent:'здороваться и прощаться на английском'},
+ {id:'naming',area:'Говорение',title:'Назвать 3–5 предметов',detail:'Называет 3–5 конкретных предметов: dog, ball, apple, mama.',parent:'называть знакомые предметы на английском'},
+ {id:'echo',area:'Говорение',title:'Повторить новое слово',detail:'Повторяет новое слово за педагогом с первой попытки — эхо.',parent:'повторять новые английские слова'},
+ {id:'help',area:'Коммуникация · социальный язык',title:'Попросить о помощи',detail:'Просит о помощи базовой фразой или жестом: help me.',parent:'просить о помощи словом или жестом'},
+ {id:'yesno',area:'Коммуникация · социальный язык',title:'Согласие или отказ',detail:'Выражает согласие или отказ: yes / no / head shake.',parent:'выражать согласие или отказ'},
+ {id:'turn',area:'Коммуникация · социальный язык',title:'Очередь в групповом кругу',detail:'Ждёт своей очереди в групповом кругу по сигналу.',parent:'ждать своей очереди по сигналу'},
+ {id:'play',area:'Игровая речь',title:'Речь в собственной игре',detail:'Озвучивает свою игру словом на втором языке.',parent:'использовать английские слова в собственной игре'},
+ {id:'song',area:'Игровая речь',title:'Знакомая песня',detail:'Подхватывает последнее слово знакомой песни.',parent:'подхватывать слова знакомых английских песен'}
+];
+const bilDraftThemes = [
+ ['2026-10-12','2026-10-21','Doctor'],['2026-10-22','2026-11-01','Halloween'],
+ ['2026-11-02','2026-11-11','Professions'],['2026-11-12','2026-11-22','Clothes'],
+ ['2026-11-23','2026-12-02','Winter'],['2026-12-03','2026-12-13','Pyjama'],
+ ['2026-12-14','2026-12-19','House'],['2026-12-20','2026-12-31','Christmas']
+];
+let bilTab='themes', bilGroup='', bilStudent='', bilDraft=null;
+function bilState(){
+ const raw=data.bilingual;
+ if(raw&&typeof raw==='object'&&!Array.isArray(raw))return {
+  version:1,groupIds:Array.isArray(raw.groupIds)?raw.groupIds:[],
+  themes:Array.isArray(raw.themes)?raw.themes:[],assessments:Array.isArray(raw.assessments)?raw.assessments:[]
+ };
+ return {version:1,groupIds:data.groups.filter(g=>g.name.toLowerCase()==='ducklings').map(g=>g.id),themes:[],assessments:[]};
+}
+function bilWrite(state){data.bilingual=state;save();}
+function bilId(){return 'b_'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));}
+function bilGroups(){return data.groups.filter(g=>bilState().groupIds.includes(g.id));}
+function bilField(label,type,value){
+ const wrap=deskEl('label','form-row'),input=deskEl(type==='textarea'?'textarea':'input','form-input');
+ if(type!=='textarea')input.type=type;input.value=value??'';input.setAttribute('aria-label',label);
+ if(type==='textarea')input.rows=3;wrap.append(deskEl('span','form-label',label),input);return{wrap,input};
+}
+function bilSelect(label,values,value){
+ const wrap=deskEl('label','form-row'),input=deskEl('select','form-select');input.setAttribute('aria-label',label);
+ values.forEach(x=>input.append(new Option(x.label,String(x.value))));input.value=String(value??'');
+ wrap.append(deskEl('span','form-label',label),input);return{wrap,input};
+}
+function bilError(form,text){let el=form.querySelector('.bil-error');if(!el){el=deskEl('div','bil-error tiny');el.setAttribute('role','alert');form.append(el);}el.textContent=text;}
+function bilSettings(){
+ const form=deskEl('div','form-section');form.append(deskEl('div','tiny','Выбери группы билингвов. Состав детей берётся из раздела «Группы».'));
+ const enabled=new Set(bilState().groupIds),checks=[];
+ data.groups.forEach(g=>{const label=deskEl('label','bil-check'),cb=deskEl('input');cb.type='checkbox';cb.checked=enabled.has(g.id);label.append(cb,deskEl('span','',g.name));form.append(label);checks.push([g.id,cb]);});
+ if(!checks.length)form.append(deskEl('div','empty-state','Сначала создай группу в разделе «Группы».'));
+ form.append(deskButton('Сохранить группы',()=>{const state=bilState();state.groupIds=checks.filter(([,cb])=>cb.checked).map(([id])=>id);bilGroup='';bilStudent='';bilDraft=null;bilWrite(state);},'btn-main'));
+ deskModal('Группы билингвов',form);
+}
+function bilThemeForm(existing){
+ const form=deskEl('form','form-section'),name=bilField('Тема','text',existing?.title),start=bilField('Начало темы','date',existing?.startDate||todayISO()),end=bilField('Конец темы','date',existing?.endDate),vocab=bilField('Слова и фразы','textarea',existing?.vocabulary),goals=bilField('Цели и игры','textarea',existing?.goals);
+ const group=bilSelect('Группа темы',[{value:'',label:'Все группы билингвов'},...bilGroups().map(g=>({value:g.id,label:g.name}))],existing?.groupId??'');
+ const dates=deskEl('div','form-row-inline');dates.append(start.wrap,end.wrap);form.append(name.wrap,dates,group.wrap,vocab.wrap,goals.wrap);
+ function submit(){if(!name.input.value.trim()||!start.input.value){bilError(form,'Укажи название и дату начала темы.');return;}
+ if(end.input.value&&end.input.value<start.input.value){bilError(form,'Конец темы должен быть не раньше начала.');return;}
+ const state=bilState(),theme={id:existing?.id||bilId(),title:name.input.value.trim(),startDate:start.input.value,endDate:end.input.value,groupId:group.input.value?Number(group.input.value):null,vocabulary:vocab.input.value.trim(),goals:goals.input.value.trim()};
+ const i=state.themes.findIndex(t=>t.id===theme.id);if(i>=0)state.themes[i]=theme;else state.themes.push(theme);bilWrite(state);}
+ form.onsubmit=e=>{e.preventDefault();submit();};form.append(deskButton('Сохранить тему',submit,'btn-main'));deskModal(existing?'Изменить тему':'Новая тема недели',form);
+}
+function renderBilingual(main){
+ const page=deskPage(main,'Билингвы','Темы, маленькие шаги и наблюдения за каждым ребёнком','Small Steps English',deskButton('Группы билингвов',bilSettings));
+ const groups=bilGroups(),state=bilState();
+ if(!groups.some(g=>String(g.id)===String(bilGroup)))bilGroup=groups.length?String(groups[0].id):'';
+ const controls=deskEl('div','bil-controls'),gSelect=bilSelect('Группа',groups.map(g=>({value:g.id,label:g.name})),bilGroup);
+ gSelect.input.onchange=()=>{bilGroup=gSelect.input.value;bilStudent='';bilDraft=null;render();};controls.append(gSelect.wrap);
+ if(groups.length){const g=groups.find(g=>String(g.id)===bilGroup);controls.append(deskEl('div','tiny',`${(g.memberIds||[]).map(id=>getStudent(id)?.name).filter(Boolean).join(' · ')||'Добавь детей в состав группы'}${g.schedule?.length?' · '+deskSchedule(g.schedule):''}`));}
+ page.append(controls);
+ const tabs=deskEl('div','desk-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Разделы билингвов');
+ [['themes','Темы недель'],['assessment','Оценка успеваемости'],['history','История и сообщения']].forEach(([key,label])=>{const b=deskButton(label,()=>{bilTab=key;render();},'btn-chip');b.setAttribute('role','tab');b.setAttribute('aria-selected',String(bilTab===key));if(bilTab===key)b.classList.add('active');tabs.append(b);});page.append(tabs);
+ if(!groups.length){page.append(deskEl('div','empty-state','Выбери группы через кнопку «Группы билингвов».'));return;}
+ const panel=deskEl('div','bil-panel');panel.setAttribute('role','tabpanel');page.append(panel);
+ if(bilTab==='themes')bilRenderThemes(panel,state);else if(bilTab==='assessment')bilRenderAssessment(panel,state);else bilRenderHistory(panel,state);
+}
+function bilRenderThemes(panel,state){
+ const tools=deskEl('div','desk-toolbar');tools.append(deskButton('+ Новая тема',()=>bilThemeForm(), 'btn-main'));panel.append(tools);
+ const themes=state.themes.filter(t=>!t.groupId||String(t.groupId)===bilGroup).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+ if(!themes.length){const empty=deskEl('div','empty-state');empty.append(deskEl('div','','Добавь тему, даты, слова и игры. Можно начать с ранее намеченных тем октября–декабря и отредактировать их под группу.'),deskButton('Добавить темы октября–декабря',()=>{const next=bilState();bilDraftThemes.forEach(([startDate,endDate,title])=>{if(!next.themes.some(t=>t.startDate===startDate&&t.title===title))next.themes.push({id:bilId(),startDate,endDate,title,groupId:null,vocabulary:'',goals:''});});bilWrite(next);}));panel.append(empty);return;}
+ const grid=deskEl('div','students-list');themes.forEach((t,i)=>{const card=deskEl('article',`student-card tone-${i%3}`);card.append(deskEl('div','tiny',t.startDate+(t.endDate?' — '+t.endDate:'')),deskEl('div','student-name',t.title));
+ if(t.startDate<=todayISO()&&(!t.endDate||t.endDate>=todayISO()))card.append(deskEl('span','desk-pill good','Текущая тема'));
+ if(t.vocabulary)card.append(deskEl('div','bil-pre tiny','Слова и фразы: '+t.vocabulary));if(t.goals)card.append(deskEl('div','bil-pre tiny','Цели и игры: '+t.goals));
+ card.append(deskButton('Изменить',()=>bilThemeForm(t)));grid.append(card);});panel.append(grid);
+}
+function bilNewDraft(studentId){return{id:null,studentId:Number(studentId),groupId:Number(bilGroup),date:todayISO(),themeId:'',scores:{},strengths:'',focus:'',notes:'',homePractice:''};}
+function bilRenderAssessment(panel,state){
+ const g=getGroup(Number(bilGroup)),members=(g?.memberIds||[]).map(getStudent).filter(Boolean);
+ if(!members.length){panel.append(deskEl('div','empty-state','В этой группе пока нет детей. Добавь их в разделе «Группы».'));return;}
+ if(!members.some(s=>String(s.id)===String(bilStudent)))bilStudent=String(members[0].id);
+ if(!bilDraft||String(bilDraft.studentId)!==bilStudent||String(bilDraft.groupId)!==bilGroup)bilDraft=bilNewDraft(bilStudent);
+ const d=bilDraft,form=deskEl('form','bil-assessment');form.onsubmit=e=>e.preventDefault();
+ const row=deskEl('div','form-section bil-form-head'),student=bilSelect('Ребёнок',members.map(s=>({value:s.id,label:s.name})),bilStudent),date=bilField('Дата наблюдения','date',d.date);
+ date.input.max=todayISO();date.input.oninput=()=>d.date=date.input.value;
+ student.input.onchange=()=>{bilStudent=student.input.value;bilDraft=null;render();};
+ const themes=state.themes.filter(t=>!t.groupId||String(t.groupId)===bilGroup);
+ const theme=bilSelect('Тема наблюдения',[{value:'',label:'Без привязки к теме'},...themes.map(t=>({value:t.id,label:t.title+' · '+t.startDate}))],d.themeId);
+ theme.input.onchange=()=>d.themeId=theme.input.value;row.append(student.wrap,date.wrap,theme.wrap);form.append(row);
+ const legend=deskEl('details','form-section bil-legend');legend.append(deskEl('summary','','Шкала наблюдений 0–5'));bilScale.forEach((text,n)=>legend.append(deskEl('div','tiny',n+' — '+text+'.')));legend.append(deskEl('div','tiny','«Не оценивали» сохраняется отдельно от 0. Не нужно оценивать все навыки за один раз.'));form.append(legend);
+ let area='';let block;bilSkills.forEach(skill=>{if(skill.area!==area){area=skill.area;block=deskEl('fieldset','form-section bil-skill-block');block.append(deskEl('legend','',area));form.append(block);}
+ const line=deskEl('div','bil-skill'),text=deskEl('div');text.append(deskEl('div','bil-skill-title',skill.title),deskEl('div','tiny',skill.detail));
+ const select=deskEl('select','form-select');select.setAttribute('aria-label',skill.title);select.append(new Option('Не оценивали',''));bilScale.forEach((label,n)=>select.append(new Option(n+' — '+label,String(n))));select.value=d.scores[skill.id]===undefined||d.scores[skill.id]===null?'':String(d.scores[skill.id]);select.onchange=()=>d.scores[skill.id]=select.value===''?null:Number(select.value);line.append(text,select);block.append(line);});
+ const notes=deskEl('div','form-section');[['strengths','Что получилось'],['focus','Что ещё тренируем'],['notes','Наблюдения педагога'],['homePractice','Что предложить дома']].forEach(([key,label])=>{const f=bilField(label,'textarea',d[key]);f.input.oninput=()=>d[key]=f.input.value;notes.append(f.wrap);});form.append(notes);
+ const actions=deskEl('div','desk-toolbar');actions.append(deskButton('Сохранить оценку',()=>bilSaveAssessment(form,false),'btn-main'),deskButton('Сохранить и подготовить сообщение',()=>bilSaveAssessment(form,true)));if(d.id)actions.append(deskButton('Новая оценка',()=>{bilDraft=bilNewDraft(bilStudent);render();}));form.append(actions);panel.append(form);
+}
+function bilSaveAssessment(form,report){
+ const d=bilDraft;if(!d||!d.date||d.date>todayISO()){bilError(form,'Укажи дату наблюдения, не позднее сегодняшней.');return;}
+ if(!bilSkills.some(s=>Number.isInteger(d.scores[s.id]))&&![d.strengths,d.focus,d.notes,d.homePractice].some(t=>t?.trim())){bilError(form,'Выбери хотя бы один уровень или добавь наблюдение.');return;}
+ const state=bilState(),theme=state.themes.find(t=>t.id===d.themeId),a={...JSON.parse(JSON.stringify(d)),id:d.id||bilId(),studentName:getStudent(d.studentId)?.name||'',groupName:getGroup(d.groupId)?.name||'',themeTitle:theme?.title||'',updatedAt:new Date().toISOString()};
+ const i=state.assessments.findIndex(x=>x.id===a.id);if(i>=0){const prev=state.assessments[i];a.parentMessage=prev.parentMessage||'';state.assessments[i]=a;}else state.assessments.push(a);
+ bilDraft=null;bilTab='history';bilWrite(state);if(report)bilReport(a.id);
+}
+function bilParentMessage(a,all){
+ const lines=[`Здравствуйте! Делюсь наблюдениями о занятиях ${a.studentName||getStudent(a.studentId)?.name||'ребёнка'} на ${a.date}${a.themeTitle?' по теме «'+a.themeTitle+'»':''}.`];
+ const levels=['пока не наблюдалась реакция','получается с физической подсказкой педагога','получается по жесту педагога','получается при повторении за педагогом','получается самостоятельно после небольшой паузы','использует самостоятельно, по собственной инициативе'];
+ const observed=bilSkills.filter(s=>Number.isInteger(a.scores[s.id])&&a.scores[s.id]>=0&&a.scores[s.id]<=5);
+ if(a.strengths?.trim())lines.push('Что получилось: '+a.strengths.trim());
+ const strong=observed.filter(s=>a.scores[s.id]>=4),support=observed.filter(s=>a.scores[s.id]<4);
+ if(strong.length)lines.push('Самостоятельные шаги: '+strong.map(s=>s.parent+' — '+levels[a.scores[s.id]]).join('; ')+'.');
+ if(support.length)lines.push('Продолжаем тренировать: '+support.map(s=>s.parent+' — '+levels[a.scores[s.id]]).join('; ')+'.');
+ const prior=all.filter(x=>x.studentId===a.studentId&&x.id!==a.id&&x.date<a.date).sort((x,y)=>y.date.localeCompare(x.date));
+ const improvements=observed.filter(s=>{const p=prior.find(x=>Number.isInteger(x.scores?.[s.id]));return p&&a.scores[s.id]>p.scores[s.id];});
+ if(improvements.length)lines.push('По сравнению с предыдущими наблюдениями стало больше самостоятельности: '+improvements.map(s=>s.parent).join(', ')+'.');
+ if(a.focus?.trim())lines.push('Ближайший фокус: '+a.focus.trim());if(a.notes?.trim())lines.push('На занятии: '+a.notes.trim());if(a.homePractice?.trim())lines.push('Дома можно: '+a.homePractice.trim());
+ lines.push('Спасибо за поддержку!');return lines.join('\n\n');
+}
+function bilReport(id){
+ const state=bilState(),a=state.assessments.find(x=>x.id===id);if(!a)return;
+ const form=deskEl('div','form-section'),field=bilField('Сообщение для родителей','textarea',a.parentMessage||bilParentMessage(a,state.assessments));field.input.rows=14;form.append(deskEl('div','tiny','Черновик по сохранённым наблюдениям. Проверь и при необходимости отредактируй перед отправкой.'),field.wrap);
+ const feedback=deskEl('div','tiny');feedback.setAttribute('role','status');
+ function keep(){const latest=bilState(),entry=latest.assessments.find(x=>x.id===id);if(entry){entry.parentMessage=field.input.value;data.bilingual=latest;save();}}
+ const actions=deskEl('div','desk-toolbar');actions.append(deskButton('Сохранить сообщение',keep,'btn-main'),deskButton('Скопировать текст',async()=>{try{await navigator.clipboard.writeText(field.input.value);feedback.textContent='Текст скопирован.';}catch{field.input.focus();field.input.select();feedback.textContent='Текст выделен. Нажми Ctrl+C, чтобы скопировать.';}}),deskButton('Собрать заново по оценке',()=>{field.input.value=bilParentMessage(a,bilState().assessments);feedback.textContent='Черновик обновлён по сохранённой оценке.';}));form.append(actions,feedback);deskModal('Сообщение · '+a.studentName,form);
+}
+function bilRenderHistory(panel,state){
+ const members=getGroup(Number(bilGroup))?.memberIds||[];const ids=[...new Set([...members,...state.assessments.filter(a=>String(a.groupId)===bilGroup).map(a=>a.studentId)])];
+ const filter=bilSelect('Ребёнок в истории',[{value:'',label:'Все дети группы'},...ids.map(id=>({value:id,label:getStudent(id)?.name||state.assessments.find(a=>a.studentId===id)?.studentName||'Ребёнок'}))],'');panel.append(filter.wrap);
+ const list=deskEl('div','bil-history');panel.append(list);
+ function fill(){list.replaceChildren();const entries=state.assessments.filter(a=>String(a.groupId)===bilGroup&&(!filter.input.value||String(a.studentId)===filter.input.value)).sort((a,b)=>b.date.localeCompare(a.date)||b.updatedAt.localeCompare(a.updatedAt));
+ if(!entries.length){list.append(deskEl('div','empty-state','Оценок пока нет. Начни с вкладки «Оценка успеваемости».'));return;}
+ entries.forEach(a=>{const card=deskEl('article','form-section');card.append(deskEl('div','student-name',a.studentName+' · '+a.date),deskEl('div','tiny',a.themeTitle||'Без привязки к теме'));
+ const details=deskEl('details');details.append(deskEl('summary','','Наблюдения по навыкам'));bilSkills.forEach(s=>{if(Number.isInteger(a.scores[s.id]))details.append(deskEl('div','tiny',s.title+': '+a.scores[s.id]+' — '+bilScale[a.scores[s.id]]));});if(a.notes)details.append(deskEl('div','bil-pre tiny',a.notes));card.append(details);
+ const actions=deskEl('div','desk-toolbar');actions.append(deskButton('Сообщение для родителей',()=>bilReport(a.id),'btn-main'),deskButton('Изменить оценку',()=>{bilStudent=String(a.studentId);bilDraft=JSON.parse(JSON.stringify(a));bilTab='assessment';render();}));card.append(actions);list.append(card);});}
+ filter.input.onchange=fill;fill();
+}
+
 const teacherCloud = (() => {
   const PROJECT_URL = 'https://ylxwkaxsuzoxxscqxkbj.supabase.co';
   const PUBLIC_KEY = 'sb_publishable_dQxVMnR6EWXiMgNioe0jAg_1uTouJ6w';
