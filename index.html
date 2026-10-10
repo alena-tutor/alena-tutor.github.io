@@ -5086,7 +5086,7 @@ function renderBilingual(main){
  page.append(controls);
  const tabs=deskEl('div','desk-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Разделы билингвов');
  [['themes','Темы недель'],['assessment','Оценка успеваемости'],['history','История и сообщения']].forEach(([key,label])=>{const b=deskButton(label,()=>{bilTab=key;render();},'btn-chip');b.setAttribute('role','tab');b.setAttribute('aria-selected',String(bilTab===key));if(bilTab===key)b.classList.add('active');tabs.append(b);});page.append(tabs);
- if(!groups.length){page.append(deskEl('div','empty-state','Выбери группы через кнопку «Группы билингвов».'));return;}
+ if(!groups.length&&bilTab!=='themes'){page.append(deskEl('div','empty-state','Выбери группы через кнопку «Группы билингвов».'));return;}
  const panel=deskEl('div','bil-panel');panel.setAttribute('role','tabpanel');page.append(panel);
  if(bilTab==='themes')bilRenderThemes(panel,state);else if(bilTab==='assessment')bilRenderAssessment(panel,state);else bilRenderHistory(panel,state);
 }
