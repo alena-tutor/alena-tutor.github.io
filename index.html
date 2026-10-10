@@ -966,8 +966,12 @@
 <style>
 .bil-controls{display:flex;align-items:center;gap:20px;margin-bottom:18px;flex-wrap:wrap}.bil-controls .form-row{min-width:200px;max-width:300px;margin:0}.bil-panel{padding-top:8px}.bil-check{display:flex;gap:10px;align-items:center;padding:8px 0}.bil-check input{accent-color:var(--accent);width:18px;height:18px}.bil-pre{white-space:pre-wrap}.bil-form-head{display:grid;grid-template-columns:1fr 1fr 1.5fr}.bil-assessment{display:flex;flex-direction:column;gap:14px}.bil-assessment .form-section{margin:0}.bil-skill-block{min-width:0;border:1px solid var(--border);border-radius:14px}.bil-skill-block legend{padding:0 8px;font-weight:700;color:#86533c;font-size:16px}.bil-skill{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,300px);gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--border)}.bil-skill:last-child{border-bottom:0}.bil-skill-title{font-weight:600;margin-bottom:4px}.bil-skill .form-select{width:100%;min-width:0}.bil-legend summary{cursor:pointer;font-weight:600}.bil-legend .tiny{margin-top:8px}.bil-error{color:var(--danger);padding:8px 0}.bil-history{display:grid;gap:16px}.bil-history .desk-toolbar{margin-bottom:0}.bil-panel>.desk-toolbar{margin-top:8px}.bil-panel>.form-row{max-width:320px}.bil-assessment>.desk-toolbar{position:sticky;bottom:0;padding:12px;background:var(--bg);border-top:1px solid var(--border);z-index:2}
 @media(max-width:700px){.bil-form-head{grid-template-columns:1fr}.bil-skill{grid-template-columns:1fr;gap:10px}.bil-skill-block{padding:16px}.bil-controls{gap:10px}.bil-controls .form-row{max-width:none;width:100%}.bil-assessment>.desk-toolbar{position:static;padding:0;border:0}.bil-assessment>.desk-toolbar button{width:100%}.bil-skill-block legend{font-size:14px}.bil-panel .desk-toolbar{flex-wrap:wrap}}
+.bil-library-tabs{margin:4px 0 22px;flex-wrap:wrap}.bil-catalog{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.bil-topic-card{background:var(--card-bg,#fffaf6);border:1px solid #e8d9cd;border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:0 7px 18px #50342105}.bil-topic-card:nth-child(3n+2){background:#f3f5ef}.bil-topic-card:nth-child(3n){background:#f7efe8}.bil-topic-card h3{font-family:Georgia,serif;font-size:21px;line-height:1.35;margin:0;overflow-wrap:anywhere}.bil-topic-card p{line-height:1.6;margin:0;flex:1}.bil-topic-meta{min-height:26px}.bil-topic-card .desk-toolbar{margin-top:auto;gap:8px}.bil-topic-card button{font-size:12px}.bil-document-head{padding:24px 0;border-bottom:1px solid #e9d9cd;margin-bottom:24px}.bil-document-head h2{font-family:Georgia,serif;font-size:30px;line-height:1.25}.bil-document{max-width:900px;margin:0 auto}.bil-content-toggle{margin:15px 0;background:#fffaf6;border:1px solid #e8d7c9;border-radius:17px;overflow:hidden}.bil-content-toggle>summary{padding:20px 22px;cursor:pointer;font-size:20px;font-family:Georgia,serif;color:#80503b;overflow-wrap:anywhere}.bil-toggle-body{border-top:1px solid #eee0d5;padding:15px 24px 20px}.bil-content-block{margin:12px 0;line-height:1.7;overflow-wrap:anywhere}.bil-content-block h3{font-size:20px;color:#8f533c;margin:22px 0 12px}.bil-resource-list{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.bil-resource-link{display:inline-block;max-width:100%;overflow-wrap:anywhere;background:#f1e6dc;border-radius:10px;padding:9px 13px;color:#80503b;text-decoration:none;font-size:13px;line-height:1.5}.bil-resource-link:hover{background:#e8d3c2}.bil-material{margin:15px 0;padding:12px;border:1px solid #ede1d6;border-radius:14px;background:white}.bil-material img{max-width:100%;height:auto;display:block;margin:0 auto 10px;max-height:900px;object-fit:contain}.bil-editor-dialog{width:min(1100px,calc(100vw - 28px))!important;max-width:1100px!important}.bil-editor{min-width:0}.bil-editor-save{position:sticky;top:0;z-index:3;background:#fbf7f2;padding:12px 0;border-bottom:1px solid #e5d5c8}.bil-edit-block{min-width:0;border:1px solid #e6d5c7;border-radius:15px;padding:14px;margin:18px 0;background:#fffdf9}.bil-edit-block legend{padding:0 8px;color:#9d6245}.bil-block-actions{justify-content:flex-end;gap:7px;margin-bottom:12px}.bil-block-actions button{font-size:12px;padding:7px 10px}.bil-edit-resources,.bil-edit-children{border-top:1px solid #eee2d8;padding-top:12px;margin-top:12px}.bil-edit-resources>summary,.bil-edit-children>summary{cursor:pointer;color:#965e45}.bil-edit-resources .form-row{margin-top:12px}.bil-nested-editor{padding-left:12px;border-left:2px solid #e1c5b1;margin-top:15px}.bil-add-block{align-items:end;padding:12px 0}.bil-add-block .form-row{margin-bottom:0;max-width:280px}.bil-library-tabs+.desk-toolbar .form-row{flex:1;min-width:180px;max-width:430px}.bil-pre{overflow-wrap:anywhere}
+@media(max-width:1100px){.bil-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.bil-catalog{grid-template-columns:1fr}.bil-topic-card{padding:18px}.bil-document-head h2{font-size:25px}.bil-toggle-body{padding:10px 14px}.bil-content-toggle>summary{padding:16px;font-size:19px}.bil-editor-dialog{width:calc(100vw - 18px)!important}.bil-edit-block{padding:10px}.bil-nested-editor{padding-left:7px}.bil-block-actions{justify-content:flex-start}.bil-editor-save{top:0}.bil-add-block{gap:8px}.bil-add-block .form-row{max-width:100%;width:100%}}
 
 </style>
+<script src="bilingual-assets-v1.js"></script>
 </head>
 <body>
 <div class="app">
@@ -5035,10 +5039,10 @@ let bilTab='themes', bilGroup='', bilStudent='', bilDraft=null;
 function bilState(){
  const raw=data.bilingual;
  if(raw&&typeof raw==='object'&&!Array.isArray(raw))return {
-  version:1,groupIds:Array.isArray(raw.groupIds)?raw.groupIds:[],
+  ...raw,version:2,library:Array.isArray(raw.library)?raw.library:[],lessonPlans:Array.isArray(raw.lessonPlans)?raw.lessonPlans:[],groupIds:Array.isArray(raw.groupIds)?raw.groupIds:[],
   themes:Array.isArray(raw.themes)?raw.themes:[],assessments:Array.isArray(raw.assessments)?raw.assessments:[]
  };
- return {version:1,groupIds:data.groups.filter(g=>g.name.toLowerCase()==='ducklings').map(g=>g.id),themes:[],assessments:[]};
+ return {version:2,library:[],lessonPlans:[],groupIds:data.groups.filter(g=>g.name.toLowerCase()==='ducklings').map(g=>g.id),themes:[],assessments:[]};
 }
 function bilWrite(state){data.bilingual=state;save();}
 function bilId(){return 'b_'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));}
@@ -5068,7 +5072,7 @@ function bilThemeForm(existing){
  const dates=deskEl('div','form-row-inline');dates.append(start.wrap,end.wrap);form.append(name.wrap,dates,group.wrap,vocab.wrap,goals.wrap);
  function submit(){if(!name.input.value.trim()||!start.input.value){bilError(form,'Укажи название и дату начала темы.');return;}
  if(end.input.value&&end.input.value<start.input.value){bilError(form,'Конец темы должен быть не раньше начала.');return;}
- const state=bilState(),theme={id:existing?.id||bilId(),title:name.input.value.trim(),startDate:start.input.value,endDate:end.input.value,groupId:group.input.value?Number(group.input.value):null,vocabulary:vocab.input.value.trim(),goals:goals.input.value.trim()};
+ const state=bilState(),theme={...existing,id:existing?.id||bilId(),title:name.input.value.trim(),startDate:start.input.value,endDate:end.input.value,groupId:group.input.value?Number(group.input.value):null,vocabulary:vocab.input.value.trim(),goals:goals.input.value.trim()};
  const i=state.themes.findIndex(t=>t.id===theme.id);if(i>=0)state.themes[i]=theme;else state.themes.push(theme);bilWrite(state);}
  form.onsubmit=e=>{e.preventDefault();submit();};form.append(deskButton('Сохранить тему',submit,'btn-main'));deskModal(existing?'Изменить тему':'Новая тема недели',form);
 }
@@ -5086,7 +5090,7 @@ function renderBilingual(main){
  const panel=deskEl('div','bil-panel');panel.setAttribute('role','tabpanel');page.append(panel);
  if(bilTab==='themes')bilRenderThemes(panel,state);else if(bilTab==='assessment')bilRenderAssessment(panel,state);else bilRenderHistory(panel,state);
 }
-function bilRenderThemes(panel,state){
+function bilRenderScheduledThemes(panel,state){
  const tools=deskEl('div','desk-toolbar');tools.append(deskButton('+ Новая тема',()=>bilThemeForm(), 'btn-main'));panel.append(tools);
  const themes=state.themes.filter(t=>!t.groupId||String(t.groupId)===bilGroup).sort((a,b)=>a.startDate.localeCompare(b.startDate));
  if(!themes.length){const empty=deskEl('div','empty-state');empty.append(deskEl('div','','Добавь тему, даты, слова и игры. Можно начать с ранее намеченных тем октября–декабря и отредактировать их под группу.'),deskButton('Добавить темы октября–декабря',()=>{const next=bilState();bilDraftThemes.forEach(([startDate,endDate,title])=>{if(!next.themes.some(t=>t.startDate===startDate&&t.title===title))next.themes.push({id:bilId(),startDate,endDate,title,groupId:null,vocabulary:'',goals:''});});bilWrite(next);}));panel.append(empty);return;}
@@ -5153,6 +5157,82 @@ function bilRenderHistory(panel,state){
  const details=deskEl('details');details.append(deskEl('summary','','Наблюдения по навыкам'));bilSkills.forEach(s=>{if(Number.isInteger(a.scores[s.id]))details.append(deskEl('div','tiny',s.title+': '+a.scores[s.id]+' — '+bilScale[a.scores[s.id]]));});if(a.notes)details.append(deskEl('div','bil-pre tiny',a.notes));card.append(details);
  const actions=deskEl('div','desk-toolbar');actions.append(deskButton('Сообщение для родителей',()=>bilReport(a.id),'btn-main'),deskButton('Изменить оценку',()=>{bilStudent=String(a.studentId);bilDraft=JSON.parse(JSON.stringify(a));bilTab='assessment';render();}));card.append(actions);list.append(card);});}
  filter.input.onchange=fill;fill();
+}
+
+/* First-year curriculum and lesson builder. Content is rendered as text, never HTML. */
+let bilLibraryTab='',bilDocument=null,bilSearch='',bilLibraryFilter='all';
+const bilCopy=value=>JSON.parse(JSON.stringify(value));
+function bilSafeURL(url){try{const u=new URL(url);return ['https:','http:'].includes(u.protocol)?u.href:null;}catch{return null;}}
+function bilBlockText(blocks){return (blocks||[]).map(b=>(b.text||'')+' '+bilBlockText(b.children)).join(' ');}
+function bilCountBlocks(blocks){return (blocks||[]).reduce((n,b)=>n+1+bilCountBlocks(b.children),0);}
+function bilHasContent(doc){return (doc.blocks||[]).some(b=>b.text&&b.text!=='Vocabulary'&&b.text!=='Video'&&!/^Playgroup/.test(b.text)||bilHasContent({blocks:b.children||[]})||b.media?.length||b.links?.length);}
+function bilCloneBlocks(blocks){return (blocks||[]).map(b=>({...bilCopy(b),id:bilId(),children:bilCloneBlocks(b.children)}));}
+function bilLink(text,url,cls='bil-resource-link'){const safe=bilSafeURL(url);if(!safe)return deskEl('span','tiny',text||'Недоступная ссылка');const a=deskEl('a',cls,text||safe);a.href=safe;a.target='_blank';a.rel='noopener noreferrer';return a;}
+function bilRenderThemes(panel,state){
+ if(!bilLibraryTab)bilLibraryTab=(state.library||[]).length?'library':'calendar';
+ const tabs=deskEl('div','desk-tabs bil-library-tabs');
+ [['library','Первый год'],['lessonPlans','Мои занятия'],['calendar','Календарь тем']].forEach(([key,title])=>{const b=deskButton(title,()=>{bilLibraryTab=key;bilDocument=null;bilSearch='';render();},'btn-chip');if(bilLibraryTab===key)b.classList.add('active');b.setAttribute('aria-pressed',String(bilLibraryTab===key));tabs.append(b);});panel.append(tabs);
+ if(bilLibraryTab==='calendar'){bilRenderScheduledThemes(panel,state);return;}
+ if(bilDocument){const doc=(state[bilDocument.kind]||[]).find(d=>d.id===bilDocument.id);if(doc){bilRenderDocument(panel,doc,bilDocument.kind);return;}bilDocument=null;}
+ const kind=bilLibraryTab,all=state[kind]||[],tools=deskEl('div','desk-toolbar');
+ const search=bilField('Поиск по темам и содержанию','search',bilSearch);search.input.placeholder='Тема, игра, слово…';search.input.oninput=()=>{bilSearch=search.input.value;draw();};tools.append(search.wrap);
+ if(kind==='library'){const filter=bilSelect('Показать',[{value:'all',label:'Все темы'},{value:'filled',label:'С содержанием'},{value:'empty',label:'Пустые темы'},{value:'template',label:'Шаблоны'}],bilLibraryFilter);filter.input.onchange=()=>{bilLibraryFilter=filter.input.value;draw();};tools.append(filter.wrap,deskButton('+ Своя тема',()=>bilEditDocument(null,'library'),'btn-main'));}
+ else tools.append(deskButton('+ Собрать занятие',bilChooseTemplate,'btn-main'));
+ panel.append(tools);const grid=deskEl('div','bil-catalog');panel.append(grid);
+ function draw(){grid.replaceChildren();const query=bilSearch.trim().toLowerCase();const docs=all.filter(d=>kind==='library'||!d.groupId||String(d.groupId)===bilGroup).filter(d=>!query||(d.title+' '+bilBlockText(d.blocks)).toLowerCase().includes(query)).filter(d=>kind!=='library'||bilLibraryFilter==='all'||bilLibraryFilter==='template'&&d.kind==='template'||bilLibraryFilter==='filled'&&bilHasContent(d)||bilLibraryFilter==='empty'&&!bilHasContent(d));
+ if(!docs.length){grid.append(deskEl('div','empty-state',all.length?'По этому запросу ничего не найдено.':'Здесь будут твои темы и занятия.'));return;}
+ docs.forEach((d,i)=>{const card=deskEl('article','bil-topic-card tone-'+i%3);const meta=deskEl('div','bil-topic-meta');meta.append(deskEl('span','desk-pill',d.kind==='template'?'Шаблон · 2 часа':kind==='library'?'Первый год':d.date||'Без даты'));card.append(meta,deskEl('h3','',d.title));const vocab=(d.blocks||[]).find(b=>/Vocabulary/i.test(b.text||''));let excerpt=(vocab?bilBlockText(vocab.children):'')||bilBlockText(d.blocks);card.append(deskEl('p','tiny',excerpt.slice(0,180)||(kind==='library'?'Тема пока пустая — можно заполнить на сайте.':'Добавь этапы и материалы занятия.')));const actions=deskEl('div','desk-toolbar');actions.append(deskButton('Открыть',()=>{bilDocument={kind,id:d.id};render();},'btn-main'),deskButton(kind==='library'?'Собрать занятие':'Копировать',()=>bilCopyDocument(d,kind)));card.append(actions);grid.append(card);});}
+ draw();
+}
+function bilRenderDocument(panel,doc,kind){
+ const bar=deskEl('div','desk-toolbar');bar.append(deskButton('← К списку',()=>{bilDocument=null;render();}),deskButton('Редактировать',()=>bilEditDocument(doc,kind)),deskButton(kind==='library'?'Собрать занятие':'Копировать занятие',()=>bilCopyDocument(doc,kind),'btn-main'));panel.append(bar);
+ const heading=deskEl('div','bil-document-head');heading.append(deskEl('div','tiny',kind==='library'?'Библиотека · Первый год':(doc.date||'Занятие без даты')+(doc.groupId?' · '+(getGroup(doc.groupId)?.name||''):'')),deskEl('h2','',doc.title));if(doc.sourceUrl)heading.append(bilLink('Источник в Buildin',doc.sourceUrl));panel.append(heading);
+ if(!(doc.blocks||[]).length){panel.append(deskEl('div','empty-state','В исходной теме пока нет содержания. Нажми «Редактировать», чтобы добавить этапы, игры и материалы.'));return;}
+ const actions=deskEl('div','desk-toolbar');const content=deskEl('div','bil-document');actions.append(deskButton('Раскрыть всё',()=>content.querySelectorAll('details').forEach(d=>d.open=true)),deskButton('Свернуть всё',()=>content.querySelectorAll('details').forEach(d=>d.open=false)));panel.append(actions,content);bilDrawBlocks(content,doc.blocks);
+}
+function bilDrawBlocks(container,blocks){
+ (blocks||[]).forEach(b=>{let wrap,body;
+ if(b.type==='toggle'){wrap=deskEl('details','bil-content-toggle');wrap.append(deskEl('summary','',b.text||'Этап занятия'));body=deskEl('div','bil-toggle-body');wrap.append(body);}
+ else{wrap=deskEl('div','bil-content-block');body=wrap;if(b.type==='heading')wrap.append(deskEl('h3','',b.text));else if(b.type==='divider')wrap.append(deskEl('hr'));else if(b.type==='checklist'){const check=deskEl('label','bil-check');const cb=deskEl('input');cb.type='checkbox';cb.checked=!!b.checked;cb.onchange=()=>{b.checked=cb.checked;bilWrite(bilState());};check.append(cb,deskEl('span','bil-pre',b.text));wrap.append(check);}else if(b.text)wrap.append(deskEl('div','bil-pre',b.text));}
+ const links=(b.links||[]).filter(l=>bilSafeURL(l.url));if(links.length){const list=deskEl('div','bil-resource-list');links.forEach((l,i)=>list.append(bilLink(l.text&&!/^https?:/.test(l.text)?l.text:(/youtu/.test(l.url)?'▶ Видео '+(i+1):'Открыть материал '+(i+1)),l.url)));body.append(list);}
+ (b.media||[]).forEach(m=>{const asset=m.assetId&&typeof bilImportedAssets!=='undefined'?bilImportedAssets[m.assetId]:null;const url=asset||bilSafeURL(m.url);if(!url)return;if(m.type==='img'){const figure=deskEl('figure','bil-material'),img=deskEl('img');img.src=url;img.alt=m.alt||'Материал занятия';img.loading='lazy';figure.append(img);const a=deskEl('a','bil-resource-link','Скачать изображение');a.href=url;a.download='material.webp';figure.append(a);body.append(figure);}else body.append(bilLink(m.alt||'Открыть материал',url));});
+ bilDrawBlocks(body,b.children);container.append(wrap);});
+}
+function bilChooseTemplate(){
+ const form=deskEl('div','form-section');const docs=bilState().library||[];const pick=bilSelect('Тема или шаблон',[{value:'',label:'Пустое занятие'},...docs.map(d=>({value:d.id,label:d.title}))],'');form.append(pick.wrap,deskButton('Создать занятие',()=>{const d=docs.find(x=>x.id===pick.input.value);bilCopyDocument(d,'library');},'btn-main'));deskModal('Основа нового занятия',form);
+}
+function bilCopyDocument(doc,kind){
+ const clone={id:bilId(),title:doc?doc.title+(kind==='lessonPlans'?' — копия':' — занятие'):'Новое занятие',date:'',groupId:Number(bilGroup)||null,themeId:kind==='library'?doc?.id||'':doc?.themeId||'',blocks:bilCloneBlocks(doc?.blocks||[])};bilEditDocument(clone,'lessonPlans',true);
+}
+function bilEditDocument(existing,kind,isNew=false){
+ document.querySelectorAll('.desk-dialog').forEach(d=>d.remove());
+ const draft=bilCopy(existing||{id:bilId(),title:'Новая тема',kind:'theme',blocks:[]});draft.blocks||=[];
+ const form=deskEl('form','bil-editor');form.onsubmit=e=>e.preventDefault();const head=deskEl('div','form-section');const title=bilField('Название','text',draft.title);title.input.oninput=()=>draft.title=title.input.value;head.append(title.wrap);
+ if(kind==='lessonPlans'){const row=deskEl('div','form-row-inline'),date=bilField('Дата занятия','date',draft.date);date.input.oninput=()=>draft.date=date.input.value;const group=bilSelect('Группа занятия',[{value:'',label:'Без привязки к группе'},...bilGroups().map(g=>({value:g.id,label:g.name}))],draft.groupId||'');group.input.onchange=()=>draft.groupId=group.input.value?Number(group.input.value):null;row.append(date.wrap,group.wrap);head.append(row);}
+ head.append(deskEl('div','tiny','Сохраняй готовое занятие или черновик. Изменения применятся после нажатия «Сохранить».'));form.append(head);
+ const toolbar=deskEl('div','desk-toolbar bil-editor-save'),blockArea=deskEl('div','bil-edit-blocks');let undo=[];
+ const back=deskButton('Отменить последнее действие',()=>{if(undo.length){draft.blocks=undo.pop();draw();}});back.disabled=true;
+ function record(){undo.push(bilCopy(draft.blocks));if(undo.length>30)undo.shift();back.disabled=false;}
+ function saveDoc(){const invalid=blocks=>(blocks||[]).some(b=>(b.links||[]).some(l=>!bilSafeURL(l.url))||(b.media||[]).some(m=>!m.assetId&&!bilSafeURL(m.url))||invalid(b.children));if(invalid(draft.blocks)){bilError(form,'Проверь ссылки: используй только http или https.');return;}if(!draft.title.trim()){bilError(form,'Укажи название.');return;}draft.title=draft.title.trim();draft.updatedAt=new Date().toISOString();const state=bilState();state[kind]||=[];const i=state[kind].findIndex(d=>d.id===draft.id);if(i<0)state[kind].push(draft);else state[kind][i]=draft;bilLibraryTab=kind;bilDocument={kind,id:draft.id};bilWrite(state);}
+ toolbar.append(deskButton('Сохранить',saveDoc,'btn-main'),back);if(existing?.originalBlocks)toolbar.append(deskButton('Восстановить исходные блоки',()=>{record();draft.blocks=bilCopy(existing.originalBlocks);draw();}));form.append(toolbar,blockArea);
+ function addControls(list,parent){const row=deskEl('div','desk-toolbar bil-add-block');const type=bilSelect('Тип нового блока',[{value:'toggle',label:'Раскрывающийся этап'},{value:'text',label:'Текст / задание'},{value:'heading',label:'Заголовок'},{value:'checklist',label:'Чеклист'},{value:'divider',label:'Разделитель'}],'toggle');row.append(type.wrap,deskButton('+ Добавить блок',()=>{record();list.push({id:bilId(),type:type.input.value,text:type.input.value==='toggle'?'Новый этап':'',links:[],media:[],children:[]});draw();}));parent.append(row);}
+ function drawList(list,parent,depth){list.forEach((b,i)=>{b.children||=[];b.links||=[];b.media||=[];const field=deskEl('fieldset','bil-edit-block');field.append(deskEl('legend','tiny',(i+1)+' · '+(b.type==='toggle'?'Раскрывающийся этап':b.type==='heading'?'Заголовок':b.type==='divider'?'Разделитель':b.type==='checklist'?'Чеклист':'Текст / материал')));const actions=deskEl('div','desk-toolbar bil-block-actions');
+ const up=deskButton('↑',()=>{record();[list[i-1],list[i]]=[list[i],list[i-1]];draw();});up.setAttribute('aria-label','Переместить блок выше');up.disabled=i===0;const down=deskButton('↓',()=>{record();[list[i],list[i+1]]=[list[i+1],list[i]];draw();});down.setAttribute('aria-label','Переместить блок ниже');down.disabled=i===list.length-1;
+ actions.append(up,down,deskButton('Копировать блок',()=>{record();list.splice(i+1,0,bilCloneBlocks([b])[0]);draw();}),deskButton('Убрать',()=>{record();list.splice(i,1);draw();}));field.append(actions);
+ if(b.type!=='divider'){const text=bilField(b.type==='toggle'||b.type==='heading'?'Заголовок блока':'Текст блока','textarea',b.text);text.input.rows=b.type==='toggle'||b.type==='heading'?2:Math.min(10,Math.max(3,(b.text||'').split('\n').length));text.input.oninput=()=>b.text=text.input.value;field.append(text.wrap);}
+ const resources=deskEl('details','bil-edit-resources');resources.append(deskEl('summary','tiny','Материалы и ссылки · '+(b.links.length+b.media.length)));
+ const links=bilField('Ссылки — по одной в строке','textarea',b.links.map(l=>l.url).join('\n'));links.input.oninput=()=>b.links=links.input.value.split('\n').map(url=>url.trim()).filter(Boolean).map(url=>({text:'',url}));resources.append(links.wrap);
+ b.media.forEach((m,j)=>{const line=deskEl('div','desk-toolbar');line.append(deskEl('span','tiny',m.assetId?'Сохранённое изображение':'Изображение / материал'),deskButton('Убрать материал',()=>{record();b.media.splice(j,1);draw();}));resources.append(line);});
+ const image=bilField('Ссылка на новое изображение','url','');resources.append(image.wrap,deskButton('Добавить изображение по ссылке',()=>{const url=bilSafeURL(image.input.value);if(!url){bilError(form,'Укажи ссылку http или https на изображение.');return;}record();b.media.push({type:'img',url,alt:'Материал занятия'});draw();}));field.append(resources);
+ const children=deskEl('details','bil-edit-children');children.open=depth===0&&b.type==='toggle';children.append(deskEl('summary','tiny','Вложенные блоки · '+b.children.length));const nested=deskEl('div','bil-nested-editor');drawList(b.children,nested,depth+1);addControls(b.children,nested);children.append(nested);field.append(children);parent.append(field);});}
+ function draw(){blockArea.replaceChildren();drawList(draft.blocks,blockArea,0);addControls(draft.blocks,blockArea);back.disabled=!undo.length;}
+ if(kind==='lessonPlans'){
+ const picker=deskEl('details','form-section');picker.append(deskEl('summary','','Добавить этапы из другой темы'));
+ const library=bilState().library||[],source=bilSelect('Тема для добавления',library.map(d=>({value:d.id,label:d.title})),library[0]?.id||''),block=bilSelect('Что добавить',[],'');
+ function options(){const doc=library.find(d=>d.id===source.input.value);block.input.replaceChildren(new Option('Вся тема / шаблон','all'));(doc?.blocks||[]).filter(b=>b.text||b.children?.length||b.media?.length).forEach(b=>block.input.append(new Option((b.text||'Материал').split('\n')[0].slice(0,90),b.id)));}source.input.onchange=options;options();
+ picker.append(source.wrap,block.wrap,deskButton('Добавить в занятие',()=>{const doc=library.find(d=>d.id===source.input.value);if(!doc)return;record();const chosen=block.input.value==='all'?doc.blocks:doc.blocks.filter(b=>b.id===block.input.value);draft.blocks.push(...bilCloneBlocks(chosen));draw();}));head.append(picker);
+ }
+ draw();const dialog=deskModal(kind==='lessonPlans'?'Конструктор занятия':'Редактор темы',form);document.querySelector('.desk-dialog')?.classList.add('bil-editor-dialog');
 }
 
 const teacherCloud = (() => {
