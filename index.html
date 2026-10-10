@@ -976,6 +976,7 @@
 .group-field{display:flex;flex-direction:column;gap:6px;min-width:0;margin:10px 0;flex:1}.group-field textarea{min-height:100px;resize:vertical}.group-schedule-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--accent-soft);padding:18px;border-radius:12px;margin-bottom:18px}.group-schedule-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.group-schedule-row>.group-field{min-width:120px}.group-check{display:flex;align-items:center;gap:10px;margin:18px 0}.group-child-editor{padding:18px;border:1px solid var(--border);border-radius:12px;margin:14px 0}.group-child-editor h4{margin:0}.group-lesson-topic{font-size:17px;font-weight:600;margin:12px 0}.group-lesson-card{margin:12px 0;cursor:default}.group-lesson-card .tiny{white-space:pre-wrap;overflow-wrap:anywhere}.group-lesson-card .lesson-top{flex-wrap:wrap;gap:10px}.group-lesson-editor{margin-top:18px}.group-lessons-list .desk-toolbar{align-items:center;margin-top:14px}.group-editor h3,.group-lesson-editor h3{font-size:18px;margin-top:22px}@media(max-width:600px){.group-schedule-summary{align-items:flex-start;flex-direction:column}.group-schedule-row{gap:8px}.group-schedule-row>.group-field{flex:1 1 100px}.group-child-editor{padding:12px}.group-lesson-editor .form-row-inline>.group-field{flex-basis:100%}}
 
 .group-save-bar{position:sticky;top:0;z-index:3;background:var(--card);padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:18px;flex-wrap:wrap}
+.finance-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0}.finance-total{padding:20px;background:#f6eee6;border:1px solid #eadbcd;border-radius:20px;display:flex;flex-direction:column;gap:12px}.finance-total:last-child{background:#dae7e2}.finance-total strong{font-size:clamp(22px,3vw,32px);color:#554037}.finance-notice{padding:16px 20px;background:#fbefd9;border-radius:16px;font-size:13px;line-height:1.6}.finance-list{display:grid;gap:12px;margin-top:18px}.finance-row{display:flex;justify-content:space-between;gap:20px;padding:20px;border:1px solid #e5ddd4;border-radius:18px;background:#fffdfa}.finance-row>div{min-width:0;overflow-wrap:anywhere}.finance-amount{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex-shrink:0}.finance-row .tiny{margin-top:6px}.finance-editor{min-width:0}.finance-editor input,.finance-editor select{max-width:100%}@media(max-width:600px){.finance-summary{grid-template-columns:1fr;gap:9px}.finance-total{flex-direction:row;align-items:center;justify-content:space-between;padding:16px}.finance-row{padding:14px;gap:10px}.finance-amount strong{font-size:16px}.finance-row .btn-chip{padding:8px 10px}.finance-row .tiny{font-size:12px}}
 
 </style>
 <script src="bilingual-assets-v1.js"></script>
@@ -1023,6 +1024,7 @@
         <span class="icon">💳</span>
         <span>Абонементы</span>
       </button>
+      <button class="nav-btn" data-view="finance" aria-label="Финансы"><span class="icon" aria-hidden="true">₽</span><span>Финансы</span></button>
       <button class="nav-btn" data-view="journal">
         <span class="icon">📒</span>
         <span>Журнал</span>
@@ -1389,29 +1391,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
 
   function getMonthlyIncomeStats(yearMonth){
-    const ym = yearMonth || todayISO().slice(0,7);
-    let subscriptionIncome=0, perLessonIncome=0;
-
-    // For subscription students: count payments whose nextPaymentDate-ish... simplify:
-    // we approximate subscription income as "paid" amounts recorded on subscriptions
-    // updated/created within this month is not tracked, so we instead sum done-lesson value
-    // proportionally is overkill — show subscription "paid" totals for active subs as a simple figure,
-    // and per-lesson income computed precisely from paidAmount in this month.
-    data.students.forEach(st=>{
-      if (st.paymentMode==="perLesson"){
-        const stats=getPerLessonStats(st.id, ym);
-        perLessonIncome += stats.totalPaid;
-      }
-    });
-
-    data.subscriptions.forEach(sub=>{
-      const st=getStudent(sub.studentId);
-      if (st && st.paymentMode!=="perLesson"){
-        subscriptionIncome += (sub.paid||0);
-      }
-    });
-
-    return {ym, subscriptionIncome, perLessonIncome, total: subscriptionIncome+perLessonIncome};
+    const ym=yearMonth||financeToday().slice(0,7),stats=financeStats(ym);
+    return {ym,total:stats.net,subscriptionIncome:stats.dated.filter(r=>r.kind==='subscription').reduce((n,r)=>n+r.amount,0),perLessonIncome:stats.dated.filter(r=>r.kind==='lesson').reduce((n,r)=>n+r.amount,0)};
   }
 
   function createLesson(studentId,date,time) {
@@ -4917,6 +4898,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     else if(currentView==="editStudent") renderEditStudent(mainCol,currentStudentId);
     else if(currentView==="lesson") renderLesson(mainCol,currentLessonId);
     else if(currentView==="subscriptions") renderSubscriptions(mainCol);
+    else if(currentView==="finance") renderFinance(mainCol);
     else if(currentView==="subscriptionEdit") renderSubscriptionEdit(mainCol,currentSubscriptionStudentId);
     else if(currentView==="journal") renderJournal(mainCol);
     else if(currentView==="plans") renderPlans(mainCol);
@@ -4925,6 +4907,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     else if(currentView=="logout") renderLogout(mainCol);
     deskDecorate();
     deskPaymentEnhance();
+    financeProfile();
   }
 
 /* Interface helpers. Stored data and existing lesson/payment operations are preserved. */
@@ -4986,17 +4969,17 @@ function deskNewSubscription(studentId){
  form.append(deskButton('Начать новый абонемент',()=>{
   if(!deskMoneyValid([total.input,price.input,paid.input])||Number(total.input.value)<1){error.textContent='Укажи целое число занятий от 1 и неотрицательные суммы.';return;}
   let sub=getSubscription(studentId);if(!sub){sub={id:data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1,studentId,history:[]};data.subscriptions.push(sub);}
-  if(sub.total>0||sub.price>0||sub.paid>0){sub.history=sub.history||[];sub.history.push({startedAt:sub.startedAt||null,closedAt:new Date().toISOString(),total:old.total,price:old.price,paid:old.paid,doneCount:old.doneCount,remaining:old.remaining,doneOffset:sub.doneOffset||0,excludedLessonKeys:[...(sub.excludedLessonKeys||[])]});}
+  if(sub.total>0||sub.price>0||sub.paid>0){sub.history=sub.history||[];sub.history.push({financeCycle:sub.financeCycle||sub.startedAt||'legacy',startedAt:sub.startedAt||null,closedAt:new Date().toISOString(),total:old.total,price:old.price,paid:old.paid,doneCount:old.doneCount,remaining:old.remaining,doneOffset:sub.doneOffset||0,excludedLessonKeys:[...(sub.excludedLessonKeys||[])]});}
   sub.excludedLessonKeys=deskBillingLessons(studentId).filter(x=>x.group?x.payment.present!==null&&x.payment.present!==undefined:x.lesson.status==='done'||x.lesson.status==='cancelled').map(x=>x.key);
-  sub.doneOffset=0;sub.total=Number(total.input.value);sub.price=Number(price.input.value);sub.paid=Number(paid.input.value);sub.startedAt=new Date().toISOString();st.paymentMode='subscription';deskProfileTab='payment';currentView='student';currentStudentId=studentId;save();
+  sub.doneOffset=0;sub.total=Number(total.input.value);sub.price=Number(price.input.value);sub.paid=Number(paid.input.value);sub.startedAt=new Date().toISOString();sub.financeCycle=sub.startedAt;st.paymentMode='subscription';deskProfileTab='payment';currentView='student';currentStudentId=studentId;save();
  },'btn-main'));
  deskModal('Новый абонемент · '+st.name,form);
 }
 function deskModeControl(st){const label=deskEl('label','form-row');label.append(deskEl('span','form-label','Способ оплаты'));const sel=deskEl('select','form-select');sel.setAttribute('aria-label','Способ оплаты: '+st.name);sel.append(new Option('Абонемент','subscription'),new Option('По занятиям','perLesson'));sel.value=st.paymentMode||'subscription';sel.onchange=()=>{st.paymentMode=sel.value;save();};label.append(sel);return label;}
 function deskPerLessonPanel(st){const panel=deskEl('div','form-section');const rate=deskNumberField('Цена одного занятия (₽)',st.lessonPrice||0);const action=deskEl('div','form-row-inline');action.append(rate.wrap,deskButton('Сохранить цену',()=>{if(!deskMoneyValid([rate.input])){rate.input.reportValidity();return;}st.lessonPrice=Number(rate.input.value);save();}));panel.append(action);
- const month=getPerLessonStats(st.id);panel.append(deskEl('div','tiny',`За ${month.ym}: проведено ${month.totalLessons} · получено ${month.totalPaid} ₽`));if(st.lessonPrice>0)panel.append(deskEl('div','tiny',`Ожидается по текущей цене: ${month.totalDue} ₽`));
- const entries=deskBillingLessons(st.id).filter(x=>x.group?x.payment.present===true:x.lesson.status==='done').sort((a,b)=>(b.lesson.date+' '+b.lesson.time).localeCompare(a.lesson.date+' '+a.lesson.time));
- if(!entries.length)panel.append(deskEl('div','tiny','Проведённых занятий пока нет. После урока здесь можно указать полученную оплату.'));
+ panel.append(deskEl('div','tiny','Указывай общую оплаченную сумму за занятие. Новая доплата запишется сегодняшним числом в «Финансы»; дату можно изменить в истории поступлений.'));const month=getPerLessonStats(st.id);panel.append(deskEl('div','tiny',`За ${month.ym}: проведено ${month.totalLessons} · оплачено за проведённые ${month.totalPaid} ₽`));if(st.lessonPrice>0)panel.append(deskEl('div','tiny',`Ожидается по текущей цене: ${month.totalDue} ₽`));
+ const entries=deskBillingLessons(st.id).filter(x=>x.lesson.status!=='cancelled').sort((a,b)=>(b.lesson.date+' '+b.lesson.time).localeCompare(a.lesson.date+' '+a.lesson.time));
+ if(!entries.length)panel.append(deskEl('div','tiny','Занятий пока нет. Оплату можно записать через «Записать поступление».'));
  entries.forEach(x=>{const row=deskEl('div','desk-payment-row');row.append(deskEl('div','tiny',`${x.lesson.date} · ${x.lesson.time} · ${x.group?'Группа':x.lesson.topic||'Занятие'}`));const field=deskNumberField('Получено за занятие (₽)',x.payment.paidAmount||0);row.append(field.wrap,deskButton('Записать оплату',()=>{if(!deskMoneyValid([field.input])){field.input.reportValidity();return;}x.payment.paidAmount=Number(field.input.value);save();},'btn-chip'));panel.append(row);});
  return panel;
 }
@@ -5004,7 +4987,7 @@ let deskFinanceFilter='all';
 function renderSubscriptions(main){const page=deskPage(main,'Оплаты и абонементы','Способ оплаты каждого ученика, остатки и полученные суммы','Финансы');const tools=deskEl('div','desk-toolbar');const sel=deskEl('select','form-select');sel.style.maxWidth='290px';sel.setAttribute('aria-label','Фильтр по способу оплаты');[['all','Все ученики'],['subscription','Абонементы'],['perLesson','Оплата по занятиям']].forEach(([v,t])=>sel.append(new Option(t,v)));sel.value=deskFinanceFilter;sel.onchange=()=>{deskFinanceFilter=sel.value;render();};tools.append(sel);page.append(tools);const list=deskEl('div','students-list');page.append(list);
  const students=data.students.filter(st=>deskFinanceFilter==='all'||(st.paymentMode||'subscription')===deskFinanceFilter);if(!students.length)list.append(deskEl('div','empty-state','В этой категории пока нет учеников.'));
  students.forEach((st,i)=>{const card=deskEl('article',`student-card tone-${i%3}`);card.append(deskIdentity(st.name,st.paymentMode==='perLesson'?'Оплата по занятиям':'Абонемент'),deskModeControl(st));
- if(st.paymentMode==='perLesson'){const stats=getPerLessonStats(st.id);card.append(deskEl('div','tiny',`За ${stats.ym}: ${stats.totalLessons} занятий · получено ${stats.totalPaid} ₽`));if(st.lessonPrice>0)card.append(deskEl('span','desk-pill',`Ожидается ${stats.totalDue} ₽`));card.append(deskButton('Занятия и оплаты ↗',()=>{deskProfileTab='payment';deskProfileStudent=st.id;openStudentView(st.id);}));}
+ if(st.paymentMode==='perLesson'){const stats=getPerLessonStats(st.id);card.append(deskEl('div','tiny',`За ${stats.ym}: ${stats.totalLessons} занятий · оплачено за проведённые ${stats.totalPaid} ₽`));if(st.lessonPrice>0)card.append(deskEl('span','desk-pill',`Ожидается ${stats.totalDue} ₽`));card.append(deskButton('Занятия и оплаты ↗',()=>{deskProfileTab='payment';deskProfileStudent=st.id;openStudentView(st.id);}));}
  else{const stats=getSubscriptionStats(st.id);card.append(deskEl('div','tiny',stats.total>0?`Проведено ${stats.doneCount} из ${stats.total} · осталось ${stats.remaining}`:'Абонемент пока не настроен'),deskEl('div','tiny',`Оплачено ${stats.paid} / ${stats.price} ₽`));const meter=deskEl('div','desk-meter'),fill=deskEl('span');fill.style.width=(stats.total?Math.min(100,stats.remaining/stats.total*100):0)+'%';meter.append(fill);card.append(meter,deskEl('span','desk-pill '+(stats.debt===0?'good':''),stats.debt>0?`Ожидается ${stats.debt} ₽`:stats.total>0&&stats.remaining<=2?'Скоро продление':'Оплачено'));const actions=deskEl('div','desk-footer');actions.append(deskButton('Изменить',()=>editSubscription(st.id)),deskButton('Новый абонемент',()=>deskNewSubscription(st.id),'btn-main'));if(stats.total>0)actions.append(deskButton('Оповестить',()=>notifySubscription(st,stats),'btn-chip'));card.append(actions);}
  list.append(card);});}
 function renderSubscriptionEdit(main,studentId){const st=getStudent(studentId);if(!st)return;const stats=getSubscriptionStats(studentId);const page=deskPage(main,'Абонемент · '+st.name,'Редактирование текущего абонемента','Финансы',deskButton('← К ученику',()=>{currentStudentId=studentId;currentView='student';deskProfileTab='payment';render();}));const form=deskEl('div','form-section');const total=deskNumberField('Занятий в абонементе',stats.total,true),price=deskNumberField('Стоимость абонемента (₽)',stats.price),paid=deskNumberField('Получено за абонемент (₽)',stats.paid),done=deskNumberField('Проведено в текущем абонементе',stats.doneCount,true);form.append(total.wrap,price.wrap,paid.wrap,done.wrap,deskEl('div','tiny',`Учтено по урокам в этом абонементе: ${stats.rawDone}. Для нового периода используй «Новый абонемент».`));const error=deskEl('div','tiny');error.setAttribute('role','alert');form.append(error,deskButton('Сохранить абонемент',()=>{if(!deskMoneyValid([total.input,price.input,paid.input,done.input])){error.textContent='Укажи неотрицательные суммы и целое количество занятий.';return;}let sub=getSubscription(studentId);if(!sub){sub={id:data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1,studentId};data.subscriptions.push(sub);}sub.total=Number(total.input.value);sub.price=Number(price.input.value);sub.paid=Number(paid.input.value);sub.doneOffset=Number(done.input.value)-stats.rawDone;deskProfileTab='payment';deskProfileStudent=studentId;currentView='student';currentStudentId=studentId;save();},'btn-main'),deskButton('Новый абонемент — счётчик с нуля',()=>deskNewSubscription(studentId)));page.append(form);}
@@ -5060,6 +5043,64 @@ function renderGroupDetail(main,groupId){
  renderGroupDetailBase(main,groupId);const group=getGroup(groupId);if(!group)return;const card=main.lastElementChild,head=card.querySelector('.card-header'),summary=deskEl('div','group-schedule-summary');summary.append(deskEl('div','',deskSchedule(group.schedule)||'Расписание пока не задано'),deskButton('Изменить дни и время',()=>deskModal('Расписание · '+group.name,buildGroupForm({group})),'btn-main'));head.after(summary);head.querySelector('.card-subtitle').textContent='Расписание, участники и журнал групповых занятий';
  const oldList=card.lastElementChild,list=deskEl('div','group-lessons-list'),tools=deskEl('div','desk-toolbar'),filter=groupSelect('Показать занятия',[['upcoming','Сегодня и будущие'],['past','Прошедшие'],['all','Все занятия']],'upcoming');tools.append(deskButton('+ Добавить занятие',()=>groupNewLesson(group),'btn-main'),filter.wrap);list.append(tools);const items=deskEl('div');list.append(items);function draw(){items.replaceChildren();const lessons=data.groupLessons.filter(l=>l.groupId===groupId&&(filter.input.value==='all'||(filter.input.value==='past'?l.date<todayISO():l.date>=todayISO()))).sort((a,b)=>(filter.input.value==='past'?-1:1)*(a.date+' '+a.time).localeCompare(b.date+' '+b.time));if(!lessons.length)items.append(deskEl('div','empty-state','Занятий в этом списке пока нет. Добавь урок или выбери другой период.'));lessons.forEach(gl=>{const row=deskEl('article','lesson-card group-lesson-card'),top=deskEl('div','lesson-top');top.append(deskEl('strong','',gl.date+' · '+gl.time),deskButton('Открыть и редактировать',()=>{currentView='groupLessonDetail';currentGroupLessonId=gl.id;render();}));row.append(top,deskEl('div','group-lesson-topic',gl.topic||'Тема пока не указана'),deskEl('div','tiny','Домашнее задание: '+(gl.hw||'Не задано')));if(gl.comment)row.append(deskEl('div','tiny','Заметки: '+gl.comment));items.append(row);});}filter.input.onchange=draw;draw();oldList.replaceWith(list);
 }
+
+/* Cash receipts are dated independently of lesson dates. Legacy balances remain undated. */
+function financeMoney(n){return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';}
+function financeToday(){return new Intl.DateTimeFormat('sv-SE',{timeZone:data.tutorTZ||'Asia/Irkutsk',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function financeSources(){
+ const rows=[];data.students.forEach(st=>deskBillingLessons(st.id).forEach(x=>rows.push({key:x.key+':'+st.id,studentId:st.id,name:st.name,kind:'lesson',title:`Занятие ${x.lesson.date} · ${x.lesson.time}`,target:x.payment,field:'paidAmount'})));
+ (data.subscriptions||[]).forEach(sub=>{const st=getStudent(sub.studentId),name=st?.name||'Удалённый ученик';const add=(s,index)=>rows.push({key:'s:'+sub.studentId+':'+(s.startedAt||s.financeCycle||('legacy'+(index<0?'':':'+index))),studentId:sub.studentId,name,kind:'subscription',title:'Абонемент'+(s.startedAt?' от '+s.startedAt.slice(0,10):' · предыдущая запись'),target:s,field:'paid'});(sub.history||[]).forEach((h,i)=>add(h,i));add(sub,-1);});
+ return rows;
+}
+function financeLedger(){if(!data.incomeLedger)data.incomeLedger={version:1,records:[],seen:[]};return data.incomeLedger;}
+function financeEntry(source,amount,date,note=''){return{id:crypto.randomUUID(),sourceKey:source?.key||null,studentId:source?.studentId??null,studentName:source?.name||'',kind:source?.kind||'other',purpose:source?.title||'Другая оплата',amount:Math.round(amount*100)/100,date:date||null,note,createdAt:new Date().toISOString()};}
+function financeReconcile(date){
+ const ledger=financeLedger();const known=new Set(ledger.seen||[]);
+ for(const source of financeSources()){
+  const total=Math.max(0,Math.round((Number(source.target[source.field])||0)*100));const entries=ledger.records.filter(r=>r.sourceKey===source.key);const recorded=Math.round(entries.reduce((s,r)=>s+r.amount,0)*100);let delta=total-recorded;
+  if(delta>0)ledger.records.push(financeEntry(source,delta/100,date, date?'Оплата записана в карточке ученика':'Старая оплата: дата получения не указана'));
+  else if(delta<0){let left=-delta;for(const r of [...entries].reverse().filter(r=>r.amount>0)){const cents=Math.round(r.amount*100),take=Math.min(cents,left);r.amount=(cents-take)/100;r.updatedAt=new Date().toISOString();left-=take;if(!left)break;}}
+  known.add(source.key);
+ }
+ ledger.seen=[...known];
+}
+function financeStats(month,student='all'){
+ const records=financeLedger().records.filter(r=>r.amount!==0&&(student==='all'||String(r.studentId)===student));const dated=records.filter(r=>r.date?.slice(0,7)===month);return{records,dated,income:dated.filter(r=>r.amount>0).reduce((s,r)=>s+r.amount,0),refunds:-dated.filter(r=>r.amount<0).reduce((s,r)=>s+r.amount,0),net:dated.reduce((s,r)=>s+r.amount,0),undated:records.filter(r=>!r.date).reduce((s,r)=>s+r.amount,0)};
+}
+function financeSetSource(sourceKey,delta){const source=financeSources().find(s=>s.key===sourceKey);if(!source)return;source.target[source.field]=Math.round(((Number(source.target[source.field])||0)+delta)*100)/100;}
+function financePaymentForm(existing=null,preselect=null){
+ const form=deskEl('div','form-section finance-editor');const date=groupField('Дата получения денег','date',existing?.date||financeToday()),amount=deskNumberField('Сумма (₽)',Math.abs(existing?.amount||0)),note=groupField('Комментарий к оплате','textarea',existing?.note||'');date.input.max=financeToday();
+ const type=groupSelect('Операция',[['income','Поступление'],['refund','Возврат денег']],existing?.amount<0?'refund':'income');
+ const student=groupSelect('Ученик',[['','Без ученика'],...data.students.map(s=>[String(s.id),s.name])],String(existing?.studentId??preselect??''));
+ const purpose=groupField('Назначение платежа','text',existing?.purpose||'');const source=groupSelect('За что оплата',[['','Другая оплата']],existing?.sourceKey||'');
+ function fillSources(){source.input.replaceChildren(new Option('Другая оплата',''));financeSources().filter(s=>String(s.studentId)===student.input.value&&(s.kind==='lesson'||data.subscriptions.some(sub=>sub===s.target))).forEach(s=>source.input.append(new Option(s.title,s.key)));source.input.value=existing?.sourceKey||'';if(!source.input.value)source.input.value='';}
+ fillSources();student.input.onchange=fillSources;source.input.onchange=()=>{purpose.input.value=source.input.selectedOptions[0]?.text||'';};
+ if(existing){student.input.disabled=source.input.disabled=true;form.append(deskEl('div','tiny',`${existing.studentName||'Без ученика'} · ${existing.purpose}`));}else form.append(student.wrap,source.wrap);
+ form.append(type.wrap,date.wrap,amount.wrap,purpose.wrap,note.wrap,deskEl('div','tiny','Дата — когда деньги действительно получены. Дата будущего урока на доход не влияет.'));
+ const error=deskEl('div','tiny');error.setAttribute('role','alert');form.append(error);
+ function commit(remove=false){
+  if(!remove&&(!date.input.value||date.input.value>financeToday()||!date.input.checkValidity()||!deskMoneyValid([amount.input])||Number(amount.input.value)<=0)){error.textContent='Укажи дату получения не позже сегодняшней и сумму больше нуля.';return;}
+  const value=remove?0:Math.round(Number(amount.input.value)*100)/100*(type.input.value==='refund'?-1:1);const key=existing?.sourceKey||source.input.value;const change=value-(existing?.amount||0);const target=financeSources().find(s=>s.key===key);
+  if(target&&(Number(target.target[target.field])||0)+change<-.001){error.textContent='Возврат превышает записанную оплату. Проверь сумму и выбранное занятие или абонемент.';return;}
+  if(remove&&!confirm('Удалить эту ошибочную запись оплаты? Связанная сумма в карточке ученика тоже уменьшится. Для возврата денег используй операцию «Возврат денег».'))return;
+  financeSetSource(key,change);const ledger=financeLedger();if(existing){Object.assign(existing,{amount:value,date:date.input.value,purpose:purpose.input.value.trim()||existing.purpose,note:note.input.value==='Старая оплата: дата получения не указана'?'':note.input.value,updatedAt:new Date().toISOString()});}else{const st=getStudent(Number(student.input.value));ledger.records.push({...financeEntry(target,value,date.input.value,note.input.value),studentId:st?.id??null,studentName:st?.name||'',purpose:purpose.input.value.trim()||target?.title||'Другая оплата'});}
+  save();
+ }
+ form.append(deskButton('Сохранить оплату',()=>commit(),'btn-main'));if(existing)form.append(deskButton('Удалить ошибочную запись',()=>commit(true),'btn-chip danger'));return form;
+}
+let financeMonth='',financeStudent='all',financeTab='dated';
+function renderFinance(main){
+ financeReconcile(null);if(!financeMonth)financeMonth=financeToday().slice(0,7);
+ const page=deskPage(main,'Финансы','Поступления по дате получения денег, включая предоплаты','Деньги под контролем',deskButton('+ Записать оплату',()=>deskModal('Новая оплата',financePaymentForm()),'btn-main'));
+ const filters=deskEl('div','form-row-inline'),month=groupField('Месяц','month',financeMonth),student=groupSelect('Фильтр по ученику',[['all','Все ученики'],...data.students.map(s=>[String(s.id),s.name])],financeStudent);filters.append(month.wrap,student.wrap);page.append(filters);
+ month.input.onchange=()=>{if(month.input.value){financeMonth=month.input.value;render();}};student.input.onchange=()=>{financeStudent=student.input.value;render();};
+ const stats=financeStats(financeMonth,financeStudent),cards=deskEl('div','finance-summary');[['Получено',stats.income],['Возвращено',stats.refunds],['Фактический доход',stats.net]].forEach(([label,value])=>{const card=deskEl('div','finance-total');card.append(deskEl('span','tiny',label),deskEl('strong','',financeMoney(value)));cards.append(card);});page.append(cards,deskEl('p','tiny','Доход = поступления − возвраты за выбранный месяц. Расходы здесь не учитываются.'));
+ const tabs=deskEl('div','desk-tabs');[['dated','История за месяц'],['undated','Без даты поступления']].forEach(([key,label])=>{const b=deskButton(label,()=>{financeTab=key;render();},'desk-tab');b.setAttribute('aria-pressed',String(financeTab===key));tabs.append(b);});page.append(tabs);
+ if(stats.undated)page.append(deskEl('p','finance-notice',`Старые оплаты без даты: ${financeMoney(stats.undated)}. Укажи дату получения — тогда сумма попадёт в нужный месяц. Дата урока или начала абонемента не подставляется автоматически.`));
+ const rows=(financeTab==='undated'?stats.records.filter(r=>!r.date):stats.dated).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||b.createdAt.localeCompare(a.createdAt));const list=deskEl('div','finance-list');if(!rows.length)list.append(deskEl('div','empty-state',financeTab==='undated'?'Все даты оплат указаны.':'За этот месяц пока нет записанных поступлений.'));
+ rows.forEach(r=>{const row=deskEl('article','finance-row');const body=deskEl('div');body.append(deskEl('strong','',getStudent(r.studentId)?.name||r.studentName||'Без ученика'),deskEl('div','tiny',r.purpose),deskEl('div','tiny',r.date?(r.amount<0?'Возврат ':'Получено ')+r.date:'Дата получения не указана'));if(r.note)body.append(deskEl('div','tiny',r.note));const right=deskEl('div','finance-amount');right.append(deskEl('strong',r.amount<0?'danger':'',financeMoney(r.amount)),deskButton(r.date?'Изменить':'Указать дату',()=>deskModal('Оплата · '+(r.studentName||'Без ученика'),financePaymentForm(r)),'btn-chip'));row.append(body,right);list.append(row);});page.append(list);
+}
+function financeProfile(){if(currentView!=='student')return;const panel=mainCol.querySelector('#desk-panel-payment');if(!panel)return;panel.prepend(deskButton('+ Записать поступление',()=>deskModal('Новая оплата',financePaymentForm(null,currentStudentId)),'btn-main'),deskButton('История поступлений ↗',()=>{financeStudent=String(currentStudentId);currentView='finance';render();},'btn-chip'));}
 
 /* Bilingual development journal. Ratings are observations, not school grades. */
 document.querySelector('.nav-btn[data-view="bilingual"] .icon')?.replaceChildren(deskIcon('sprout'));
@@ -5348,12 +5389,13 @@ const teacherCloud = (() => {
       throw new Error('Облачная запись имеет неизвестный формат. Данные браузера сохранены.');
     for (const field of ['subscriptions','completedTasks','coursePlans','groups','groupLessons'])
       if (value[field] !== undefined && !Array.isArray(value[field])) throw new Error('Неверный формат: '+field);
+    if(value.incomeLedger && (!Array.isArray(value.incomeLedger.records)||value.incomeLedger.version!==1))throw new Error('Неверный формат истории оплат.');
     return {...clone(defaultData),...clone(value)};
   }
   function install(value) {
     data = normalize(value);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    data = loadData(); render();
+    data = loadData(); financeReconcile(null); render();
   }
   async function getRow() {
     const {data:rows,error} = await client.from('teacher_desk_state').select('data,revision,updated_at').eq('owner_id',user.id);
@@ -5430,7 +5472,7 @@ const teacherCloud = (() => {
     if (dirty && !blocked && localGeneration !== generation) timer = setTimeout(flush,600);
   }
   async function poll(force = false) {
-    if (document.querySelector('.bil-inline-dialog,.group-lesson-editor,.group-editor')) return;
+    if (document.querySelector('.bil-inline-dialog,.group-lesson-editor,.group-editor,.finance-editor')) return;
     if (!ready || !user || busy || blocked) return;
     if (dirty) { await flush(); return; }
     if (!force && (document.hidden || dialog || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.querySelector('.desk-dialog'))) return;
@@ -5507,7 +5549,7 @@ const teacherCloud = (() => {
     if(!materialURLs.has(path))materialURLs.set(path,(async()=>{const {data:blob,error}=await client.storage.from('teacher-desk-materials').download(path);if(error)throw error;return URL.createObjectURL(blob);})().catch(error=>{materialURLs.delete(path);throw error;}));return materialURLs.get(path);
   }
   const oldSave = save;
-  save = function(){oldSave();changed();};
+  save = function(){financeReconcile(financeToday());oldSave();changed();};
   setInterval(()=>poll(),12000);
   window.addEventListener('online',()=>poll(true));
   window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
@@ -5523,6 +5565,7 @@ const teacherCloud = (() => {
   return {show,flush,poll,connect,changed,uploadImage,imageURL,getState:()=>({ready,dirty,blocked,empty,revision,message})};
 })();
 
+  financeReconcile(null);
   render();
 </script>
 </body>
