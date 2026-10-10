@@ -971,6 +971,9 @@
 @media(max-width:650px){.bil-catalog{grid-template-columns:1fr}.bil-topic-card{padding:18px}.bil-document-head h2{font-size:25px}.bil-toggle-body{padding:10px 14px}.bil-content-toggle>summary{padding:16px;font-size:19px}.bil-editor-dialog{width:calc(100vw - 18px)!important}.bil-edit-block{padding:10px}.bil-nested-editor{padding-left:7px}.bil-block-actions{justify-content:flex-start}.bil-editor-save{top:0}.bil-add-block{gap:8px}.bil-add-block .form-row{max-width:100%;width:100%}}
 
 .bil-topic-card .desk-toolbar{flex-wrap:wrap}
+.bil-inline-dialog{width:min(1150px,calc(100vw - 24px))!important;max-width:1150px!important;background:#f6f0e8!important}.bil-inline-editor{min-width:0}.bil-inline-toolbar{position:sticky;top:0;z-index:8;background:#f6f0e8;padding:12px 0;border-bottom:1px solid #e4d4c5;flex-wrap:wrap}.bil-inline-help{font-size:13px;color:#8b705d;padding:14px 0}.bil-editor-paper{background:#fffdf9;padding:32px 45px;border:1px solid #e9dacf;border-radius:15px;margin:12px 0}.bil-inline-title{font-family:Georgia,serif;font-size:32px;line-height:1.25;margin:0 0 24px;outline:none;overflow-wrap:anywhere}.bil-inline-meta{display:flex;gap:15px;flex-wrap:wrap}.bil-inline-item{position:relative;min-width:0;padding:4px 0 4px 23px}.bil-inline-menu{position:absolute;left:-10px;top:6px;z-index:5}.bil-inline-menu>summary{list-style:none;cursor:pointer;font-size:22px;color:#b99781;padding:0 7px}.bil-inline-menu>summary::-webkit-details-marker{display:none}.bil-inline-actions{display:flex;flex-direction:column;position:absolute;left:0;top:25px;min-width:145px;gap:5px;background:#fffaf5;box-shadow:0 6px 24px #49362b20;border:1px solid #e3cdbb;padding:8px;border-radius:10px}.bil-inline-section{border:0;background:transparent;margin:14px 0}.bil-inline-section>summary{cursor:pointer;font-family:Georgia,serif;font-size:23px;color:#8e533b;padding:10px 0}.bil-section-title{outline:none;display:inline;cursor:text}.bil-inline-section-body{border-left:2px solid #ecd7c5;margin-left:6px;padding:4px 0 4px 14px}.bil-rich-content{line-height:1.75;font-size:15px;overflow-wrap:anywhere;min-width:0}.bil-rich-content p{margin:9px 0;white-space:pre-wrap}.bil-rich-content img{max-width:100%;height:auto;display:block;margin:15px 0;border-radius:10px}.bil-rich-content a{color:#a35b40;text-decoration:underline;overflow-wrap:anywhere}.bil-rich-content details{border:1px solid #e9d6c6;border-radius:12px;padding:12px 16px;margin:15px 0;background:#fbf4ec}.bil-rich-content summary{cursor:pointer;font-weight:600;color:#87553d}.bil-rich-content table{border-collapse:collapse;max-width:100%;table-layout:fixed}.bil-rich-content td,.bil-rich-content th{border:1px solid #dec8b4;padding:8px;overflow-wrap:anywhere}.bil-writing{min-height:40px;outline:none;border-radius:7px;padding:6px 8px;white-space:pre-wrap}.bil-writing:focus{background:#fcf6ee;box-shadow:inset 3px 0 #c88762}.bil-writing:empty:before{content:attr(data-placeholder);color:#b29b87;pointer-events:none}.bil-inline-heading{font-family:Georgia,serif;font-size:22px;color:#8b513b}.bil-inline-add{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;opacity:.8}.bil-inline-add button{border-style:dashed;background:transparent;font-size:12px}.bil-inline-library{padding:16px;border:1px solid #e4d4c5;border-radius:12px;margin-top:16px}.bil-inline-library>summary{cursor:pointer;color:#8d583e}.bil-inline-library .form-row{margin-top:15px}.bil-image-loading{display:block;background:#f0e5d7;padding:15px;border-radius:9px}
+@media(max-width:650px){.bil-editor-paper{padding:20px 12px}.bil-inline-title{font-size:26px}.bil-inline-item{padding-left:17px}.bil-inline-section-body{padding-left:6px;margin-left:0}.bil-inline-section>summary{font-size:20px}.bil-rich-content{font-size:14px}.bil-inline-dialog{width:calc(100vw - 12px)!important;padding:12px!important}.bil-inline-toolbar{gap:7px}.bil-inline-toolbar button{padding:8px 10px}.bil-inline-toolbar [role=status]{width:100%}.bil-inline-help{font-size:12px}.bil-inline-add button{max-width:100%;white-space:normal}}
+
 </style>
 <script src="bilingual-assets-v1.js"></script>
 </head>
@@ -5160,7 +5163,7 @@ function bilRenderHistory(panel,state){
  filter.input.onchange=fill;fill();
 }
 
-/* First-year curriculum and lesson builder. Content is rendered as text, never HTML. */
+/* First-year curriculum and lesson builder. Rich content is sanitized before rendering. */
 let bilLibraryTab='',bilDocument=null,bilSearch='',bilLibraryFilter='all';
 const bilCopy=value=>JSON.parse(JSON.stringify(value));
 function bilSafeURL(url){try{const u=new URL(url);return ['https:','http:'].includes(u.protocol)?u.href:null;}catch{return null;}}
@@ -5194,7 +5197,7 @@ function bilRenderDocument(panel,doc,kind){
 function bilDrawBlocks(container,blocks){
  (blocks||[]).forEach(b=>{let wrap,body;
  if(b.type==='toggle'){wrap=deskEl('details','bil-content-toggle');wrap.append(deskEl('summary','',b.text||'Этап занятия'));body=deskEl('div','bil-toggle-body');wrap.append(body);}
- else{wrap=deskEl('div','bil-content-block');body=wrap;if(b.type==='heading')wrap.append(deskEl('h3','',b.text));else if(b.type==='divider')wrap.append(deskEl('hr'));else if(b.type==='checklist'){const check=deskEl('label','bil-check');const cb=deskEl('input');cb.type='checkbox';cb.checked=!!b.checked;cb.onchange=()=>{b.checked=cb.checked;bilWrite(bilState());};check.append(cb,deskEl('span','bil-pre',b.text));wrap.append(check);}else if(b.text)wrap.append(deskEl('div','bil-pre',b.text));}
+ else{wrap=deskEl('div','bil-content-block');body=wrap;if(b.type==='heading'){const heading=deskEl('h3');heading.append(b.html?bilRichRender(b.html):document.createTextNode(b.text||''));wrap.append(heading);}else if(b.type==='divider')wrap.append(deskEl('hr'));else if(b.type==='checklist'){const check=deskEl('label','bil-check');const cb=deskEl('input');cb.type='checkbox';cb.checked=!!b.checked;cb.onchange=()=>{b.checked=cb.checked;bilWrite(bilState());};check.append(cb,b.html?bilRichRender(b.html):deskEl('span','bil-pre',b.text));wrap.append(check);}else if(b.html)wrap.append(bilRichRender(b.html));else if(b.text)wrap.append(deskEl('div','bil-pre',b.text));}
  const links=(b.links||[]).filter(l=>bilSafeURL(l.url));if(links.length){const list=deskEl('div','bil-resource-list');links.forEach((l,i)=>list.append(bilLink(l.text&&!/^https?:/.test(l.text)?l.text:(/youtu/.test(l.url)?'▶ Видео '+(i+1):'Открыть материал '+(i+1)),l.url)));body.append(list);}
  (b.media||[]).forEach(m=>{const asset=m.assetId&&typeof bilImportedAssets!=='undefined'?bilImportedAssets[m.assetId]:null;const url=asset||bilSafeURL(m.url);if(!url)return;if(m.type==='img'){const figure=deskEl('figure','bil-material'),img=deskEl('img');img.src=url;img.alt=m.alt||'Материал занятия';img.loading='lazy';figure.append(img);const a=deskEl('a','bil-resource-link','Скачать изображение');a.href=url;a.download='material.webp';figure.append(a);body.append(figure);}else body.append(bilLink(m.alt||'Открыть материал',url));});
  bilDrawBlocks(body,b.children);container.append(wrap);});
@@ -5205,35 +5208,69 @@ function bilChooseTemplate(){
 function bilCopyDocument(doc,kind){
  const clone={id:bilId(),title:doc?doc.title+(kind==='lessonPlans'?' — копия':' — занятие'):'Новое занятие',date:'',groupId:Number(bilGroup)||null,themeId:kind==='library'?doc?.id||'':doc?.themeId||'',blocks:bilCloneBlocks(doc?.blocks||[])};bilEditDocument(clone,'lessonPlans',true);
 }
-function bilEditDocument(existing,kind,isNew=false){
- document.querySelectorAll('.desk-dialog').forEach(d=>d.remove());
- const draft=bilCopy(existing||{id:bilId(),title:'Новая тема',kind:'theme',blocks:[]});draft.blocks||=[];
- const form=deskEl('form','bil-editor');form.onsubmit=e=>e.preventDefault();const head=deskEl('div','form-section');const title=bilField('Название','text',draft.title);title.input.oninput=()=>draft.title=title.input.value;head.append(title.wrap);
- if(kind==='lessonPlans'){const row=deskEl('div','form-row-inline'),date=bilField('Дата занятия','date',draft.date);date.input.oninput=()=>draft.date=date.input.value;const group=bilSelect('Группа занятия',[{value:'',label:'Без привязки к группе'},...bilGroups().map(g=>({value:g.id,label:g.name}))],draft.groupId||'');group.input.onchange=()=>draft.groupId=group.input.value?Number(group.input.value):null;row.append(date.wrap,group.wrap);head.append(row);}
- head.append(deskEl('div','tiny','Сохраняй готовое занятие или черновик. Изменения применятся после нажатия «Сохранить».'));form.append(head);
- const toolbar=deskEl('div','desk-toolbar bil-editor-save'),blockArea=deskEl('div','bil-edit-blocks');let undo=[];
- const back=deskButton('Отменить последнее действие',()=>{if(undo.length){draft.blocks=undo.pop();draw();}});back.disabled=true;
- function record(){undo.push(bilCopy(draft.blocks));if(undo.length>30)undo.shift();back.disabled=false;}
- function saveDoc(){const invalid=blocks=>(blocks||[]).some(b=>(b.links||[]).some(l=>!bilSafeURL(l.url))||(b.media||[]).some(m=>!m.assetId&&!bilSafeURL(m.url))||invalid(b.children));if(invalid(draft.blocks)){bilError(form,'Проверь ссылки: используй только http или https.');return;}if(!draft.title.trim()){bilError(form,'Укажи название.');return;}draft.title=draft.title.trim();draft.updatedAt=new Date().toISOString();const state=bilState();state[kind]||=[];const i=state[kind].findIndex(d=>d.id===draft.id);if(i<0)state[kind].push(draft);else state[kind][i]=draft;bilLibraryTab=kind;bilDocument={kind,id:draft.id};bilWrite(state);}
- toolbar.append(deskButton(kind==='library'?'Сохранить тему':'Сохранить',saveDoc,'btn-main'),back);if(existing?.originalBlocks)toolbar.append(deskButton('Восстановить исходные блоки',()=>{record();draft.blocks=bilCopy(existing.originalBlocks);draw();}));form.append(toolbar,blockArea);
- function addControls(list,parent){const row=deskEl('div','desk-toolbar bil-add-block');const type=bilSelect('Тип нового блока',[{value:'toggle',label:'Раскрывающийся этап'},{value:'text',label:'Текст / задание'},{value:'heading',label:'Заголовок'},{value:'checklist',label:'Чеклист'},{value:'divider',label:'Разделитель'}],'toggle');row.append(type.wrap,deskButton('+ Добавить блок',()=>{record();list.push({id:bilId(),type:type.input.value,text:type.input.value==='toggle'?'Новый этап':'',links:[],media:[],children:[]});draw();}));parent.append(row);}
- function drawList(list,parent,depth){list.forEach((b,i)=>{b.children||=[];b.links||=[];b.media||=[];const field=deskEl('fieldset','bil-edit-block');field.append(deskEl('legend','tiny',(i+1)+' · '+(b.type==='toggle'?'Раскрывающийся этап':b.type==='heading'?'Заголовок':b.type==='divider'?'Разделитель':b.type==='checklist'?'Чеклист':'Текст / материал')));const actions=deskEl('div','desk-toolbar bil-block-actions');
- const up=deskButton('↑',()=>{record();[list[i-1],list[i]]=[list[i],list[i-1]];draw();});up.setAttribute('aria-label','Переместить блок выше');up.disabled=i===0;const down=deskButton('↓',()=>{record();[list[i],list[i+1]]=[list[i+1],list[i]];draw();});down.setAttribute('aria-label','Переместить блок ниже');down.disabled=i===list.length-1;
- actions.append(up,down,deskButton('Копировать блок',()=>{record();list.splice(i+1,0,bilCloneBlocks([b])[0]);draw();}),deskButton('Убрать',()=>{record();list.splice(i,1);draw();}));field.append(actions);
- if(b.type!=='divider'){const text=bilField(b.type==='toggle'||b.type==='heading'?'Заголовок блока':'Текст блока','textarea',b.text);text.input.rows=b.type==='toggle'||b.type==='heading'?2:Math.min(10,Math.max(3,(b.text||'').split('\n').length));text.input.oninput=()=>b.text=text.input.value;field.append(text.wrap);}
- const resources=deskEl('details','bil-edit-resources');resources.append(deskEl('summary','tiny','Материалы и ссылки · '+(b.links.length+b.media.length)));
- const links=bilField('Ссылки — по одной в строке','textarea',b.links.map(l=>l.url).join('\n'));links.input.oninput=()=>b.links=links.input.value.split('\n').map(url=>url.trim()).filter(Boolean).map(url=>({text:'',url}));resources.append(links.wrap);
- b.media.forEach((m,j)=>{const line=deskEl('div','desk-toolbar');line.append(deskEl('span','tiny',m.assetId?'Сохранённое изображение':'Изображение / материал'),deskButton('Убрать материал',()=>{record();b.media.splice(j,1);draw();}));resources.append(line);});
- const image=bilField('Ссылка на новое изображение','url','');resources.append(image.wrap,deskButton('Добавить изображение по ссылке',()=>{const url=bilSafeURL(image.input.value);if(!url){bilError(form,'Укажи ссылку http или https на изображение.');return;}record();b.media.push({type:'img',url,alt:'Материал занятия'});draw();}));field.append(resources);
- const children=deskEl('details','bil-edit-children');children.open=depth===0&&b.type==='toggle';children.append(deskEl('summary','tiny','Вложенные блоки · '+b.children.length));const nested=deskEl('div','bil-nested-editor');drawList(b.children,nested,depth+1);addControls(b.children,nested);children.append(nested);field.append(children);parent.append(field);});}
- function draw(){blockArea.replaceChildren();drawList(draft.blocks,blockArea,0);addControls(draft.blocks,blockArea);back.disabled=!undo.length;}
- if(kind==='lessonPlans'){
- const picker=deskEl('details','form-section');picker.append(deskEl('summary','','Добавить этапы из другой темы'));
- const library=bilState().library||[],source=bilSelect('Тема для добавления',library.map(d=>({value:d.id,label:d.title})),library[0]?.id||''),block=bilSelect('Что добавить',[],'');
- function options(){const doc=library.find(d=>d.id===source.input.value);block.input.replaceChildren(new Option('Вся тема / шаблон','all'));(doc?.blocks||[]).filter(b=>b.text||b.children?.length||b.media?.length).forEach(b=>block.input.append(new Option((b.text||'Материал').split('\n')[0].slice(0,90),b.id)));}source.input.onchange=options;options();
- picker.append(source.wrap,block.wrap,deskButton('Добавить в занятие',()=>{const doc=library.find(d=>d.id===source.input.value);if(!doc)return;record();const chosen=block.input.value==='all'?doc.blocks:doc.blocks.filter(b=>b.id===block.input.value);draft.blocks.push(...bilCloneBlocks(chosen));draw();}));head.append(picker);
+
+/* Visible page editor; rich content is cleaned before insertion and storage. */
+function bilImageSource(url){return bilSafeURL(url)||(/^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=\s]+$/i.test(url||'')?url:null);}
+function bilCleanRich(html,forStorage=false){
+ const template=document.createElement('template');template.innerHTML=html||'';const output=document.createElement('div');
+ const allowed=new Set(['P','DIV','BR','SPAN','B','STRONG','I','EM','U','S','UL','OL','LI','H1','H2','H3','H4','BLOCKQUOTE','A','IMG','DETAILS','SUMMARY','TABLE','THEAD','TBODY','TR','TD','TH','HR']);
+ function clean(node,parent){if(node.nodeType===3){parent.append(document.createTextNode(node.textContent));return;}if(node.nodeType!==1)return;if(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','FORM','INPUT','BUTTON','NOSCRIPT'].includes(node.tagName))return;
+  if(!allowed.has(node.tagName)){Array.from(node.childNodes).forEach(n=>clean(n,parent));return;}
+  const el=document.createElement(node.tagName.toLowerCase());
+  if(node.tagName==='A'){const url=bilSafeURL(node.getAttribute('href'));if(!url){Array.from(node.childNodes).forEach(n=>clean(n,parent));return;}el.href=url;el.target='_blank';el.rel='noopener noreferrer';}
+  if(node.tagName==='IMG'){const asset=node.getAttribute('data-bil-asset'),file=node.getAttribute('data-bil-file');if(asset&&typeof bilImportedAssets!=='undefined'&&bilImportedAssets[asset]){el.dataset.bilAsset=asset;if(!forStorage)el.src=bilImportedAssets[asset];}
+   else if(file&&/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.webp$/i.test(file)){el.dataset.bilFile=file;}
+   else{const url=bilImageSource(node.getAttribute('src'));if(!url)return;el.src=url;}el.alt=node.getAttribute('alt')||'Материал занятия';}
+  if(node.tagName==='DETAILS'){if(node.hasAttribute('open'))el.open=true;if(node.dataset.bilLink)el.dataset.bilLink='true';}
+  if(['TD','TH'].includes(node.tagName)){for(const attr of ['colspan','rowspan']){const n=Number(node.getAttribute(attr));if(Number.isInteger(n)&&n>1&&n<=20)el.setAttribute(attr,String(n));}}
+  Array.from(node.childNodes).forEach(n=>clean(n,el));parent.append(el);
  }
- draw();const dialog=deskModal(kind==='lessonPlans'?'Конструктор занятия':'Редактор темы',form);document.querySelector('.desk-dialog')?.classList.add('bil-editor-dialog');
+ Array.from(template.content.childNodes).forEach(n=>clean(n,output));return output.innerHTML;
+}
+function bilRichRender(html){const div=deskEl('div','bil-rich-content');div.innerHTML=bilCleanRich(html);div.querySelectorAll('img[data-bil-file]').forEach(img=>{teacherCloud.imageURL(img.dataset.bilFile).then(url=>{if(img.isConnected)img.src=url;}).catch(()=>{img.alt='Не удалось загрузить изображение — проверь подключение';});});return div;}
+function bilOwnRich(block){
+ if(block.html)return bilRichRender(block.html);const div=deskEl('div','bil-rich-content');if(block.text){const p=deskEl('p','',block.text);p.style.whiteSpace='pre-wrap';div.append(p);}
+ (block.links||[]).forEach(l=>{if(!bilSafeURL(l.url))return;const p=deskEl('p');p.append(bilLink(l.text||l.url,l.url,''));div.append(p);});
+ (block.media||[]).forEach(m=>{if(m.type!=='img'){if(bilSafeURL(m.url))div.append(bilLink(m.alt||'Материал',m.url));return;}const img=deskEl('img');if(m.assetId&&typeof bilImportedAssets!=='undefined'&&bilImportedAssets[m.assetId]){img.dataset.bilAsset=m.assetId;img.src=bilImportedAssets[m.assetId];}else if(bilImageSource(m.url))img.src=bilImageSource(m.url);else return;img.alt=m.alt||'Материал занятия';div.append(img);});return div;
+}
+function bilEditDocument(existing,kind){
+ document.querySelectorAll('.desk-dialog').forEach(d=>d.remove());const draft=bilCopy(existing||{id:bilId(),title:'Новая тема',kind:'theme',blocks:[]});draft.blocks||=[];
+ const form=deskEl('div','bil-inline-editor'),toolbar=deskEl('div','desk-toolbar bil-inline-toolbar'),paper=deskEl('div','bil-editor-paper'),body=deskEl('div','bil-inline-body');let undo=[],pending=0,active=null,selection=null;
+ const status=deskEl('span','tiny','Изменения ещё не сохранены');status.setAttribute('role','status');
+ const title=deskEl('h1','bil-inline-title',draft.title);title.contentEditable='plaintext-only';title.setAttribute('role','textbox');title.setAttribute('aria-label','Название');title.oninput=()=>draft.title=title.innerText;
+ function rememberSelection(){const sel=window.getSelection();if(active&&sel?.rangeCount&&active.contains(sel.anchorNode))selection=sel.getRangeAt(0).cloneRange();}
+ const save=deskButton(kind==='library'?'Сохранить тему':'Сохранить занятие',()=>{if(pending){status.textContent='Подожди, картинки ещё сохраняются…';return;}if(!draft.title.trim()){status.textContent='Укажи название темы или занятия.';return;}const state=bilState();state[kind]||=[];draft.title=draft.title.trim();draft.updatedAt=new Date().toISOString();const index=state[kind].findIndex(d=>d.id===draft.id);if(index<0)state[kind].push(draft);else state[kind][index]=draft;bilLibraryTab=kind;bilDocument={kind,id:draft.id};bilWrite(state);},'btn-main');
+ function record(){undo.push(bilCopy(draft.blocks));if(undo.length>30)undo.shift();undoButton.disabled=false;}
+ const undoButton=deskButton('Отменить действие',()=>{if(undo.length){draft.blocks=undo.pop();draw();}});undoButton.disabled=true;
+ function format(command){if(!active)return;active.focus();if(selection){const sel=window.getSelection();sel.removeAllRanges();sel.addRange(selection);}document.execCommand(command,false,null);active.dispatchEvent(new Event('input',{bubbles:true}));rememberSelection();}
+ toolbar.append(save,undoButton,deskButton('Жирный',()=>format('bold')),deskButton('Список',()=>format('insertUnorderedList')),status);form.append(toolbar);
+ const intro=deskEl('div','bil-inline-help','Пиши прямо на странице. Ctrl+V — вставить текст, ссылку или картинку. Стрелка слева раскрывает раздел.');form.append(intro);paper.append(title);
+ if(kind==='lessonPlans'){const meta=deskEl('div','bil-inline-meta'),date=bilField('Дата занятия','date',draft.date),group=bilSelect('Группа занятия',[{value:'',label:'Без группы'},...bilGroups().map(g=>({value:g.id,label:g.name}))],draft.groupId||'');date.input.oninput=()=>draft.date=date.input.value;group.input.onchange=()=>draft.groupId=group.input.value?Number(group.input.value):null;meta.append(date.wrap,group.wrap);paper.append(meta);}
+ paper.append(body);form.append(paper);
+ function capture(block,editor){block.html=bilCleanRich(editor.innerHTML,true);block.text=editor.innerText;block.links=[];block.media=[];status.textContent='Изменения ещё не сохранены';}
+ function insert(editor,node){editor.focus();const sel=window.getSelection();let range;if(sel?.rangeCount&&editor.contains(sel.anchorNode))range=sel.getRangeAt(0);else{range=document.createRange();range.selectNodeContents(editor);range.collapse(false);}range.deleteContents();const last=node.nodeType===11?node.lastChild:node;range.insertNode(node);if(last)range.setStartAfter(last);range.collapse(true);sel.removeAllRanges();sel.addRange(range);selection=range.cloneRange();}
+ function linkCard(url){const details=deskEl('details');details.dataset.bilLink='true';details.open=true;const summary=deskEl('summary','',(/youtu/.test(url)?'Видео · ':'Материал · ')+new URL(url).hostname);const p=deskEl('p');p.append(bilLink('Открыть ссылку ↗',url,''));details.append(summary,p,deskEl('p','','Заметки к материалу…'));return details;}
+ async function paste(event,block,editor){event.preventDefault();const clip=event.clipboardData;if(!clip)return;record();const files=Array.from(clip.items||[]).filter(x=>x.kind==='file'&&/^image\//.test(x.type)).map(x=>x.getAsFile()).filter(Boolean);
+  if(files.length){for(const file of files){const loading=deskEl('span','bil-image-loading','Сохраняю картинку…');loading.contentEditable='false';insert(editor,loading);pending++;save.disabled=true;try{const path=await teacherCloud.uploadImage(file);const img=deskEl('img');img.dataset.bilFile=path;img.alt='Материал занятия';img.src=await teacherCloud.imageURL(path);loading.replaceWith(img);capture(block,editor);}catch(error){loading.remove();status.textContent=error.message||'Картинка не загрузилась. Попробуй ещё раз.';}finally{pending--;save.disabled=!!pending;}}return;}
+  const html=clip.getData('text/html'),text=clip.getData('text/plain');
+  if(bilSafeURL(text.trim()))insert(editor,linkCard(text.trim()));
+  else if(html){const box=deskEl('div');box.innerHTML=bilCleanRich(html);const images=Array.from(box.querySelectorAll('img'));
+   for(const img of images){if(img.dataset.bilAsset||img.dataset.bilFile)continue;const source=img.getAttribute('src');if(/^data:image\//.test(source||'')){pending++;save.disabled=true;try{const blob=await (await fetch(source)).blob();const path=await teacherCloud.uploadImage(blob);img.removeAttribute('src');img.dataset.bilFile=path;}catch(error){img.remove();status.textContent=error.message;}finally{pending--;save.disabled=!!pending;}}}
+   const fragment=document.createDocumentFragment();while(box.firstChild)fragment.append(box.firstChild);const last=fragment.lastChild;insert(editor,fragment);if(last){const sel=window.getSelection(),range=document.createRange();range.setStartAfter(last);range.collapse(true);sel.removeAllRanges();sel.addRange(range);}editor.querySelectorAll('img[data-bil-file]').forEach(img=>{teacherCloud.imageURL(img.dataset.bilFile).then(url=>img.src=url).catch(()=>{});});
+  }else{const p=deskEl('p','',text);p.style.whiteSpace='pre-wrap';insert(editor,p);}
+  capture(block,editor);rememberSelection();
+ }
+ function editable(block){const rich=bilOwnRich(block);rich.classList.add('bil-writing');rich.contentEditable='true';rich.setAttribute('role','textbox');rich.setAttribute('aria-label','Содержание этапа');rich.setAttribute('aria-multiline','true');rich.dataset.placeholder='Пиши здесь или вставь текст, ссылку, картинку…';rich.onfocus=()=>{active=rich;selection=null;};rich.onkeyup=rich.onmouseup=rememberSelection;rich.oninput=()=>capture(block,rich);rich.onpaste=e=>paste(e,block,rich);rich.ondragover=e=>{if(e.dataTransfer?.files?.length)e.preventDefault();};rich.ondrop=e=>{if(e.dataTransfer?.files?.length){e.preventDefault();paste({preventDefault(){},clipboardData:{items:Array.from(e.dataTransfer.files).map(f=>({kind:'file',type:f.type,getAsFile:()=>f}))}},block,rich);}};return rich;}
+ function addButtons(list,parent){const line=deskEl('div','bil-inline-add');line.append(deskButton('+ Текст',()=>{record();list.push({id:bilId(),type:'text',text:'',children:[]});draw();}),deskButton('+ Раскрывающийся раздел',()=>{record();list.push({id:bilId(),type:'toggle',text:'Новый раздел',editorOpen:true,children:[{id:bilId(),type:'text',text:'',children:[]}]});draw();}));parent.append(line);}
+ function drawList(list,parent,depth=0){list.forEach((block,index)=>{block.children||=[];const row=deskEl('div','bil-inline-item');const menu=deskEl('details','bil-inline-menu');menu.append(deskEl('summary','','⋯'));const actions=deskEl('div','bil-inline-actions');const up=deskButton('Выше',()=>{record();[list[index-1],list[index]]=[list[index],list[index-1]];draw();});up.disabled=!index;const down=deskButton('Ниже',()=>{record();[list[index],list[index+1]]=[list[index+1],list[index]];draw();});down.disabled=index===list.length-1;actions.append(up,down,deskButton('Копировать',()=>{record();list.splice(index+1,0,...bilCloneBlocks([block]));draw();}),deskButton('Убрать',()=>{record();list.splice(index,1);draw();}));menu.append(actions);row.append(menu);
+  if(block.type==='toggle'){const details=deskEl('details','bil-inline-section');details.open=block.editorOpen??depth===0;details.ontoggle=()=>block.editorOpen=details.open;const summary=deskEl('summary'),label=deskEl('span','bil-section-title',block.text||'Раздел');label.contentEditable='plaintext-only';label.setAttribute('role','textbox');label.setAttribute('aria-label','Название раздела');label.onclick=e=>e.stopPropagation();label.oninput=()=>block.text=label.innerText;summary.append(label);details.append(summary);const inner=deskEl('div','bil-inline-section-body');if(block.html||block.links?.length||block.media?.length){const own={...block,id:bilId(),text:'',type:'text',children:[]};block.children.unshift(own);delete block.html;block.links=[];block.media=[];}drawList(block.children,inner,depth+1);addButtons(block.children,inner);details.append(inner);row.append(details);}
+  else if(block.type==='divider')row.append(deskEl('hr'));
+  else{const rich=editable(block);if(block.type==='heading')rich.classList.add('bil-inline-heading');if(block.type==='checklist'){const cb=deskEl('input');cb.type='checkbox';cb.checked=!!block.checked;cb.onchange=()=>block.checked=cb.checked;row.append(cb);}row.append(rich);if(block.children.length){const inner=deskEl('div','bil-inline-section-body');drawList(block.children,inner,depth+1);row.append(inner);}}
+  parent.append(row);});}
+ function draw(){body.replaceChildren();drawList(draft.blocks,body);addButtons(draft.blocks,body);undoButton.disabled=!undo.length;}
+ if(kind==='lessonPlans'){const picker=deskEl('details','bil-inline-library');picker.append(deskEl('summary','','Добавить из другой темы'));const library=bilState().library||[],source=bilSelect('Тема для добавления',library.map(d=>({value:d.id,label:d.title})),library[0]?.id||''),part=bilSelect('Что добавить',[],'');function options(){const doc=library.find(d=>d.id===source.input.value);part.input.replaceChildren(new Option('Вся тема','all'));(doc?.blocks||[]).filter(b=>b.text||b.children?.length||b.media?.length).forEach(b=>part.input.append(new Option((b.text||'Материал').split('\n')[0].slice(0,90),b.id)));}source.input.onchange=options;options();picker.append(source.wrap,part.wrap,deskButton('Добавить в занятие',()=>{const doc=library.find(d=>d.id===source.input.value);if(!doc)return;record();draft.blocks.push(...bilCloneBlocks(part.input.value==='all'?doc.blocks:doc.blocks.filter(b=>b.id===part.input.value)));draw();}));form.append(picker);}
+ if(existing?.originalBlocks){const restore=deskEl('details','bil-inline-library');restore.append(deskEl('summary','','Исходная версия из Buildin'),deskButton('Восстановить исходные блоки',()=>{record();draft.blocks=bilCopy(existing.originalBlocks);draw();}));form.append(restore);}
+ draw();deskModal(kind==='library'?'Редактор темы':'План занятия',form);document.querySelector('.desk-dialog')?.classList.add('bil-inline-dialog');
 }
 
 const teacherCloud = (() => {
@@ -5345,6 +5382,7 @@ const teacherCloud = (() => {
     if (dirty && !blocked && localGeneration !== generation) timer = setTimeout(flush,600);
   }
   async function poll(force = false) {
+    if (document.querySelector('.bil-inline-dialog')) return;
     if (!ready || !user || busy || blocked) return;
     if (dirty) { await flush(); return; }
     if (!force && (document.hidden || dialog || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.querySelector('.desk-dialog'))) return;
@@ -5406,6 +5444,20 @@ const teacherCloud = (() => {
     box.append(deskButton('Закрыть',close));dialog.append(box);document.body.append(dialog);
     dialog.addEventListener('cancel',close);dialog.showModal();
   }
+  const materialURLs=new Map();
+  async function uploadImage(file){
+    if(!user||!ready||blocked)throw new Error('Для сохранения картинки войди в облачный кабинет и синхронизируй записи.');
+    if(file.size>20*1024*1024)throw new Error('Картинка слишком большая. Выбери файл до 20 МБ.');
+    const bitmap=await createImageBitmap(file);const ratio=Math.min(1,2000/Math.max(bitmap.width,bitmap.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.93));if(!blob)throw new Error('Не удалось прочитать картинку.');
+    const path=user.id+'/'+crypto.randomUUID()+'.webp';const {error}=await client.storage.from('teacher-desk-materials').upload(path,blob,{contentType:'image/webp',upsert:false});if(error)throw error;materialURLs.set(path,Promise.resolve(URL.createObjectURL(blob)));return path;
+  }
+  async function imageURL(path){
+    if(!user)throw new Error('Войди в облачный кабинет для загрузки картинки.');
+    if(!path.startsWith(user.id+'/'))throw new Error('Этот материал недоступен.');
+    if(!materialURLs.has(path))materialURLs.set(path,(async()=>{const {data:blob,error}=await client.storage.from('teacher-desk-materials').download(path);if(error)throw error;return URL.createObjectURL(blob);})().catch(error=>{materialURLs.delete(path);throw error;}));return materialURLs.get(path);
+  }
   const oldSave = save;
   save = function(){oldSave();changed();};
   setInterval(()=>poll(),12000);
@@ -5420,7 +5472,7 @@ const teacherCloud = (() => {
   client.auth.getSession().then(({data:auth,error})=>{
     if(error)paint('В этом браузере · войти');else if(auth.session)connect(auth.session);
   }).catch(()=>paint('В этом браузере · войти'));
-  return {show,flush,poll,connect,changed,getState:()=>({ready,dirty,blocked,empty,revision,message})};
+  return {show,flush,poll,connect,changed,uploadImage,imageURL,getState:()=>({ready,dirty,blocked,empty,revision,message})};
 })();
 
   render();
