@@ -2206,20 +2206,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     main.appendChild(card);
   }
 
-  function moveLessonDate(lessonId,newDate){
-    const l=data.lessons.find(x=>x.id===lessonId);
-    if(!l) return;
-    l.date=newDate;
-    l.wasMoved=true;
-    save();
+  function calendarMoveDialog(lesson,newDate,group=false){
+    const entity=group?getGroup(lesson.groupId):getStudent(lesson.studentId),form=deskEl('div','form-section group-editor'),date=groupField('Новая дата занятия','date',newDate),weekday=groupDay(newDate),slot=(entity?.schedule||[]).find(x=>x.dayKey===weekday),time=groupField('Новое время занятия','time',slot?.time||lesson.time||'');
+    form.append(deskEl('div','tiny',`Было: ${lesson.date} · ${lesson.time||'время не указано'}. Изменится только это занятие.`),date.wrap,time.wrap);const error=deskEl('div','tiny');error.setAttribute('role','alert');form.append(error);
+    form.append(deskButton('Сохранить перенос',()=>{if(!date.input.value||!date.input.checkValidity()||!time.input.value||!time.input.checkValidity()){error.textContent='Укажи новую дату и время занятия.';return;}const items=group?data.groupLessons:data.lessons;if(items.some(l=>l.id!==lesson.id&&(group?l.groupId===lesson.groupId:l.studentId===lesson.studentId)&&l.date===date.input.value&&l.time===time.input.value&&l.status!=='cancelled')){error.textContent='На эту дату и время уже есть занятие. Выбери другое время.';return;}lesson.date=date.input.value;lesson.time=time.input.value;lesson.wasMoved=true;save();},'btn-main'),deskButton('Отмена',()=>form.closest('dialog')?.close()));deskModal('Перенести занятие · '+(entity?.name||'Ученик'),form);
   }
-
-  function moveGroupLessonDate(groupLessonId,newDate){
-    const gl=data.groupLessons.find(x=>x.id===groupLessonId);
-    if(!gl) return;
-    gl.date=newDate;
-    save();
-  }
+  function moveLessonDate(lessonId,newDate){const lesson=data.lessons.find(l=>l.id===lessonId);if(lesson)calendarMoveDialog(lesson,newDate);}
+  function moveGroupLessonDate(lessonId,newDate){const lesson=data.groupLessons.find(l=>l.id===lessonId);if(lesson)calendarMoveDialog(lesson,newDate,true);}
 
   function openAddLessonForDate(dateStr){
     const name = prompt("Имя ученика (как в списке)", "");
@@ -3795,7 +3788,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const scopeHint=document.createElement("div");
     scopeHint.className="tiny";
     scopeHint.style.marginBottom="4px";
-    scopeHint.textContent="«Только это занятие» — изменится и дата, и время именно этого урока. «Все будущие» — поменяется только время (на всех будущих занятиях с прежним временем), а дата меняется только у этого урока.";
+    scopeHint.textContent="«Только это занятие» — изменится и дата, и время именно этого урока. «Все будущие» — поменяется только время (на будущих занятиях в тот же день недели с прежним временем), а дата меняется только у этого урока.";
     const selScope=document.createElement("select");
     selScope.className="form-select";
     [["only","Только это занятие"],["future","Это и все будущие занятия (тот же день недели и время)"]]
@@ -3808,42 +3801,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     btnApplyDateTime.className="btn-secondary";
     btnApplyDateTime.textContent="Сохранить дату и время";
     btnApplyDateTime.style.marginTop="6px";
-    btnApplyDateTime.onclick=()=>{
-      const newDate=inDate.value;
-      const newTime=inTime.value;
-      if(!newDate || !newTime){alert("Укажите дату и время.");return;}
-
-      applyLessonContent();
-      if (selScope.value==="future") {
-        const oldTime = l.time;
-        const today = todayISO();
-        let count=0;
-        data.lessons.forEach(other=>{
-          if (other.studentId===l.studentId &&
-              other.status==="scheduled" &&
-              other.time===oldTime &&
-              other.date>=today) {
-            other.time = newTime;
-            // shift each lesson's date by the same day-of-week offset as the edited one,
-            // keeping their own original date but applying the new time only —
-            // changing the date for a whole series would be ambiguous, so we only
-            // propagate the time change across the series.
-            count++;
-          }
-        });
-        l.date = newDate;
-        l.time = newTime;
-        l.wasMoved=true;
-        save();
-        alert(`Время обновлено для этого занятия и ещё ${count-1>0?count-1:0} будущих занятий с тем же временем.`);
-      } else {
-        l.date = newDate;
-        l.time = newTime;
-        l.wasMoved=true;
-        save();
-      }
-      render();
-    };
+    function applyLessonTiming(){
+      const newDate=inDate.value,newTime=inTime.value;
+      if(!newDate||!inDate.checkValidity()||!inTime.checkValidity()||(!newTime&&(l.time||newDate!==l.date))){alert('Укажите корректную дату и время.');return false;}
+      if(data.lessons.some(other=>other.id!==l.id&&other.studentId===l.studentId&&other.date===newDate&&other.time===newTime&&other.status!=='cancelled')){alert('На эту дату и время уже есть занятие этого ученика.');return false;}
+      const oldTime=l.time,oldDay=groupDay(l.date);const future=selScope.value==='future'?data.lessons.filter(other=>other.id!==l.id&&other.studentId===l.studentId&&other.status==='scheduled'&&other.time===oldTime&&groupDay(other.date)===oldDay&&other.date>=financeToday()):[];
+      if(future.some(other=>data.lessons.some(x=>x.id!==other.id&&x.studentId===l.studentId&&(x.id===l.id?newDate:x.date)===other.date&&(x.id===l.id||future.includes(x)?newTime:x.time)===newTime&&x.status!=='cancelled'))){alert('Изменение времени создаст два занятия в один час. Измени только этот урок.');return false;}
+      const changed=l.date!==newDate||l.time!==newTime;future.forEach(other=>other.time=newTime);l.date=newDate;l.time=newTime;if(changed)l.wasMoved=true;return true;
+    }
+    btnApplyDateTime.onclick=()=>{if(!applyLessonTiming())return;applyLessonContent();save();};
 
     rowApplyScope.appendChild(lblScope);
     rowApplyScope.appendChild(scopeHint);
@@ -4125,7 +4091,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       l.comment=inComment.value;
       l.lessonPlan=lessonPlan.input.value;l.nextLessonComment=nextLesson.input.value;
     }
-    btnSave.onclick=()=>{applyLessonContent();save();};
+    btnSave.onclick=()=>{if(!applyLessonTiming())return;applyLessonContent();save();};
 
     const rowPaid=document.createElement("div");
     rowPaid.className="form-row";
@@ -4140,6 +4106,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       inPaid.placeholder="например, 1500";
       inPaid.value = (l.paidAmount!=null) ? l.paidAmount : "";
       inPaid.onchange=()=>{
+        if(!applyLessonTiming())return;
         applyLessonContent();
         l.paidAmount = inPaid.value!=="" ? parseFloat(inPaid.value) : null;
         save();
@@ -4151,12 +4118,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const btnDone=document.createElement("button");
     btnDone.className="btn-secondary";
     btnDone.textContent="Отметить как проведён";
-    btnDone.onclick=()=>{applyLessonContent();l.status="done";save();};
+    btnDone.onclick=()=>{if(!applyLessonTiming())return;applyLessonContent();l.status="done";save();};
 
     const btnCancel=document.createElement("button");
     btnCancel.className="btn-danger";
     btnCancel.textContent="Отменить урок";
-    btnCancel.onclick=()=>{applyLessonContent();l.status="cancelled";save();};
+    btnCancel.onclick=()=>{if(!applyLessonTiming())return;applyLessonContent();l.status="cancelled";save();};
 
     const btnRem=document.createElement("button");
     btnRem.className="btn-secondary";
