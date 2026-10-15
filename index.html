@@ -1551,6 +1551,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   /* HOME (Главная) */
 
+  function groupLessonStatus(lesson){
+    if(lesson.status==='cancelled')return 'cancelled';
+    return lesson.status==='done'||(lesson.attendance||[]).some(a=>a.present===true)?'done':'scheduled';
+  }
   function renderToday(main) {
     const today = todayISO();
     const todaysAll = getIndividualLessons(l=>l.date===today)
@@ -1568,8 +1572,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     heroTitle.textContent=new Date().toLocaleDateString("ru-RU",{weekday:"long",day:"numeric",month:"long"});
     const heroSub=document.createElement("div");
     heroSub.className="day-hero-sub";
-    const totalEventsToday = todaysAll.filter(l=>l.status!=="cancelled").length + todaysGroupAll.length;
-    const doneEventsToday = todaysAll.filter(l=>l.status==="done").length;
+    const todayStatuses=[...todaysAll.map(l=>l.status||"scheduled"),...todaysGroupAll.map(groupLessonStatus)];
+    const totalEventsToday = todayStatuses.length;
+    const doneEventsToday = todayStatuses.filter(status=>status==="done").length;
     heroSub.textContent = totalEventsToday
       ? `${totalEventsToday} занятий сегодня · ${doneEventsToday} уже прошло`
       : "Сегодня занятий нет";
@@ -1586,7 +1591,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
       const allEvents = [
         ...todaysAll.map(l=>({time:l.time, status:l.status, name:getStudent(l.studentId)?.name||"?", kind:"lesson", id:l.id})),
-        ...todaysGroupAll.map(gl=>({time:gl.time, status:"scheduled", name:getGroup(gl.groupId)?.name||"Группа", kind:"group", id:gl.id}))
+        ...todaysGroupAll.map(gl=>({time:gl.time, status:groupLessonStatus(gl), name:getGroup(gl.groupId)?.name||"Группа", kind:"group", id:gl.id}))
       ].filter(e=>e.status!=="cancelled" || true)
        .sort((a,b)=>a.time.localeCompare(b.time));
 
@@ -1724,6 +1729,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         top.appendChild(nameSpan);
         top.appendChild(timeSpan);
         row.appendChild(top);
+        const state=groupLessonStatus(gl),stateLabel=deskEl('div','tiny group-lesson-status');
+        stateLabel.textContent=state==='done'?'Проведено':state==='cancelled'?'Отменено':'Запланировано';
+        row.append(stateLabel);
         const carry=lessonCarryover(gl,true,true);if(carry)row.append(carry);
         list.appendChild(row);
       });
@@ -1755,10 +1763,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     tHeader.appendChild(tLeft);
     todayCard.appendChild(tHeader);
 
-    const totalToday = todays.length;
-    const doneToday = getIndividualLessons(l=>l.date===today && l.status==="done").length;
-    const cancelledToday = getIndividualLessons(l=>l.date===today && l.status==="cancelled").length;
-    const plannedToday = getIndividualLessons(l=>l.date===today && l.status==="scheduled").length;
+    const totalToday = totalEventsToday;
+    const doneToday = doneEventsToday;
+    const cancelledToday = todayStatuses.filter(status=>status==="cancelled").length;
+    const plannedToday = todayStatuses.filter(status=>status==="scheduled").length;
 
     const number=document.createElement("div");
     number.className="summary-number";
