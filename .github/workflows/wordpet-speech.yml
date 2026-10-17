@@ -22,8 +22,8 @@ jobs:
     env:
       WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
       WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
-      WORDPET_SPEECH_WORKDIR: ${{ runner.temp }}/wordpet-speech
-      WORDPET_SPEECH_MODEL_DIR: ${{ runner.temp }}/wordpet-speech-model
+      WORDPET_SPEECH_WORKDIR: /tmp/wordpet-speech-${{ github.run_id }}-${{ github.run_attempt }}
+      WORDPET_SPEECH_MODEL_DIR: /tmp/wordpet-speech-model-${{ github.run_id }}-${{ github.run_attempt }}
       OMP_NUM_THREADS: '2'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
