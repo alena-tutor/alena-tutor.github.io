@@ -94,6 +94,25 @@ const WordPetCore = (() => {
     });
     return shuffle(chosen, random);
   }
+  function selectPracticeWords(words, progress, today, counts = {}, limit = 6, random = Math.random) {
+    const available = words.filter(w => w.active !== false && w.english && w.russian);
+    const chosen = [];
+    const takeLeastSeen = (pool, places) => {
+      while (places > 0 && pool.length) {
+        const least = Math.min(...pool.map(w => Number(counts[w.id]) || 0));
+        const tier = pool.filter(w => (Number(counts[w.id]) || 0) === least);
+        const picked = selectWords(tier, progress, today, places, random);
+        chosen.push(...picked); places -= picked.length;
+        const ids = new Set(picked.map(w => w.id));
+        pool = pool.filter(w => !ids.has(w.id));
+      }
+    };
+    // Keep room for unresolved difficulties; rotate the rest across today's glossary.
+    takeLeastSeen(available.filter(w => category(w, progress, today) === 'hard'), Math.min(2, limit));
+    const ids = new Set(chosen.map(w => w.id));
+    takeLeastSeen(available.filter(w => !ids.has(w.id)), limit - chosen.length);
+    return shuffle(chosen, random);
+  }
   function gapData(word) {
     const example = String(word.example || '');
     for (const answer of [word.english,...String(word.answers || '').split('|')].map(value=>String(value || '').trim()).filter(Boolean)) {
@@ -208,6 +227,6 @@ const WordPetCore = (() => {
     const p = progress.filter(x => x.wordId === word.id && ['write_en','listen','gap'].includes(x.skill));
     return p.some(x => Number(x.streak) >= 2);
   };
-  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, gapData, letterParts, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
+  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, selectPracticeWords, makeTasks, gapData, letterParts, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
 })();
 if (typeof module !== 'undefined') module.exports = WordPetCore;

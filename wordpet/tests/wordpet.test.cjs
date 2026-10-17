@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.7.0'/);
+ assert.match(code,/version: '1.8.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -485,4 +485,40 @@ test('the pronunciation queue contains only words, examples and the sample and u
  b.api('teacher','sync');let queue=JSON.parse(b.files.get('speech-queue').getDataAsString());assert.ok(queue.texts.includes('occasionally'));assert.equal(JSON.stringify(queue).includes(keys.teacher),false);assert.equal(JSON.stringify(queue).includes('learner_b'),false);
  b.api('teacher','addWord',{studentId:'learner_b',english:'a new expression',russian:'новое выражение',example:'I use a new expression today.'});
  queue=JSON.parse(b.files.get('speech-queue').getDataAsString());assert.ok(queue.texts.includes('a new expression'));assert.ok(queue.texts.includes('I use a new expression today.'));
+});
+
+test('extra rounds rotate through unpractised words before repeating easy ones',()=>{
+ const words=Array.from({length:18},(_,i)=>({id:'w'+i,english:'word '+i,russian:'слово '+i,lessonOn:'2026-09-01'}));
+ const counts={},seen=new Set();
+ for(let round=0;round<3;round++){
+  const selected=core.selectPracticeWords(words,[],'2026-10-16',counts,6,()=>.5);
+  assert.equal(selected.length,6);
+  for(const w of selected){assert.equal(seen.has(w.id),false);seen.add(w.id);counts[w.id]=(counts[w.id]||0)+1;}
+ }
+ assert.equal(seen.size,18);
+ assert.equal(core.selectPracticeWords(words,[],'2026-10-16',counts,6,()=>.5).length,6);
+});
+test('extra rounds mix current difficulties with other words and handle small pools',()=>{
+ const words=Array.from({length:12},(_,i)=>({id:'w'+i,english:'word '+i,russian:'слово '+i,lessonOn:'2026-09-01'}));
+ const progress=[{wordId:'w0',wrong:1,streak:0,lastAt:'2026-10-16',nextReview:'2026-10-16'}];
+ const selected=core.selectPracticeWords(words,progress,'2026-10-16',{w0:1,w1:1,w2:1,w3:1,w4:1,w5:1},6,()=>.5);
+ assert.ok(selected.some(w=>w.id==='w0'));
+ assert.equal(selected.filter(w=>Number(w.id.slice(1))>=6).length,5);
+ const small=core.selectPracticeWords(words.slice(0,2),progress,'2026-10-16',{w0:8,w1:8},6,()=>.5);
+ assert.deepEqual(new Set(small.map(w=>w.id)),new Set(['w0','w1']));
+});
+test('retries use later words and remain available after four sessions without duplicate rewards',()=>{
+ const b=backend();finish(b,'learner_b');
+ const first=JSON.parse(b.records('Тренировки')[0].payload).studyWords.map(w=>w.id);
+ const second=b.api('learner_b','start',{retry:true});
+ assert.ok(second.studyWords.some(w=>!first.includes(w.id)));
+ assert.equal(b.api('learner_b','start',{retry:true}).id,second.id,'unfinished practice resumes');
+ finish(b,'learner_b',{retry:true});
+ for(let i=0;i<14;i++)finish(b,'learner_b',{retry:true});
+ const dashboard=b.api('learner_b','bootstrap');
+ assert.equal(b.records('Тренировки').length,16);
+ assert.equal(dashboard.doneToday,true);
+ assert.equal(dashboard.history.some(s=>s.mode==='daily'),false,'daily result has left the short history');
+ assert.equal(dashboard.pet.xp,80);assert.equal(dashboard.pet.coins,10);
+ assert.equal(b.api('learner_b','start',{retry:true}).status,'active');
 });

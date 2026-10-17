@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.7.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.8.0',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
@@ -226,6 +226,7 @@ function studentDashboard_(studentId) {
   words.forEach(w => byCategory[WordPetCore.category(w,progress,today)]++);
   return {role:'student',name:student.name,studentId,today,pet:publicPet_(pet_(studentId)),
     words:words.map(w => ({id:w.id,english:w.english,russian:w.russian,...exampleContext_(w),topic:w.topic,category:WordPetCore.category(w,progress,today),mastered:WordPetCore.mastered(w,progress)})),
+    doneToday:sessions.some(s => s.day === today && s.mode === 'daily' && s.status === 'completed'),
     counts:byCategory,stats:{total:words.length,seen:seen.size,mastered:words.filter(w => WordPetCore.mastered(w,progress)).length,
       completed:sessions.filter(s => s.status === 'completed' && s.mode === 'daily').length+archiveTotal_(studentId,sessions).completed,
       pending:answers.filter(a => a.status === 'pending').length},
@@ -254,16 +255,17 @@ function start_(studentId,data) {
   if (active) return sessionResponse_(active);
   const daily = all.find(s => s.mode === 'daily' && s.status === 'completed');
   if (daily && !data.retry) return sessionResponse_(daily);
-  if (all.length >= 4) throw Error('На сегодня достаточно тренировок. Завтра будут новые задания.');
   const words = words_(studentId), progress = progress_(studentId);
   if (!words.length) throw Error('В глоссарии пока нет слов. Преподаватель скоро добавит их.');
-  let candidates = words;
-  if (data.retry && daily) {
-    const failed = JSON.parse(daily.payload).results.filter(r => r.correct === false).map(r => r.wordId);
-    candidates = words.filter(w => failed.includes(w.id));
-    if (!candidates.length) candidates = words;
-  }
-  const picked = WordPetCore.selectWords(candidates,progress,today_());
+  const counts = {};
+  all.filter(s => s.status === 'completed').forEach(s => {
+    const payload = JSON.parse(s.payload);
+    const ids = new Set((payload.studyWords || payload.tasks || []).map(w => w.wordId || w.id));
+    ids.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+  });
+  const picked = daily
+    ? WordPetCore.selectPracticeWords(words,progress,today_(),counts)
+    : WordPetCore.selectWords(words,progress,today_());
   let tasks = WordPetCore.makeTasks(picked,words,progress,today_());
   const studyWords = picked.map(studyWord_);
   const s = {id:Utilities.getUuid(),studentId,createdAt:now_(),day:today_(),mode:daily?'retry':'daily',status:'active',payload:JSON.stringify({tasks,studyWords,results:[]})};
