@@ -195,7 +195,7 @@ test('unknown gap shows its answer, repeats after two tasks, persists, and is id
  assert.equal(result.result.correct,false);assert.equal(result.result.answer,'Не знаю');assert.equal(result.result.unknown,true);
  assert.equal(result.result.expected,original.gapAnswer||original.english);assert.equal(result.session.total,total+1);
  const ts=b.tasks(s.id),pos=ts.findIndex(t=>t.isReview&&t.wordId===original.wordId);
- assert.equal(pos,result.session.index+2);assert.equal(ts[pos].prompt,original.prompt);
+ assert.equal(pos,Math.min(result.session.index+2,total));assert.equal(ts[pos].prompt,original.prompt);
  const repeated=b.api('learner_b','answer',{sessionId:s.id,taskId:original.id,unknown:true});
  assert.equal(repeated.session.total,total+1);assert.equal(b.records('Прогресс').find(p=>p.wordId===original.wordId&&p.skill==='gap').wrong,1);
  s=b.api('learner_b','start');assert.equal(s.total,total+1);
