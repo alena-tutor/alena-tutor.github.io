@@ -20,8 +20,6 @@ jobs:
       run:
         working-directory: wordpet
     env:
-      WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
-      WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
       WORDPET_SPEECH_WORKDIR: /tmp/wordpet-speech-${{ github.run_id }}-${{ github.run_attempt }}
       WORDPET_SPEECH_MODEL_DIR: /tmp/wordpet-speech-model-${{ github.run_id }}-${{ github.run_attempt }}
       OMP_NUM_THREADS: '2'
@@ -36,12 +34,15 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Inspect private queue and existing recordings
         id: plan
+        env:
+          WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
+          WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
         run: node scripts/speech-store.mjs prepare
       - name: Install pinned speech runtime
         if: steps.plan.outputs.pending != '0'
         run: |
           python3 -m venv "$RUNNER_TEMP/wordpet-voice-env"
-          "$RUNNER_TEMP/wordpet-voice-env/bin/pip" install --disable-pip-version-check kokoro-onnx==0.4.9 onnxruntime==1.22.1 numpy==2.2.6 soundfile==0.13.1
+          "$RUNNER_TEMP/wordpet-voice-env/bin/pip" install --disable-pip-version-check kokoro-onnx==0.6.1 onnxruntime==1.22.1 numpy==2.2.6 soundfile==0.13.1
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng libespeak-ng1
           command -v ffmpeg
@@ -55,6 +56,9 @@ jobs:
         if: steps.plan.outputs.pending != '0'
         run: '"$RUNNER_TEMP/wordpet-voice-env/bin/python" scripts/speech-audio.py'
       - name: Save and verify recordings in private Google Drive
+        env:
+          WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
+          WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
         run: node scripts/speech-store.mjs upload
       - name: Remove private temporary files
         if: always()
