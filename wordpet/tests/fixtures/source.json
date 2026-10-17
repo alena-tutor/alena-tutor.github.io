@@ -1,0 +1,80 @@
+[
+  {
+    "id": "fixture-learner_a",
+    "studentId": "learner_a",
+    "name": "Ученик А",
+    "sheet": "Глоссарий",
+    "rows": [
+      [
+        "Дата",
+        "Тема",
+        "Vocabulary",
+        "Phrases / constructions",
+        "Заметки"
+      ],
+      [
+        "02.10.2026",
+        "Учебная тема",
+        "now and then — время от времени\nin the middle of the day — в середине дня\nvariety of things — разнообразие вещей / разные вещи",
+        null,
+        ""
+      ],
+      [
+        "16.10.2026",
+        "Учебная тема",
+        "quite — довольно, вполне\nquite interested — довольно заинтересован(а)\ncan't stand — терпеть не могу\nbe keen on — увлекаться, очень любить\nkind of — своего рода; немного (разг.)\ndifferent — другой, отличающийся",
+        "What are ... like? — Какие ...? / Что ... собой представляют? (в записи ученицы: are like)",
+        "Слова вызвали трудности"
+      ]
+    ]
+  },
+  {
+    "id": "fixture-learner_b",
+    "studentId": "learner_b",
+    "name": "Ученик Б",
+    "sheet": "Глоссарий",
+    "rows": [
+      [
+        "Дата",
+        "Тема",
+        "Vocabulary",
+        "Phrases / constructions",
+        "Заметки"
+      ],
+      [
+        "01.10.2026",
+        "Учебная тема",
+        "mean — значить / иметь в виду\nupset — расстроенный\nagreement — согласие\nsuggestion — предложение\nopinion — мнение\nconfused — растерянный / сбитый с толку",
+        null,
+        ""
+      ],
+      [
+        "03.10.2026",
+        "Учебная тема",
+        "advice — совет\nopinion — мнение\nnow and then — время от времени",
+        null,
+        "advice, opinion — трудности"
+      ],
+      [
+        "08.10.2026",
+        "Учебная тема",
+        "hardly ever — почти никогда\nfrequently — часто\noccasionally — иногда / время от времени"
+      ]
+    ]
+  },
+  {
+    "id": "fixture-empty_learner",
+    "studentId": "empty_learner",
+    "name": "Пустой профиль",
+    "sheet": "Глоссарий",
+    "rows": [
+      [
+        "Дата",
+        "Тема",
+        "Vocabulary",
+        "Phrases / constructions",
+        "Заметки"
+      ]
+    ]
+  }
+]

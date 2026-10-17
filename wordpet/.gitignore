@@ -1,0 +1,10 @@
+node_modules/
+output/
+.clasprc.json
+.clasp.json
+*.secret
+.env*
+!.env.example
+wordpet-config.json
+deployment.json
+deploy-receipt.json

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Подключение обновлений WordPet</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#faf6f0;color:#303a30;font:17px/1.6 system-ui,sans-serif}main{max-width:850px;margin:60px auto;padding:0 24px 60px}.brand{font-weight:800;color:#aa563d;letter-spacing:.06em}.status{display:inline-block;font-size:14px;padding:6px 12px;border-radius:30px;background:#f0e4cd;margin:22px 0 10px}h1{font-size:clamp(32px,5vw,46px);line-height:1.15;letter-spacing:-.025em;margin:14px 0}h2{font-size:22px;margin:0 0 6px}p{margin:12px 0}.lead{font-size:20px;color:#62705f}a{color:#985038}.button{display:inline-block;margin:15px 0 7px;background:#ac573f;color:white;text-decoration:none;padding:15px 22px;border-radius:14px;font-weight:700}.card{background:white;border:1px solid #e8e2d7;border-radius:20px;margin:17px 0;padding:24px}.number{color:#b05f44;font-weight:800;font-size:14px;letter-spacing:.08em}.small{font-size:14px;color:#667160}code{background:#f2ede5;border-radius:5px;padding:3px 6px;overflow-wrap:anywhere}.note{padding:20px;background:#eaf0e5;border-radius:16px;margin-top:25px}
+</style>
+<main><div class="brand">WORDPET</div><span class="status">Нужно один раз подключить Google</span>
+<h1>Обновления игры —<br>без ручной вставки кода</h1>
+<p class="lead">Слова, прогресс и питомцы остаются в твоём Google. После подключения новые версии будут публиковаться через GitHub.</p>
+<p class="note">Скачай WordPet-Setup.zip из сообщения ChatGPT. В нём находятся настройки твоего Google-проекта, поэтому этот архив не опубликован на сайте.</p>
+<p class="small">Распакуй архив целиком и запусти WordPet-Setup.cmd. Если Windows показывает предупреждение, исходный код обоих файлов доступен <a href="https://github.com/alena-tutor/alena-tutor.github.io/tree/main/wordpet/scripts">в твоём репозитории</a>.</p>
+<section class="card"><div class="number">ШАГ 1</div><h2>Запусти настройку</h2><p>Оставь все файлы из архива рядом. Если программа попросит Node.js, установи версию LTS с открывшейся официальной страницы, затем запусти настройку ещё раз.</p></section>
+<section class="card"><div class="number">ШАГ 2</div><h2>Подключи свой Google</h2><p>Настройка откроет страницу Google. Включи Google Apps Script API, вернись в окно программы и нажми Enter. Затем войди в аккаунт, которому принадлежит WordPet.</p></section>
+<section class="card"><div class="number">ШАГ 3</div><h2>Сохрани разрешение в GitHub</h2><p>Программа скопирует разрешение в буфер и откроет нужную страницу GitHub. Имя секрета: <code>WORDPET_CLASPRC_JSON</code>. Сначала программа предложит сохранить WORDPET_CONFIG_JSON, затем WORDPET_CLASPRC_JSON. Для каждого секрета вставь содержимое буфера в поле Secret с помощью Ctrl+V и нажми Add secret. Между сохранениями возвращайся в программу и нажимай Enter.</p><p class="small">Разрешение не нужно отправлять в чат или добавлять в файлы сайта.</p><p>Вернись в программу и нажми Enter. На открывшейся странице WordPet нажми Run workflow, оставь Publish включённым и запусти обновление.</p></section>
+<div class="note"><b>Когда всё подключено?</b><p>Когда в GitHub успешно завершится «Publish to Google». До этого рабочая игра остаётся на прежней версии.</p><p>В обновлённой игре появятся список слов перед заданиями, кнопка «Не знаю» и раздел «Архив» в кабинете преподавателя.</p></div>
+<p class="small" style="margin-top:28px"><a href="https://github.com/alena-tutor/alena-tutor.github.io/blob/main/wordpet/SETUP.md">Подробная инструкция и восстановление предыдущей версии</a></p>
+</main></html>

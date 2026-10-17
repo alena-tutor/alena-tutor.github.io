@@ -1,0 +1,15 @@
+{
+  "name": "wordpet-google",
+  "version": "1.2.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@google/clasp": "3.4.1"
+  }
+}

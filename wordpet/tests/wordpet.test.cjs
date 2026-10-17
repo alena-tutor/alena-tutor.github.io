@@ -1,0 +1,284 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const crypto=require('node:crypto');
+const zlib=require('node:zlib');
+const root=path.resolve(__dirname,'..');
+const core=require('../src/Core.js');
+const seed=require('./fixtures/seed.cjs');
+const source=JSON.parse(fs.readFileSync(root+'/tests/fixtures/source.json','utf8'));
+const examples=JSON.parse(fs.readFileSync(root+'/src/examples.json','utf8'));
+const keys={teacher:'a'.repeat(64),learner_b:'b'.repeat(64),learner_a:'c'.repeat(64),empty_learner:'d'.repeat(64)};
+function backend(){
+ const data=new Map(),files=new Map(),properties=new Map();
+ let activeEmail='owner@example.test',failNextSessionWrite=false,failDelete='',failFile=false;
+ const range=(name,row,col,nr,nc)=>({
+  getValues:()=>Array.from({length:nr},(_,i)=>Array.from({length:nc},(_,j)=>data.get(name)?.[row-1+i]?.[col-1+j]??'')),
+  setValues:values=>{if(name==='Тренировки'&&failNextSessionWrite){failNextSessionWrite=false;throw Error('SIMULATED_WRITE_FAILURE');}const rows=data.get(name)||[];values.forEach((v,i)=>{rows[row-1+i]??=[];v.forEach((val,j)=>rows[row-1+i][col-1+j]=val);});data.set(name,rows);}
+ });
+ const sheet=name=>({getLastRow:()=>data.get(name)?.length||0,getLastColumn:()=>data.get(name)?.[0]?.length||0,getRange:(r,c,nr,nc)=>range(name,r,c,nr,nc),setFrozenRows(){},deleteRows:(start,count)=>{if(failDelete===name){failDelete='';throw Error('SIMULATED_DELETE_FAILURE');}data.get(name).splice(start-1,count);}});
+ const db={getSheetByName:name=>data.has(name)?sheet(name):null,getOwner:()=>({getEmail:()=> 'owner@example.test'}),setSpreadsheetTimeZone(){},insertSheet:name=>{data.set(name,[]);return sheet(name);}};
+ const sourceDb=id=>{const s=source.find(s=>s.id===id);if(!s)throw Error('Source not found');return {getSheetByName:name=>name===s.sheet?{getLastRow:()=>s.rows.length,getLastColumn:()=>5,getRange:()=>({getValues:()=>s.rows.map(r=>Array.from({length:5},(_,i)=>r[i]??''))})}:null};};
+ const blob=(bytes,mime,name)=>{const buffer=typeof bytes==='string'?Buffer.from(bytes):Buffer.from(bytes);return {getBytes:()=>Array.from(buffer),getDataAsString:()=>buffer.toString('utf8'),mime,name};};
+ const folder=id=>({getId:()=>id,createFolder:()=>folder(crypto.randomUUID()),createFile:b=>{if(failFile){failFile=false;throw Error('SIMULATED_DRIVE_FAILURE');}const id=crypto.randomUUID();files.set(id,b);return {getId:()=>id};}});
+ const context=vm.createContext({console,Date,JSON,Math,Error,Set,Map,Array,String,Number,Boolean,Object,RegExp,
+  SpreadsheetApp:{openById:id=>id==='__DATABASE_ID__'?db:sourceDb(id)},
+  PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties.get(k),setProperty:(k,v)=>properties.set(k,v)})},
+  Session:{getActiveUser:()=>({getEmail:()=>activeEmail})},
+  LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},
+  Utilities:{getUuid:()=>crypto.randomUUID(),formatDate:()=> '2026-10-16',base64Decode:s=>Array.from(Buffer.from(s,'base64')),base64Encode:b=>Buffer.from(b).toString('base64'),newBlob:blob,DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(algo,text)=>Array.from(crypto.createHash('sha256').update(text).digest()),gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),ungzip:b=>blob(zlib.gunzipSync(Buffer.from(b.getBytes())))},
+  DriveApp:{createFolder:()=>folder('new-folder'),getFolderById:folder,getFileById:id=>({getBlob:()=>files.get(id)})},
+  ScriptApp:{getService:()=>({getUrl:()=> 'https://script.google.com/macros/s/TEST/exec'}),getProjectTriggers:()=>[{getHandlerFunction:()=> 'syncScheduled_'}]},
+  HtmlService:{createHtmlOutput:()=>({setTitle(){return this;},addMetaTag(){return this;}})}
+ });
+ vm.runInContext(fs.readFileSync(root+'/src/Core.js','utf8')+'\n'+fs.readFileSync(root+'/src/Server.js','utf8')+'\n'+fs.readFileSync(root+'/src/Archive.js','utf8')+'\nconst WORD_EXAMPLES_='+JSON.stringify(examples)+';',context);
+ const schema=JSON.parse(vm.runInContext('JSON.stringify(SCHEMA)',context));
+ Object.entries(schema).forEach(([name,headers])=>data.set(name,[headers]));
+ const insert=(name,obj)=>data.get(name).push(schema[name].map(k=>obj[k]??''));
+ seed.students.forEach(s=>insert('Ученики',s));seed.words.forEach(w=>insert('Слова',w));
+ seed.students.forEach(s=>insert('Питомцы',{studentId:s.id,name:'Рыжик',species:'fox',xp:0,food:65,clean:75,coins:0,rations:1,lastDecay:'2026-10-16',lastRewardDay:'',lastBonusDay:'',accessory:'none'}));
+ Object.entries(keys).forEach(([id,key])=>insert('Доступ',{personId:id==='teacher'?'alena':id,role:id==='teacher'?'teacher':'student',token:key,link:'https://example.test/#key='+key}));
+ properties.set('RECORDINGS_FOLDER','audio-folder');
+ const api=(who,action,args={})=>context.api({key:keys[who]||who,action,data:args});
+ const records=name=>data.get(name).slice(1).map(r=>Object.fromEntries(schema[name].map((k,i)=>[k,r[i]])));
+ const tasks=sessionId=>JSON.parse(records('Тренировки').find(s=>s.id===sessionId).payload).tasks;
+ return {api,records,tasks,files,data,context,properties,failDelete:name=>failDelete=name,failFile:()=>failFile=true,failSessionWrite:()=>failNextSessionWrite=true,setActiveEmail:e=>activeEmail=e};
+}
+function finish(b,student,{wrong=0,retry=false}={}){
+ let session=b.api(student,'start',{retry});let latest,original=0,guard=0;
+ while(session.status!=='completed'){
+  assert.ok(++guard<100,'mission must finish when review answers are correct');
+  const t=b.tasks(session.id)[session.index];const input={sessionId:session.id,taskId:t.id};
+  if(t.kind==='voice'){input.audio=Buffer.from('recorded-audio-bytes').toString('base64');input.mime='audio/webm';}
+  else if(t.kind==='sentence')input.answer='I occasionally play chess with my friends.';
+  else {input.answer=!t.isReview&&original++<wrong?'definitely incorrect':t.kind==='choose'?t.russian:t.answers[0];}
+  latest=b.api(student,'answer',input);session=latest.session;
+ }
+ return latest;
+}
+test('parses synthetic glossaries, deduplicates and identifies difficulties',()=>{
+ assert.equal(seed.words.length,21);assert.equal(seed.words.filter(w=>w.studentId==='learner_a').length,10);
+ assert.equal(seed.words.filter(w=>w.studentId==='learner_b').length,11);
+ assert.equal(seed.words.filter(w=>w.studentId==='empty_learner').length,0);
+ assert.equal(seed.words.find(w=>w.id==='learner_b:opinion').hardOn,'2026-10-03');
+ assert.equal(seed.words.find(w=>w.id==='learner_b:advice').hardOn,'2026-10-03');
+ assert.equal(seed.words.filter(w=>w.studentId==='learner_a'&&w.hardOn==='2026-10-16').length,7);
+});
+test('round always includes available old, recent and hard words',()=>{
+ const words=[{id:'a',english:'a',russian:'a',hardOn:'2026-10-16',lessonOn:'2026-10-16'},
+  {id:'b',english:'b',russian:'b',lessonOn:'2026-10-16'},
+  {id:'c',english:'c',russian:'c',lessonOn:'2026-09-01'}];
+ const selection=core.selectWords(words,[],'2026-10-16',3,()=>.5);
+ assert.deepEqual(new Set(selection.map(w=>core.category(w,[],'2026-10-16'))),new Set(['hard','recent','review']));
+});
+test('typed answers accept curated variants, punctuation and apostrophe forms',()=>{
+ const ws=seed.words.filter(w=>w.studentId==='learner_a');
+ const tasks=core.makeTasks(ws,ws,[],'2026-10-16',()=>.5);
+ const word=seed.words.find(w=>w.english==="can't stand");
+ assert.equal(core.grade({kind:'write_en',answers:["can't stand",'cannot stand']},'CAN’T STAND.'),true);
+ assert.equal(core.grade({kind:'write_ru',answers:['иногда','изредка']},'изредка'),true);
+ assert.equal(core.grade({kind:'sentence'},'Any valid sentence'),null);
+ assert.equal(tasks.length,12);assert.equal(tasks.filter(t=>t.kind==='voice').length,1);
+ assert.ok(word.example);
+});
+test('public tasks hide expected answers and use genuine authored gaps',()=>{
+ const ws=seed.words.filter(w=>w.studentId==='learner_b');const ts=core.makeTasks(ws,ws,[],'2026-10-16',()=>.5);
+ const gaps=ts.filter(t=>t.kind==='gap');assert.ok(gaps.length);gaps.forEach(t=>assert.match(t.prompt,/______/));
+ ts.forEach(t=>assert.equal(Object.hasOwn(core.publicTask(t),'answers'),false));
+ const write=ts.find(t=>t.kind==='write_en');assert.equal(Object.hasOwn(core.publicTask(write),'english'),false);
+});
+test('translation choices exclude distractors with equivalent meanings',()=>{
+ const ws=seed.words.filter(w=>w.studentId==='learner_b');const target=ws.find(w=>w.english==='occasionally');
+ const ts=core.makeTasks([target],ws,[],'2026-10-16',()=>.5);const choose=ts.find(t=>t.kind==='choose');
+ assert.ok(choose.options.includes(target.russian));assert.equal(choose.options.includes('время от времени'),false);
+});
+test('spaced progress schedules 1, 3, 7 days; failure resets streak',()=>{
+ let p=core.updateProgress(null,{wordId:'a',kind:'write_en'},true,'2026-10-16T09:00:00Z','2026-10-16');assert.equal(p.nextReview,'2026-10-17');
+ p=core.updateProgress(p,{wordId:'a',kind:'write_en'},true,'2026-10-17T09:00:00Z','2026-10-17');assert.equal(p.nextReview,'2026-10-20');
+ p=core.updateProgress(p,{wordId:'a',kind:'write_en'},false,'2026-10-20T09:00:00Z','2026-10-20');assert.equal(p.streak,0);assert.equal(p.nextReview,'2026-10-20');
+});
+test('invalid access and owner-only setup are rejected',()=>{
+ const b=backend();assert.throws(()=>b.api('bad','bootstrap'),/личную ссылку/);assert.throws(()=>b.api('e'.repeat(64),'bootstrap'),/не найден/);
+ b.setActiveEmail('');assert.throws(()=>b.context.setupWordPet(),/владельцу/);
+ assert.throws(()=>b.api('learner_b','review',{answerId:'x',correct:true}),/недоступно/);
+});
+test('student bootstrap excludes other pupils, source IDs, tokens and teacher tools',()=>{
+ const b=backend(),s=b.api('learner_b','bootstrap'),text=JSON.stringify(s);
+ assert.ok(s.words.length);assert.ok(s.words.every(w=>w.id.startsWith('learner_b:')));
+ assert.equal(text.includes('Ученик А'),false);assert.equal(text.includes(keys.teacher),false);
+ assert.equal(text.includes('sourceId'),false);assert.equal(s.role,'student');
+ assert.throws(()=>b.api('empty_learner','start'),/пока нет слов/);
+});
+test('saved mission resumes and one pupil cannot answer another pupil’s session',()=>{
+ const b=backend(),s=b.api('learner_b','start'),again=b.api('learner_b','start');assert.equal(s.id,again.id);
+ const t=b.tasks(s.id)[0];assert.throws(()=>b.api('learner_a','answer',{sessionId:s.id,taskId:t.id,answer:'x'}),/не найдена/);
+ assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:'t500',answer:'x'}),/Порядок/);
+});
+test('90 percent excludes pending own speech; rewards and audio persist once',()=>{
+ const b=backend(),result=finish(b,'learner_b',{wrong:1});
+ assert.equal(result.session.status,'completed');assert.equal(result.session.summary.score,90);
+ assert.equal(result.session.summary.pending,2);assert.equal(result.session.summary.rations,2);assert.equal(result.pet.coins,10);
+ assert.equal(b.files.size,1);assert.equal(b.records('Ответы').length,2);
+ const s=b.api('learner_b','start');assert.equal(s.id,result.session.id);assert.equal(s.status,'completed');
+ const before=result.pet.xp;const duplicate=b.api('learner_b','answer',{sessionId:s.id,taskId:b.tasks(s.id).at(-1).id,audio:'eA==',mime:'audio/webm'});
+ assert.equal(duplicate.pet.xp,before);assert.equal(b.files.size,1);
+ const retry=finish(b,'learner_b',{retry:true});assert.equal(retry.session.summary.xp,0);assert.equal(retry.pet.coins,10);assert.equal(retry.pet.xp,before);
+});
+test('a later retry can earn 90 percent bonus once without extra base rewards',()=>{
+ const b=backend(),first=finish(b,'learner_a',{wrong:3});assert.equal(first.session.summary.score,70);assert.equal(first.pet.coins,0);assert.equal(first.session.summary.rations,1);
+ const retry=finish(b,'learner_a',{retry:true});assert.equal(retry.session.summary.score,100);assert.equal(retry.session.summary.rations,1);assert.equal(retry.session.summary.xp,20);assert.equal(retry.pet.coins,10);
+});
+test('same answer after interrupted session write does not count twice',()=>{
+ const b=backend(),s=b.api('learner_b','start'),t=b.tasks(s.id)[0],answer=t.kind==='choose'?t.russian:t.answers[0];
+ b.failSessionWrite();assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer}),/SIMULATED/);
+ b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer});
+ assert.equal(b.records('Прогресс').find(p=>p.wordId===t.wordId&&p.skill===t.kind).correct,1);
+});
+test('teacher reviews own speech, learner sees feedback, repeat review is blocked',()=>{
+ const b=backend();finish(b,'learner_b');const teacher=b.api('teacher','bootstrap');assert.equal(teacher.pending.length,2);
+ const a=teacher.pending.find(a=>a.kind==='voice');const recording=b.api('teacher','audio',{answerId:a.id});assert.equal(recording.mime,'audio/webm');assert.ok(recording.audio);
+ b.api('teacher','review',{answerId:a.id,correct:true,feedback:'Хорошее предложение. Обрати внимание на ударение.'});
+ assert.equal(b.api('learner_b','bootstrap').reviews.length,1);assert.equal(b.api('learner_b','bootstrap').stats.pending,1);
+ assert.throws(()=>b.api('teacher','review',{answerId:a.id,correct:true}),/уже проверен/);
+ assert.throws(()=>b.api('learner_a','myAudio',{answerId:a.id}),/недоступна/);
+});
+test('teacher hard marks and glossary sync preserve authored fields and source files',()=>{
+ const b=backend(),before=JSON.stringify(source),w=b.records('Слова').find(w=>w.id==='learner_b:frequently');
+ b.api('teacher','addWord',{studentId:'learner_b',english:w.english,russian:w.russian,example:'I frequently read comics.',answers:'frequently',russianAliases:'часто|нередко',hard:true});
+ b.api('teacher','sync');const after=b.records('Слова').find(w=>w.id===w.id&&w.english==='frequently');
+ assert.equal(after.example,'I frequently read comics.');assert.equal(after.hardOn,'2026-10-16');assert.equal(JSON.stringify(source),before);
+ assert.ok(b.api('learner_b','bootstrap').words.find(w=>w.english==='frequently').category==='hard');
+});
+test('rotating a learner link invalidates old key without affecting others',()=>{
+ const b=backend(),rot=b.api('teacher','rotateKey',{studentId:'learner_b'});assert.match(rot.link,/#key=/);
+ assert.throws(()=>b.api('learner_b','bootstrap'),/не найден/);assert.equal(b.api('learner_a','bootstrap').name,'Ученик А');
+});
+test('production HTML and Apps Script compile without demo data',()=>{
+ const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
+ const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
+ assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
+ assert.match(code,/version: '1.2.0'/);
+ assert.match(code,/archiveScheduled_/);
+});
+
+test('personal links use the published deployment and never convert a dev identifier into exec',()=>{
+ const b=backend();
+ b.context.ScriptApp.getService=()=>({getUrl:()=> 'https://script.google.com/macros/s/DEV_ID/dev'});
+ assert.match(b.context.refreshStudentLinks(),/URL опубликованного/);
+ vm.runInContext("APP_CONFIG.webAppUrl='https://script.google.com/macros/s/REAL_PUBLISHED_ID/exec'",b.context);
+ b.context.refreshStudentLinks();
+ b.records('Доступ').forEach(a=>assert.equal(a.link,'https://script.google.com/macros/s/REAL_PUBLISHED_ID/exec#key='+a.token));
+});
+
+test('preview shows exactly the selected words and survives legacy sessions without a stored list',()=>{
+ const b=backend(),s=b.api('learner_b','start'),ids=new Set(b.tasks(s.id).map(t=>t.wordId));
+ assert.equal(s.studyWords.length,ids.size);
+ assert.deepEqual(new Set(s.studyWords.map(w=>w.id)),ids);
+ assert.ok(s.studyWords.every(w=>w.id.startsWith('learner_b:')&&w.english&&w.russian));
+ assert.equal(JSON.stringify(s.studyWords).includes(keys.teacher),false);
+ const rows=b.data.get('Тренировки'),payload=JSON.parse(rows[1][6]);delete payload.studyWords;rows[1][6]=JSON.stringify(payload);
+ const resumed=b.api('learner_b','start');assert.equal(resumed.id,s.id);
+ assert.deepEqual(new Set(resumed.studyWords.map(w=>w.id)),ids);
+});
+
+test('unknown gap shows its answer, repeats after two tasks, persists, and is idempotent',()=>{
+ const b=backend();let s=b.api('learner_b','start');
+ while(s.task.kind!=='gap'){
+  const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;
+ }
+ const original=b.tasks(s.id)[s.index],total=s.total;
+ const result=b.api('learner_b','answer',{sessionId:s.id,taskId:original.id,unknown:true});
+ assert.equal(result.result.correct,false);assert.equal(result.result.answer,'Не знаю');assert.equal(result.result.unknown,true);
+ assert.equal(result.result.expected,original.gapAnswer||original.english);assert.equal(result.session.total,total+1);
+ const ts=b.tasks(s.id),pos=ts.findIndex(t=>t.isReview&&t.wordId===original.wordId);
+ assert.equal(pos,result.session.index+2);assert.equal(ts[pos].prompt,original.prompt);
+ const repeated=b.api('learner_b','answer',{sessionId:s.id,taskId:original.id,unknown:true});
+ assert.equal(repeated.session.total,total+1);assert.equal(b.records('Прогресс').find(p=>p.wordId===original.wordId&&p.skill==='gap').wrong,1);
+ s=b.api('learner_b','start');assert.equal(s.total,total+1);
+ while(!s.task.isReview){const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;}
+ assert.equal(s.task.wordId,original.wordId);
+ const again=b.api('learner_b','answer',{sessionId:s.id,taskId:s.task.id,unknown:true});assert.equal(again.session.total,total+2);
+ const done=finish(b,'learner_b');assert.equal(done.session.status,'completed');assert.equal(done.session.summary.score,90);
+ assert.equal(done.session.summary.xp,75);assert.equal(done.pet.coins,10);
+});
+
+test('an interrupted unknown send does not double-count failures or create two repeats',()=>{
+ const b=backend(),s=b.api('learner_b','start'),task=s.task;
+ b.failSessionWrite();assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:task.id,unknown:true}),/SIMULATED/);
+ const retry=b.api('learner_b','answer',{sessionId:s.id,taskId:task.id,unknown:true});
+ assert.equal(retry.session.total,s.total+1);
+ assert.equal(b.records('Прогресс').find(p=>p.wordId===task.wordId&&p.skill===task.kind).wrong,1);
+ assert.equal(b.tasks(s.id).filter(t=>t.isReview).length,1);
+});
+
+test('mistakes on the last objective task repeat before speech; speech cannot be skipped as unknown',()=>{
+ const b=backend();let s=b.api('learner_b','start');
+ while(s.index<9){const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;}
+ const bad=b.api('learner_b','answer',{sessionId:s.id,taskId:s.task.id,unknown:true});
+ assert.equal(bad.session.task.isReview,true);
+ const t=b.tasks(s.id)[bad.session.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;
+ assert.equal(s.task.kind,'sentence');
+ assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:s.task.id,unknown:true}),/нужен ответ/);
+});
+
+function oldSession(b,id,{studentId='learner_b',status='completed',day='2026-01-01',mode='daily',answerStatus}={}){
+ const insert=(name,obj)=>b.data.get(name).push(b.data.get(name)[0].map(k=>obj[k]??''));
+ insert('Тренировки',{id,studentId,createdAt:day+'T10:00:00Z',day,mode,status,payload:JSON.stringify({tasks:[],results:[{correct:true}],summary:{score:100}})});
+ if(answerStatus)insert('Ответы',{id:id+':written',sessionId:id,studentId,wordId:studentId+':occasionally',kind:'sentence',submittedAt:day+'T10:00:00Z',text:'I occasionally walk.',status:answerStatus,correct:true,reviewedAt:day+'T11:00:00Z'});
+}
+test('archive verifies saved bytes, preserves current progress and totals, and excludes pending/recent/active work',()=>{
+ const b=backend();oldSession(b,'old',{answerStatus:'reviewed'});oldSession(b,'pending',{answerStatus:'pending'});oldSession(b,'active',{status:'active',day:'2026-10-15'});oldSession(b,'recent',{day:'2026-10-16'});
+ const before=['Ученики','Слова','Прогресс','Питомцы','Доступ'].map(n=>JSON.stringify(b.records(n)));
+ const total=b.api('learner_b','bootstrap').stats.completed;
+ const result=b.api('teacher','archiveHistory');assert.equal(result.archived,1);assert.equal(result.answers,1);
+ assert.deepEqual(['Ученики','Слова','Прогресс','Питомцы','Доступ'].map(n=>JSON.stringify(b.records(n))),before);
+ assert.deepEqual(b.records('Тренировки').map(s=>s.id),['pending','active','recent']);
+ assert.equal(b.records('Ответы')[0].status,'pending');assert.equal(b.api('learner_b','bootstrap').stats.completed,total);
+ const journal=b.records('Архивы')[0];assert.equal(journal.status,'committed');assert.equal(journal.year,'2026');
+ const payload=JSON.parse(zlib.gunzipSync(Buffer.from(b.files.get(journal.fileId).getBytes())).toString());
+ assert.equal(payload.sessions[0].id,'old');assert.equal(payload.answers[0].text,'I occasionally walk.');
+ assert.equal(JSON.stringify(payload).includes(keys.teacher),false);
+ assert.equal(b.api('teacher','archiveStatus').items.length,1);assert.throws(()=>b.api('learner_b','archiveStatus'),/недоступно/);
+ assert.equal(JSON.stringify(b.api('learner_b','bootstrap')).includes(journal.fileId),false);
+});
+test('archival resumes after a partial deletion without losing or duplicating lifetime totals',()=>{
+ const b=backend();oldSession(b,'old',{answerStatus:'reviewed'});b.failDelete('Тренировки');
+ assert.throws(()=>b.api('teacher','archiveHistory'),/SIMULATED_DELETE/);
+ assert.equal(b.records('Архивы')[0].status,'prepared');assert.equal(b.records('Итоги')[0].completed,1);
+ assert.equal(b.api('learner_b','bootstrap').stats.completed,1);assert.equal(b.records('Тренировки').length,1);
+ assert.equal(b.api('teacher','archiveHistory').archived,1);assert.equal(b.files.size,1);
+ assert.equal(b.api('learner_b','bootstrap').stats.completed,1);assert.equal(b.records('Итоги')[0].completed,1);
+ assert.equal(b.api('teacher','archiveHistory').archived,0);assert.equal(b.files.size,1);
+});
+test('a failed Drive write never prunes source history',()=>{
+ const b=backend();oldSession(b,'old',{answerStatus:'reviewed'});b.failFile();
+ assert.throws(()=>b.api('teacher','archiveHistory'),/SIMULATED_DRIVE/);
+ assert.equal(b.records('Тренировки').length,1);assert.equal(b.records('Ответы').length,1);assert.equal(b.records('Итоги').length,0);assert.equal(b.records('Архивы').length,0);
+});
+test('corrupted archive blocks cleanup and can be resumed after bytes are restored',()=>{
+ const b=backend();oldSession(b,'old');b.failDelete('Тренировки');assert.throws(()=>b.api('teacher','archiveHistory'),/SIMULATED_DELETE/);
+ const j=b.records('Архивы')[0],original=b.files.get(j.fileId);
+ b.files.set(j.fileId,{getBytes:()=>Array.from(zlib.gzipSync(Buffer.from('{}')))});
+ assert.throws(()=>b.api('teacher','archiveHistory'),/не прошёл проверку/);assert.equal(b.records('Тренировки').length,1);
+ b.files.set(j.fileId,original);assert.equal(b.api('teacher','archiveHistory').archived,1);assert.equal(b.api('learner_b','bootstrap').stats.completed,1);
+});
+test('archive work is bounded and retains totals across multiple batches',()=>{
+ const b=backend();for(let i=0;i<101;i++)oldSession(b,'old-'+i);
+ assert.equal(b.api('teacher','archiveHistory').archived,100);assert.equal(b.records('Тренировки').length,1);assert.equal(b.api('learner_b','bootstrap').stats.completed,101);
+ assert.equal(b.api('teacher','archiveHistory').archived,1);assert.equal(b.records('Тренировки').length,0);assert.equal(b.api('learner_b','bootstrap').stats.completed,101);assert.equal(b.files.size,2);
+});
+test('scheduled archive uses the existing glossary trigger and reports errors without blocking glossary sync',()=>{
+ const b=backend();oldSession(b,'old');b.failFile();b.context.syncScheduled_();
+ assert.match(b.properties.get('ARCHIVE_ERROR'),/SIMULATED_DRIVE/);assert.equal(b.records('Тренировки').length,1);
+ b.context.syncScheduled_();assert.equal(b.records('Тренировки').length,0);assert.equal(b.properties.get('ARCHIVE_ERROR'),'');
+});
+
+test('abandoned sessions older than retention are archived without counting them as completed',()=>{
+ const b=backend();oldSession(b,'abandoned',{status:'active'});oldSession(b,'pending',{status:'active',answerStatus:'pending'});
+ assert.equal(b.api('teacher','archiveHistory').archived,1);assert.equal(b.api('learner_b','bootstrap').stats.completed,0);assert.deepEqual(b.records('Тренировки').map(s=>s.id),['pending']);
+});
+test('the old eight-tab database can open before the archive trigger creates its extra tabs',()=>{
+ const b=backend();b.data.delete('Итоги');b.data.delete('Архивы');assert.equal(b.api('learner_b','bootstrap').stats.completed,0);assert.equal(b.api('teacher','bootstrap').archive.items.length,0);b.context.syncScheduled_();assert.ok(b.data.has('Архивы'));
+});

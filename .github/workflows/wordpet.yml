@@ -1,0 +1,73 @@
+name: WordPet
+
+on:
+  push:
+    branches: [main]
+    paths: ['wordpet/**', '.github/workflows/wordpet.yml']
+  pull_request:
+    paths: ['wordpet/**', '.github/workflows/wordpet.yml']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to Google
+        type: boolean
+        default: true
+      rollback_version:
+        description: Rollback Google version (leave empty for a normal update)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpet-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Build and test WordPet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wordpet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Build production code
+        run: npm run build
+      - name: Test learning, saving, archival and deployment
+        run: npm test
+
+  google:
+    name: Publish to Google
+    needs: checks
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wordpet
+    env:
+      WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
+      WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
+      WORDPET_ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Check Google authorization
+        run: |
+          node -e 'if (!process.env.WORDPET_CLASPRC_JSON || !process.env.WORDPET_CONFIG_JSON) { console.error("Google is not connected. Follow wordpet/SETUP.md. Nothing was deployed."); process.exit(1); }'
+      - name: Install the locked Google publishing tool
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build production code
+        run: npm run build
+      - name: Publish and verify the existing deployment
+        run: node scripts/deploy.mjs
