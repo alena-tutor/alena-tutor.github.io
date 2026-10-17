@@ -94,34 +94,56 @@ const WordPetCore = (() => {
     });
     return shuffle(chosen, random);
   }
+  function gapData(word) {
+    const example = String(word.example || '');
+    for (const answer of [word.english,...String(word.answers || '').split('|')].map(value=>String(value || '').trim()).filter(Boolean)) {
+      const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const found = new RegExp('(^|[^a-z])(' + escaped + ')(?=$|[^a-z])','i').exec(example);
+      if (found) {
+        const start = found.index + found[1].length;
+        return {gapAnswer:found[2],prompt:example.slice(0,start)+'______'+example.slice(start+found[2].length)};
+      }
+    }
+    return null;
+  }
+  function letterParts(word,random = Math.random) {
+    const answer = norm(word.english);
+    if (!/^[a-z][a-z '-]*[a-z]$/.test(answer)) return null;
+    const letters = answer.match(/[a-z]/g) || [];
+    if (letters.length < 3 || letters.length > 24 || new Set(letters).size < 2) return null;
+    let parts = shuffle(letters,random);
+    if (parts.join('') === letters.join('')) parts = parts.slice(1).concat(parts[0]);
+    return {parts,pattern:answer.replace(/[a-z]/g,'_')};
+  }
   function makeTasks(selected, allWords, records, today, random = Math.random) {
     if (!selected.length) return [];
-    const types = ['choose', 'write_en', 'write_ru', 'listen', 'gap', 'assemble', 'write_en', 'write_ru', 'listen', 'gap'];
+    const types = ['choose', 'letters', 'write_ru', 'listen', 'context', 'assemble', 'write_en', 'choose', 'context', 'letters'];
     const tasks = [];
+    // Include a typed gap only for vocabulary already recalled without answer choices.
+    const learned = selected.filter(w => mastered(w,records) && gapData(w));
     for (let i = 0; i < 10; i++) {
-      const word = selected[i % selected.length];
-      let kind = types[i % types.length];
+      const word = i === 8 && learned.length ? learned[0] : selected[i % selected.length];
+      let kind = types[i], options = [];
       const assembly = kind === 'assemble' ? sentenceParts(word,random) : null;
-      if (kind === 'assemble' && !assembly) kind = 'write_en';
-      // A meaningful gap needs an authored example containing the literal target or alternatives.
-      const match = [word.english, ...String(word.answers || '').split('|')].filter(Boolean)
-        .find(answer => word.example && norm(word.example).includes(norm(answer)));
-      if (kind === 'gap' && !match) kind = 'write_en';
-      const escaped = match?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const prompt = kind === 'gap' ? word.example.replace(new RegExp(escaped, 'i'), '______') : '';
-      let options = [];
-      if (kind === 'choose') {
-        const targetMeanings = russianAnswers(word);
-        options = shuffle([word.russian, ...shuffle(allWords.filter(w => !russianAnswers(w).some(answer=>targetMeanings.includes(answer))), random)
-          .map(w => w.russian).filter((v,ix,a) => a.indexOf(v) === ix).slice(0,3)], random);
-        if (options.length < 2) kind = 'write_en';
+      const letters = kind === 'letters' ? letterParts(word,random) : null;
+      if ((kind === 'assemble' && !assembly) || (kind === 'letters' && !letters)) kind = 'write_en';
+      const gap = kind === 'context' ? gapData(word) : null;
+      if (kind === 'context') kind = gap ? (mastered(word,records) ? 'gap' : 'gap_choice') : 'write_en';
+      const meanings = russianAnswers(word), forms = englishAnswers(word);
+      const distractors = allWords.filter(w => !russianAnswers(w).some(a=>meanings.includes(a)) && !englishAnswers(w).some(a=>forms.includes(a)));
+      if (kind === 'choose' || kind === 'gap_choice') {
+        const target = kind === 'choose' ? word.russian : gap.gapAnswer;
+        const alternatives = shuffle(distractors,random).map(w=>kind === 'choose' ? w.russian : w.english)
+          .filter((v,index,array)=>array.findIndex(x=>norm(x) === norm(v)) === index && norm(v)!==norm(target)).slice(0,3);
+        options = shuffle([target,...alternatives],random);
+        if (options.length < 2) kind = kind === 'gap_choice' ? 'gap' : 'write_en';
       }
-      tasks.push({ id: 't' + i, wordId: word.id, kind, english: word.english, russian: word.russian,
-        answers: kind === 'assemble' ? [norm(assembly.answer)] : kind === 'write_ru' ? russianAnswers(word) : englishAnswers(word), options, prompt,
-        ...(assembly || {}),
-        gapAnswer: kind === 'gap' ? match : '', category: category(word, records, today) });
+      const answers = kind === 'assemble' ? [norm(assembly.sentenceAnswer)] : kind === 'write_ru' ? russianAnswers(word)
+        : ['gap','gap_choice'].includes(kind) ? [norm(gap.gapAnswer)] : englishAnswers(word);
+      tasks.push({id:'t'+i,wordId:word.id,kind,english:word.english,russian:word.russian,answers,options,
+        prompt:gap?.prompt || '',gapAnswer:gap?.gapAnswer || '',...(assembly || {}),...(letters || {}),category:category(word,records,today)});
     }
-    return shuffle(tasks, random);
+    return shuffle(tasks,random);
   }
   function sentenceParts(word, random = Math.random) {
     const example = String(word.example || '').trim().replace(/\s+/g,' ');
@@ -151,9 +173,10 @@ const WordPetCore = (() => {
     if (!task) return null;
     const t = { id: task.id, wordId: task.wordId, kind: task.kind, options: task.options || [], prompt: task.prompt || '', category: task.category, isReview: Boolean(task.isReview) };
     if (['choose','write_ru','assemble'].includes(task.kind)) t.english = task.english;
-    if (['write_en','gap'].includes(task.kind)) t.russian = task.russian;
+    if (['write_en','gap','gap_choice','letters'].includes(task.kind)) t.russian = task.russian;
     if (task.kind === 'listen') t.speak = task.english;
     if (task.kind === 'assemble') { t.opening = task.opening; t.parts = task.parts.slice(); }
+    if (task.kind === 'letters') { t.pattern = task.pattern; t.parts = task.parts.slice(); }
     return t;
   }
   function grade(task, answer) {
@@ -185,6 +208,6 @@ const WordPetCore = (() => {
     const p = progress.filter(x => x.wordId === word.id && ['write_en','listen','gap'].includes(x.skill));
     return p.some(x => Number(x.streak) >= 2);
   };
-  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
+  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, gapData, letterParts, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
 })();
 if (typeof module !== 'undefined') module.exports = WordPetCore;

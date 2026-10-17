@@ -19,6 +19,7 @@
 <div id="toasts" aria-live="polite"></div><div id="dialogs"></div>
 <script>
 /*__CORE__*/
+/*__PRONUNCIATION__*/
 /*__DEMO__*/
 const PET_ART = /*__PET_ART__*/;
 const FOX_ART = PET_ART.fox;
@@ -26,6 +27,9 @@ function petType(species){return WordPetCore.petSpecies.find(p=>p.id===species)|
 function petImage(species){return PET_ART[petType(species).id]||FOX_ART;}
 const IS_GOOGLE = Boolean(window.google?.script?.run);
 const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,assembly:[]};
+let audioStatus={};
+let audioStore;try{audioStore=globalThis.localStorage;}catch{}
+const pronunciation=WordPetAudio.create({store:audioStore,onStatus:status=>{audioStatus=status;updateAudioStatus();}});
 const icons = {
  paw:'<path d="M7 15c-2 2-1 6 2 5l3-1 3 1c3 1 4-3 2-5l-3-3c-1-1-3-1-4 0Z"/><ellipse cx="5" cy="9" rx="2" ry="2.5"/><ellipse cx="10" cy="5.5" rx="2" ry="2.5"/><ellipse cx="15.5" cy="6" rx="2" ry="2.5"/><ellipse cx="20" cy="10" rx="2" ry="2.5"/>',
  home:'<path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/>',
@@ -63,7 +67,7 @@ async function busy(fn) {
   try { return await fn(); } catch(e) {toast(e.message,true);} finally {state.busy=false;controls.forEach(([b,disabled])=>{if(b.isConnected)b.disabled=disabled;});}
 }
 function header() {
-  return `<header class="topbar row between"><div class="brand"><span class="brand-mark">${icon('paw')}</span><div>WordPet<small>Маленькая привычка. Большой словарь.</small></div></div><button class="button ghost" id="logout" aria-label="Выйти">${icon('exit')} Выйти</button></header>`;
+  return `<header class="topbar row between wrap"><div class="brand"><span class="brand-mark">${icon('paw')}</span><div>WordPet<small>Маленькая привычка. Большой словарь.</small></div></div><div class="row"><button class="button ghost small" id="audioPreferences">${icon('sound')} Озвучка</button><button class="button ghost" id="logout" aria-label="Выйти">${icon('exit')} Выйти</button></div></header><div class="tiny muted" id="audioStatus" aria-live="polite" style="margin:-14px 0 20px;overflow-wrap:anywhere"></div>`;
 }
 function nav() {
   return `<nav class="nav" aria-label="Разделы">${[['home','home','Дом'],['words','book','Слова'],['progress','chart','Прогресс']].map(([page,ico,label])=>`<button data-page="${page}" class="${state.page===page?'active':''}" ${state.page===page?'aria-current="page"':''}>${icon(ico)}${label}</button>`).join('')}</nav>`;
@@ -74,7 +78,8 @@ function render() {
   const body = state.data.role==='teacher' ? teacherPage() : state.page==='study' ? studyPage() : state.page==='lesson' ? lessonPage() : state.page==='words' ? wordsPage() : state.page==='progress' ? progressPage() : homePage();
   document.getElementById('root').innerHTML=`<main class="app">${header()}${body}</main>${state.data.role==='student'&&!['lesson','study'].includes(state.page)?nav():''}`;
   document.getElementById('logout').onclick=logout;
-  document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{stopRecording();state.page=b.dataset.page;render();window.scrollTo(0,0);});
+  document.getElementById('audioPreferences').onclick=openAudioPreferences;updateAudioStatus();
+  document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{stopPronunciation();state.assembly=[];state.page=b.dataset.page;render();window.scrollTo(0,0);});
   if (state.data.role==='teacher') bindTeacher(); else bindStudent();
 }
 function homePage() {
@@ -86,9 +91,9 @@ function homePage() {
   <div class="meter-row"><span>Сытость</span><div class="meter warm"><i style="width:${p.food}%"></i></div><span>${p.food}%</span></div><div class="meter-row"><span>Чистота</span><div class="meter"><i style="width:${p.clean}%"></i></div><span>${p.clean}%</span></div>
   <div class="row between tiny muted"><span>${p.xp%100} / 100 опыта до следующего уровня</span><span>${p.coins} монет · ${p.rations} корма</span></div>
   <div class="pet-actions"><button data-care="feed">${icon('food')}Кормить</button><button data-care="clean">${icon('spark')}Убрать</button><button data-care="toy">${icon('ball')}${p.accessory==='ball'?'Мячик куплен':'Мячик · 20'}</button></div><p class="pet-note">Питомец всегда дождётся тебя. Награды сохраняются.</p></div></section>
-  <div class="stack"><section class="card mission"><div class="mission-top"><div><div class="label">${done?'Миссия выполнена':'Твоя миссия сегодня'}</div><h2>${done?'Можно ещё немного':'Помоги питомцу'}</h2></div><span class="mission-icon">${icon(done?'check':'book')}</span></div><p class="muted subtitle">Сначала список слов, затем 10 заданий с автоматической проверкой. Незнакомые слова повторим ещё раз.</p>
+  <div class="stack"><section class="card mission"><div class="mission-top"><div><div class="label">${done?'Миссия выполнена':'Твоя миссия сегодня'}</div><h2>${done?'Можно ещё немного':'Помоги питомцу'}</h2></div><span class="mission-icon">${icon(done?'check':'book')}</span></div><p class="muted subtitle">Сначала список слов, затем 10 разных заданий: перевод, пропуски, буквы, предложения и понимание на слух. Незнакомые слова повторим ещё раз.</p>
   <div class="chips"><div class="chip recent"><b>${d.counts.recent}</b>с урока</div><div class="chip hard"><b>${d.counts.hard}</b>трудные</div><div class="chip"><b>${d.counts.review}</b>на повторение</div></div>
-  <button class="button full" id="startMission" ${!d.words.length?'disabled':''}>${icon('play')}${done?'Посмотреть результат':'Начать тренировку'}</button>
+  <button class="button full" id="startMission" ${!d.words.length?'disabled':''}>${icon('play')}${done?'Посмотреть результат':'Начать тренировку'}</button>${done?'<button class="button secondary full" id="retryMission" style="margin-top:10px">Пройти ещё раз</button>':''}
   ${!d.words.length?'<p class="subtitle">В глоссарии пока нет слов. Они появятся после добавления преподавателем.</p>':''}
   <div class="reward-note">${icon('spark')}<span>За выполненную миссию — корм. За 90% в вопросах — ещё корм, опыт и 10 монет.</span></div></section>
   <section class="card"><div class="mini-stats"><div><strong>${d.stats.total}</strong><span>слов в словаре</span></div><div><strong>${d.stats.mastered}</strong><span>вспоминаешь сам</span></div><div><strong>${d.stats.completed}</strong><span>дней практики</span></div></div></section>
@@ -114,18 +119,23 @@ function lessonPage() {
   const t=s.task;
   if(!t&&!state.feedback)return summaryPage();
   const task=state.feedback?.task || t;
-  const headings={choose:task.english,write_en:task.russian,write_ru:task.english,listen:'Какое слово ты слышишь?',gap:task.prompt,assemble:task.english};
-  const instructions={choose:'Выбери перевод',write_en:'Напиши по-английски',write_ru:'Напиши перевод на русский',listen:'Послушай и напиши по-английски',gap:'Вставь нужное слово или выражение',assemble:'Восстанови пример из списка слов: добавь части по порядку'};
-  return `<section class="lesson"><div class="row between"><button class="button ghost" id="leaveLesson">${icon('back')}На главную</button><span class="muted tiny">${Math.min(s.index+(!state.feedback?1:0),s.total)} / ${s.total}</span></div><div class="lesson-progress"><i style="width:${s.index/s.total*100}%"></i></div><div class="card task-card"><span class="pill ${task.category}">${catName(task.category)}</span>${task.isReview?'<span class="pill hard" style="margin-left:7px">Повторим ещё раз</span>':''}<div class="task-heading ${['choose','write_ru','assemble'].includes(task.kind)?'english':''} ${task.kind==='gap'?'gap':''}">${esc(headings[task.kind])}</div><p class="task-instruction">${instructions[task.kind]}</p>
+  const headings={choose:task.english,write_en:task.russian,write_ru:task.english,listen:'Какое слово ты слышишь?',gap:task.prompt,gap_choice:task.prompt,letters:task.russian,assemble:task.english};
+  const instructions={choose:'Выбери перевод',write_en:'Напиши по-английски',write_ru:'Напиши перевод на русский',listen:'Послушай и напиши по-английски',gap:'Вспомни и впиши слово без вариантов',gap_choice:'Выбери нужное слово для пропуска',letters:'Собери английское слово или выражение из букв',assemble:'Восстанови пример из списка слов: добавь части по порядку'};
+  return `<section class="lesson"><div class="row between"><button class="button ghost" id="leaveLesson">${icon('back')}На главную</button><span class="muted tiny">${Math.min(s.index+(!state.feedback?1:0),s.total)} / ${s.total}</span></div><div class="lesson-progress"><i style="width:${s.index/s.total*100}%"></i></div><div class="card task-card"><span class="pill ${task.category}">${catName(task.category)}</span>${task.isReview?'<span class="pill hard" style="margin-left:7px">Повторим ещё раз</span>':''}<div class="task-heading ${['choose','write_ru','assemble'].includes(task.kind)?'english':''} ${['gap','gap_choice'].includes(task.kind)?'gap':''}">${esc(headings[task.kind])}</div><p class="task-instruction">${instructions[task.kind]}</p>
   ${['choose','write_ru','assemble'].includes(task.kind)?`<button class="speak" style="margin:-7px auto 20px" data-speak="${esc(task.english)}" aria-label="Послушать слово">${icon('sound')}</button>`:''}
-  ${state.feedback?feedbackHTML():taskBody(task)}</div><p class="footer-note" style="text-align:center">Ответ сохраняется в Google после нажатия кнопки. Можно вернуться к незавершённой тренировке сегодня.</p></section>`;
+  ${!state.feedback&&['gap','gap_choice'].includes(task.kind)?`<p class="tiny muted" style="margin-bottom:18px">Значение: ${esc(task.russian)}</p>`:''}${state.feedback?feedbackHTML():taskBody(task)}</div><p class="footer-note" style="text-align:center">Ответ сохраняется в Google после нажатия кнопки. Можно вернуться к незавершённой тренировке сегодня.</p></section>`;
 }
 function taskBody(t) {
   const unknown= '<button class="button secondary full" id="unknownAnswer" data-save style="margin-top:12px">Не знаю</button>';
-  if(t.kind==='choose')return `<div class="options">${t.options.map(x=>`<button class="option" data-option="${esc(x)}">${esc(x)}</button>`).join('')}</div>${unknown}`;
+  if(['choose','gap_choice'].includes(t.kind))return `<div class="options">${t.options.map(x=>`<button class="option" data-option="${esc(x)}">${esc(x)}</button>`).join('')}</div>${unknown}`;
+  if(t.kind==='letters') {
+    const chosen=state.assembly || [];let index=0;
+    const answer=Array.from(t.pattern).map(char=>char==='_'?(chosen[index++]===undefined?'＿':t.parts[chosen[index-1]]):char).join('');
+    return `<div class="letter-answer" aria-label="Твой ответ" aria-live="polite" style="white-space:pre-wrap;font-size:28px;letter-spacing:3px;padding:18px;border-radius:16px;background:var(--soft);margin-bottom:14px">${esc(answer)}</div><div class="row wrap" style="justify-content:center;gap:10px;margin:18px 0">${t.parts.map((letter,i)=>`<button class="button secondary" data-letter="${i}" aria-label="Буква ${esc(letter)}" style="min-width:44px;min-height:44px;padding:10px" ${chosen.includes(i)?'disabled':''}>${esc(letter)}</button>`).join('')}</div><div class="row" style="justify-content:center;margin-bottom:14px"><button class="button ghost small" id="undoLetter" ${chosen.length?'':'disabled'}>Убрать букву</button><button class="button ghost small" id="resetLetters" ${chosen.length?'':'disabled'}>Сначала</button></div><button class="button full" id="checkLetters" data-save ${chosen.length!==t.parts.length?'disabled':''}>Проверить ${icon('arrow')}</button>${unknown}`;
+  }
   if(t.kind==='assemble') {
     const chosen=state.assembly || [];
-    return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:16px;margin-bottom:12px;background:var(--soft);border-radius:15px;text-align:left" class="assembly-answer" aria-label="Твоё предложение"><b>${esc(t.opening)}</b> ${chosen.map((index,pos)=>`<button class="button secondary small" data-remove-part="${pos}" aria-label="Убрать часть ${esc(t.parts[index])}">${esc(t.parts[index])}</button>`).join(' ')}</div><p class="tiny muted">Нажимай на части. Нажми на выбранную часть, чтобы вернуть её.</p><div class="row wrap" style="justify-content:center;margin:18px 0">${t.parts.map((part,index)=>`<button class="button secondary small" data-part="${index}" ${chosen.includes(index)?'disabled':''}>${esc(part)}</button>`).join('')}</div><button class="button full" id="checkAssembly" ${chosen.length!==t.parts.length?'disabled':''}>Проверить ${icon('arrow')}</button>${unknown}`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:16px;margin-bottom:12px;background:var(--soft);border-radius:15px;text-align:left" class="assembly-answer" aria-label="Твоё предложение"><b>${esc(t.opening)}</b> ${chosen.map((index,pos)=>`<button class="button secondary small" data-remove-part="${pos}" aria-label="Убрать часть ${esc(t.parts[index])}">${esc(t.parts[index])}</button>`).join(' ')}</div><p class="tiny muted">Нажимай на части. Нажми на выбранную часть, чтобы вернуть её.</p><div class="row wrap" style="justify-content:center;margin:18px 0">${t.parts.map((part,index)=>`<button class="button secondary small" data-part="${index}" ${chosen.includes(index)?'disabled':''}>${esc(part)}</button>`).join('')}</div><button class="button full" id="checkAssembly" data-save ${chosen.length!==t.parts.length?'disabled':''}>Проверить ${icon('arrow')}</button>${unknown}`;
   }
   const listen=t.kind==='listen'?`<button class="button secondary full" id="listenWord" style="margin-bottom:14px">${icon('sound')}Послушать</button><button class="button ghost small" id="noAudio" style="margin-bottom:15px">Не слышу — заменить задание</button>`:'';
   return `${listen}<form class="answer-form" id="answerForm"><input class="field" id="typedAnswer" required maxlength="300" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${t.kind==='write_ru'?'Перевод':'Твой ответ'}" aria-label="Твой ответ"><button class="button full" type="submit">Проверить${icon('arrow')}</button></form>${unknown}`;
@@ -136,7 +146,7 @@ function feedbackHTML() {
 }
 function summaryPage() {
   const s=state.session,summary=s.summary||{score:s.score,xp:0,rations:0,coins:0,pending:0};
-  return `<section class="lesson"><div class="card task-card"><span class="pill recent">Миссия выполнена</span><h2 style="margin-top:18px">${summary.score>=90?'Отличная работа!':'Ты сделал важный шаг'}</h2><div class="summary-number">${summary.score??0}%</div><p class="muted">Результат ${s.mode==='daily'?'первой':'повторной'} попытки в 10 вопросах. Повторения после ошибок не меняют этот процент.</p><div class="reward-grid"><div><strong>+${summary.xp}</strong><span>опыта</span></div><div><strong>+${summary.rations}</strong><span>корма</span></div><div><strong>+${summary.coins}</strong><span>монет</span></div></div>${summary.pending?`<p class="subtitle">Ещё ${summary.pending} ответа ждут проверки преподавателя. Они не входят в этот процент.</p>`:''}<button class="button full" id="backHome" style="margin-top:22px">${icon('paw')}К питомцу</button>${summary.score<100?'<button class="button secondary full" id="retryMission" style="margin-top:10px">Повторить трудные слова</button>':''}<p class="footer-note">Базовая награда выдаётся один раз в день. Бонус за 90% тоже можно получить только один раз.</p></div></section>`;
+  return `<section class="lesson"><div class="card task-card"><span class="pill recent">Миссия выполнена</span><h2 style="margin-top:18px">${summary.score>=90?'Отличная работа!':'Ты сделал важный шаг'}</h2><div class="summary-number">${summary.score??0}%</div><p class="muted">Результат ${s.mode==='daily'?'первой':'повторной'} попытки в 10 вопросах. Повторения после ошибок не меняют этот процент.</p><div class="reward-grid"><div><strong>+${summary.xp}</strong><span>опыта</span></div><div><strong>+${summary.rations}</strong><span>корма</span></div><div><strong>+${summary.coins}</strong><span>монет</span></div></div>${summary.pending?`<p class="subtitle">Ещё ${summary.pending} ответа ждут проверки преподавателя. Они не входят в этот процент.</p>`:''}<button class="button full" id="backHome" style="margin-top:22px">${icon('paw')}К питомцу</button><button class="button secondary full" id="retryMission" style="margin-top:10px">${summary.score<100?'Повторить трудные слова':'Ещё тренировка'}</button><p class="footer-note">Базовая награда выдаётся один раз в день. Бонус за 90% тоже можно получить только один раз.</p></div></section>`;
 }
 function teacherPage() {
   const d=state.data;
@@ -167,36 +177,53 @@ function bindStudent() {
   document.getElementById('choosePet')?.addEventListener('click',openPetPicker);
   document.getElementById('startMission')?.addEventListener('click',()=>startMission(false));
   document.getElementById('retryMission')?.addEventListener('click',()=>startMission(true));
-  document.getElementById('beginExercises')?.addEventListener('click',()=>{state.page='lesson';render();window.scrollTo(0,0);document.getElementById('typedAnswer')?.focus();});
-  document.getElementById('backHome')?.addEventListener('click',()=>busy(async()=>{await reload();state.page='home';state.session=null;render();}));
-  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{state.assembly=[];await reload();state.page='home';state.feedback=null;render();}));
+  document.getElementById('beginExercises')?.addEventListener('click',()=>{stopPronunciation();state.page='lesson';render();window.scrollTo(0,0);document.getElementById('typedAnswer')?.focus();});
+  document.getElementById('backHome')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();await reload();state.page='home';state.session=null;render();}));
+  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();state.assembly=[];await reload();state.page='home';state.feedback=null;render();}));
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;render();});
   document.getElementById('wordSearch')?.addEventListener('input',e=>{state.search=e.target.value;const position=e.target.selectionStart;render();const el=document.getElementById('wordSearch');el.focus();el.setSelectionRange(position,position);});
   document.querySelectorAll('[data-option]').forEach(b=>b.onclick=()=>submitAnswer(b.dataset.option));
   document.getElementById('answerForm')?.addEventListener('submit',e=>{e.preventDefault();submitAnswer(document.getElementById('typedAnswer').value);});
   document.getElementById('unknownAnswer')?.addEventListener('click',()=>submitAnswer('',{unknown:true}));
   document.getElementById('listenWord')?.addEventListener('click',()=>speak(state.session.task.speak));
-  document.getElementById('noAudio')?.addEventListener('click',()=>busy(async()=>{state.session=await rpc('noAudio',{sessionId:state.session.id});render();}));
-  document.getElementById('nextTask')?.addEventListener('click',()=>{state.feedback=null;state.assembly=[];render();document.getElementById('typedAnswer')?.focus();});
+  document.getElementById('noAudio')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();state.session=await rpc('noAudio',{sessionId:state.session.id});render();}));
+  document.getElementById('nextTask')?.addEventListener('click',()=>{stopPronunciation();state.feedback=null;state.assembly=[];render();document.getElementById('typedAnswer')?.focus();});
+  document.querySelectorAll('[data-letter]').forEach(b=>b.onclick=()=>{if(!state.assembly.includes(Number(b.dataset.letter)))state.assembly.push(Number(b.dataset.letter));render();});
+  document.getElementById('undoLetter')?.addEventListener('click',()=>{state.assembly.pop();render();});
+  document.getElementById('resetLetters')?.addEventListener('click',()=>{state.assembly=[];render();});
+  document.getElementById('checkLetters')?.addEventListener('click',()=>{const t=state.session.task;let i=0;submitAnswer(Array.from(t.pattern).map(char=>char==='_'?t.parts[state.assembly[i++]]:char).join(''));});
   document.querySelectorAll('[data-part]').forEach(b=>b.onclick=()=>{state.assembly.push(Number(b.dataset.part));render();});
   document.querySelectorAll('[data-remove-part]').forEach(b=>b.onclick=()=>{state.assembly.splice(Number(b.dataset.removePart),1);render();});
   document.getElementById('checkAssembly')?.addEventListener('click',()=>{const t=state.session.task;submitAnswer([t.opening,...state.assembly.map(i=>t.parts[i])].join(' '));});
 }
 async function startMission(retry) {
-  return busy(async()=>{const session=await rpc('start',{retry});state.assembly=[];state.session=session;state.feedback=null;state.page=session.status==='completed'?'lesson':'study';render();window.scrollTo(0,0);});
+  return busy(async()=>{stopPronunciation();const session=await rpc('start',{retry});void pronunciation.preload(session.studyWords || []);state.assembly=[];state.session=session;state.feedback=null;state.page=session.status==='completed'?'lesson':'study';render();window.scrollTo(0,0);});
 }
 async function submitAnswer(answer,extra={}) {
   return busy(async()=>{
-    const task=state.session.task;
+    stopPronunciation();const task=state.session.task;
     const result=await rpc('answer',{sessionId:state.session.id,taskId:task.id,answer,...extra});
     state.session=result.session;state.data.pet=result.pet;state.feedback={result:result.result,task};state.assembly=[];render();
   });
 }
-function speak(text) {
-  if(!window.speechSynthesis){toast('Озвучивание недоступно. Задание на слух можно заменить.',true);return;}
-  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-GB';u.rate=.85;
-  const voices=speechSynthesis.getVoices();u.voice=voices.find(v=>v.lang==='en-GB')||voices.find(v=>v.lang.startsWith('en'))||null;
-  u.onerror=()=>toast('Не удалось озвучить слово. Задание на слух можно заменить.',true);speechSynthesis.speak(u);
+function updateAudioStatus() {
+  const el=document.getElementById('audioStatus');if(!el)return;
+  el.innerHTML=esc(audioStatus.message || '')+(audioStatus.source?` · <a href="${esc(audioStatus.source)}" target="_blank" rel="noopener noreferrer">Источник записи</a>`:'')+(audioStatus.license?` · <a href="${esc(audioStatus.license)}" target="_blank" rel="noopener noreferrer">${esc(audioStatus.licenseName || 'Лицензия')}</a>`:'');
+}
+function stopPronunciation(){pronunciation.stop();audioStatus={};updateAudioStatus();}
+function speak(text){void pronunciation.speak(text);}
+async function openAudioPreferences() {
+  const available=await pronunciation.ready(),prefs=pronunciation.preferences();
+  const preferred=WordPetAudio.chooseVoice(available,prefs.voiceURI);
+  dialog(`<h2>Как звучат слова</h2><p class="subtitle">Для отдельных слов сначала ищем словарную запись. Если её нет, используем выбранный английский голос. В словарных записях предпочитаем британское произношение.</p><form id="audioForm"><label class="field-label">Озвучивание<select class="field" id="audioMode"><option value="auto" ${prefs.mode==='auto'?'selected':''}>Словарные записи + голос для фраз</option><option value="voice" ${prefs.mode==='voice'?'selected':''}>Только выбранный голос</option></select></label><label class="field-label">Английский голос для фраз<select class="field" id="audioVoice">${available.length?available.map(v=>`<option value="${esc(v.voiceURI)}" ${v.voiceURI===preferred?.voiceURI?'selected':''}>${esc(v.name)} · ${esc(v.lang)}</option>`).join(''):'<option value="">Английский голос пока не найден</option>'}</select></label><label class="field-label">Скорость голоса<select class="field" id="audioRate">${[[0.85,'Медленнее'],[0.95,'Обычная'],[1.05,'Быстрее']].map(([rate,label])=>`<option value="${rate}" ${Math.abs(prefs.rate-rate)<0.04?'selected':''}>${label}</option>`).join('')}</select></label><button class="button secondary full" type="button" id="testAudioVoice">${icon('sound')}Послушать голос: I enjoy learning English.</button><p class="tiny muted" id="voiceTestStatus" aria-live="polite"></p><button class="button full" type="submit">Сохранить</button><p class="footer-note">Голоса зависят от устройства. Настройка сохраняется в этом браузере. Записей для некоторых слов и выражений в словаре нет.</p></form>`);
+  const choice=()=>({mode:document.getElementById('audioMode').value,voiceURI:document.getElementById('audioVoice').value,rate:document.getElementById('audioRate').value});
+  document.getElementById('testAudioVoice').onclick=async()=>{
+    const old=pronunciation.preferences();pronunciation.updatePreferences(choice());
+    try {const success=await pronunciation.speak('I enjoy learning English.',{forceVoice:true});
+      const result=document.getElementById('voiceTestStatus');if(result)result.textContent=success?'Если голос не нравится, выбери другой из списка.':'Английский голос недоступен. Попробуй другой браузер.';
+    } finally {pronunciation.updatePreferences(old);}
+  };
+  document.getElementById('audioForm').onsubmit=e=>{e.preventDefault();stopPronunciation();pronunciation.updatePreferences(choice());closeDialog();toast('Озвучка настроена.');};
 }
 function openPetPicker() {
   const current=state.data.pet;
@@ -240,7 +267,7 @@ function renderLogin(){
 
 }
 async function connect(key){return busy(async()=>{state.key=key;try{await reload();}catch(e){state.data=null;renderLogin();throw e;}try{localStorage.setItem('wordpet-key',key);}catch{}state.page='home';render();});}
-function logout(){state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
+function logout(){stopPronunciation();state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
 
 async function boot(){
   if(!IS_GOOGLE){document.getElementById('demoBanner').classList.remove('hidden');document.getElementById('demoSwitch').onclick=chooseDemo;}

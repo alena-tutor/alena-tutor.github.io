@@ -83,7 +83,7 @@ test('typed answers accept curated variants, punctuation and apostrophe forms',(
 });
 test('public tasks hide expected answers and use genuine authored gaps',()=>{
  const ws=seed.words.filter(w=>w.studentId==='learner_b');const ts=core.makeTasks(ws,ws,[],'2026-10-16',()=>.5);
- const gaps=ts.filter(t=>t.kind==='gap');assert.ok(gaps.length);gaps.forEach(t=>assert.match(t.prompt,/______/));
+ const gaps=ts.filter(t=>['gap','gap_choice'].includes(t.kind));assert.ok(gaps.length);gaps.forEach(t=>assert.match(t.prompt,/______/));
  ts.forEach(t=>assert.equal(Object.hasOwn(core.publicTask(t),'answers'),false));
  const write=ts.find(t=>t.kind==='write_en');assert.equal(Object.hasOwn(core.publicTask(write),'english'),false);
 });
@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.4.1'/);
+ assert.match(code,/version: '1.5.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -187,7 +187,7 @@ test('preview shows exactly the selected words and survives legacy sessions with
 
 test('unknown gap shows its answer, repeats after two tasks, persists, and is idempotent',()=>{
  const b=backend();let s=b.api('learner_b','start');
- while(s.task.kind!=='gap'){
+ while(!['gap','gap_choice'].includes(s.task.kind)){
   const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;
  }
  const original=b.tasks(s.id)[s.index],total=s.total;
@@ -197,7 +197,7 @@ test('unknown gap shows its answer, repeats after two tasks, persists, and is id
  const ts=b.tasks(s.id),pos=ts.findIndex(t=>t.isReview&&t.wordId===original.wordId);
  assert.equal(pos,Math.min(result.session.index+2,total));assert.equal(ts[pos].prompt,original.prompt);
  const repeated=b.api('learner_b','answer',{sessionId:s.id,taskId:original.id,unknown:true});
- assert.equal(repeated.session.total,total+1);assert.equal(b.records('Прогресс').find(p=>p.wordId===original.wordId&&p.skill==='gap').wrong,1);
+ assert.equal(repeated.session.total,total+1);assert.equal(b.records('Прогресс').find(p=>p.wordId===original.wordId&&p.skill===original.kind).wrong,1);
  s=b.api('learner_b','start');assert.equal(s.total,total+1);
  while(!s.task.isReview){const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;}
  assert.equal(s.task.wordId,original.wordId);
@@ -379,7 +379,7 @@ test('assembly controls add and return parts, submit their order, and never requ
  const u=petUi(),parts=[{dataset:{part:'0'}},{dataset:{part:'1'}}],remove=[{dataset:{removePart:'0'}}];
  u.context.document.querySelectorAll=selector=>selector==='[data-part]'?parts:selector==='[data-remove-part]'?remove:[];
  vm.runInContext("state.session={id:'s',task:{id:'t',kind:'assemble',english:'play',opening:'I often',parts:['play chess','after school.']}};submitAnswer=(answer)=>{globalThis.sent=answer;};",u.context);
- const initial=vm.runInContext('taskBody(state.session.task)',u.context);assert.match(initial,/id="checkAssembly" disabled/);assert.match(initial,/unknownAnswer/);
+ const initial=vm.runInContext('taskBody(state.session.task)',u.context);assert.match(initial,/id="checkAssembly"[^>]* disabled/);assert.match(initial,/unknownAnswer/);
  u.context.bindStudent();parts[0].onclick();parts[1].onclick();remove[0].onclick();parts[0].onclick();
  u.element('checkAssembly').click();assert.equal(u.context.sent,'I often after school. play chess');
  const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('getUserMedia'),false);assert.equal(html.includes('MediaRecorder'),false);assert.equal(html.includes('sendVoice'),false);
@@ -388,4 +388,47 @@ test('assembly controls add and return parts, submit their order, and never requ
 test('production manifest publishes a web app that pupils can open without a Google account',()=>{
  const manifest=JSON.parse(fs.readFileSync(root+'/output/appsscript.json','utf8'));
  assert.deepEqual(manifest.webapp,{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'});
+});
+
+test('guided vocabulary gets a context choice and familiar vocabulary gets typed gaps',()=>{
+ const ws=seed.words.filter(w=>w.studentId==='learner_b');const target=ws.find(w=>w.english==='occasionally');
+ const guided=core.makeTasks([target],ws,[],'2026-10-16',()=>.5);assert.ok(guided.some(t=>t.kind==='gap_choice'));assert.equal(guided.some(t=>t.kind==='gap'),false);
+ const progress=[{wordId:target.id,skill:'write_en',streak:2,correct:2,wrong:0}];
+ const learned=core.makeTasks([target],ws,progress,'2026-10-16',()=>.5);assert.ok(learned.some(t=>t.kind==='gap'));assert.equal(learned.some(t=>t.kind==='gap_choice'),false);
+ const gap=learned.find(t=>t.kind==='gap');assert.equal(core.grade(gap,gap.gapAnswer),true);assert.equal(core.publicTask(gap).english,undefined);
+});
+test('context choices exclude synonymous distractors and grade the actual form in the example',()=>{
+ const w={id:'keen',english:'be keen on',russian:'увлекаться',answers:'am keen on | is keen on',example:'I am keen on chess.',lessonOn:'2026-10-16'};
+ const all=[w,{id:'like',english:'like',russian:'увлекаться'},{id:'play',english:'play',russian:'играть'}];
+ const t=core.makeTasks([w],all,[],'2026-10-16',()=>.5).find(t=>t.kind==='gap_choice');
+ assert.equal(t.gapAnswer,'am keen on');assert.equal(t.prompt,'I ______ chess.');assert.ok(t.options.includes('am keen on'));assert.equal(t.options.includes('like'),false);
+ assert.equal(core.grade(t,'am keen on'),true);assert.equal(core.grade(t,'is keen on'),false);assert.equal(core.grade(t,'be keen on'),false);
+ assert.equal(core.gapData({english:'own',example:'I go down the street.'}),null);
+});
+test('letter tasks support duplicate letters, spaces and apostrophes while hiding the answer',()=>{
+ const w={id:'stand',english:"can't stand",russian:'терпеть не могу',example:"I can't stand wet socks."};
+ const t=core.makeTasks([w],[w],[],'2026-10-16',()=>.5).find(t=>t.kind==='letters');assert.ok(t);
+ assert.equal(t.pattern,"___'_ _____");assert.equal(t.parts.length,9);assert.equal(t.parts.filter(x=>x==='t').length,2);
+ assert.equal(core.grade(t,"CAN’T STAND"),true);assert.equal(core.grade(t,'cant stand'),false);
+ const visible=core.publicTask(t);assert.equal(visible.english,undefined);assert.equal(visible.answers,undefined);assert.equal(visible.russian,w.russian);assert.equal(visible.pattern,t.pattern);
+ assert.equal(core.letterParts({english:'a'}),null);assert.equal(core.letterParts({english:'café'}),null);
+});
+test('a new mission mixes translations, context, letters, listening and sentence assembly without pending answers',()=>{
+ const ws=seed.words.filter(w=>w.studentId==='learner_b');const w=ws.find(w=>w.english==='occasionally');
+ const tasks=core.makeTasks([w],ws,[],'2026-10-16',()=>.5);
+ assert.equal(tasks.length,10);for(const kind of ['choose','letters','write_ru','listen','gap_choice','assemble','write_en'])assert.ok(tasks.some(t=>t.kind===kind),kind);
+ const b=backend(),done=finish(b,'learner_b');assert.equal(done.session.summary.score,100);assert.equal(done.session.summary.pending,0);assert.equal(b.records('Ответы').length,0);assert.equal(b.files.size,0);
+});
+test('letter controls keep duplicate tiles distinct and allow undo and reset before automatic checking',()=>{
+ const u=petUi(),letters=[{dataset:{letter:'0'}},{dataset:{letter:'1'}},{dataset:{letter:'2'}}];
+ u.context.document.querySelectorAll=selector=>selector==='[data-letter]'?letters:[];
+ vm.runInContext("state.session={id:'s',task:{id:'t',kind:'letters',russian:'весь',parts:['l','a','l'],pattern:'___'}};submitAnswer=(answer)=>{globalThis.sent=answer;};",u.context);
+ const initial=vm.runInContext('taskBody(state.session.task)',u.context);assert.match(initial,/id="checkLetters"[^>]*disabled/);assert.match(initial,/unknownAnswer/);
+ u.context.bindStudent();letters[1].onclick();letters[0].onclick();letters[0].onclick();assert.equal(vm.runInContext('state.assembly.length',u.context),2);
+ u.element('undoLetter').click();letters[2].onclick();letters[0].onclick();u.element('checkLetters').click();assert.equal(u.context.sent,'all');
+ u.element('resetLetters').click();assert.equal(vm.runInContext('state.assembly.length',u.context),0);
+});
+test('navigation has no removed recording callback and sound settings list only English voices',async()=>{
+ const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('stopRecording('),false);assert.match(html,/id="audioPreferences"/);assert.equal(html.includes('getUserMedia'),false);
+ const u=petUi();await u.context.openAudioPreferences();const markup=u.element('dialogs').innerHTML;assert.match(markup,/id="audioVoice"/);assert.match(markup,/id="testAudioVoice"/);assert.match(markup,/Словарные записи/);
 });
