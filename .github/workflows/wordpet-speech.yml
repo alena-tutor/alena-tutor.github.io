@@ -1,0 +1,59 @@
+name: WordPet speech
+on:
+  push:
+    branches: [main]
+    paths: ['wordpet/scripts/speech-*', '.github/workflows/wordpet-speech.yml', 'wordpet/src/Server.js']
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wordpet-speech
+  cancel-in-progress: false
+jobs:
+  recordings:
+    name: Prepare private British recordings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: wordpet
+    env:
+      WORDPET_CONFIG_JSON: ${{ secrets.WORDPET_CONFIG_JSON }}
+      WORDPET_CLASPRC_JSON: ${{ secrets.WORDPET_CLASPRC_JSON }}
+      WORDPET_SPEECH_WORKDIR: ${{ runner.temp }}/wordpet-speech
+      WORDPET_SPEECH_MODEL_DIR: ${{ runner.temp }}/wordpet-speech-model
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install Google client
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Inspect private queue and existing recordings
+        id: plan
+        run: node scripts/speech-store.mjs prepare
+      - name: Install pinned speech runtime
+        if: steps.plan.outputs.pending != '0'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wordpet-voice-env"
+          "$RUNNER_TEMP/wordpet-voice-env/bin/pip" install --disable-pip-version-check kokoro-onnx==0.4.9 onnxruntime==1.22.1 numpy==2.2.6 soundfile==0.13.1
+          command -v ffmpeg
+      - name: Fetch the released model and voice pack
+        if: steps.plan.outputs.pending != '0'
+        run: |
+          mkdir -p "$WORDPET_SPEECH_MODEL_DIR"
+          curl --fail --location --retry 3 --output "$WORDPET_SPEECH_MODEL_DIR/kokoro-v1.0.onnx" https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx
+          curl --fail --location --retry 3 --output "$WORDPET_SPEECH_MODEL_DIR/voices-v1.0.bin" https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
+      - name: Generate and check British recordings
+        if: steps.plan.outputs.pending != '0'
+        run: '"$RUNNER_TEMP/wordpet-voice-env/bin/python" scripts/speech-audio.py'
+      - name: Save and verify recordings in private Google Drive
+        run: node scripts/speech-store.mjs upload
+      - name: Remove private temporary files
+        if: always()
+        run: rm -rf "$WORDPET_SPEECH_WORKDIR" "$WORDPET_SPEECH_MODEL_DIR" "$RUNNER_TEMP/wordpet-voice-env"
