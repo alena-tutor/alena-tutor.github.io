@@ -1,22 +1,124 @@
 {
-  "mean": {"example":"What does this word mean?","russianAliases":"значить|иметь в виду|означать"},
-  "upset": {"example":"I feel upset when my friends argue.","russianAliases":"расстроенный|расстроенная|расстроен|расстроена"},
-  "agreement": {"example":"We reached an agreement about the project.","russianAliases":"согласие|соглашение"},
-  "suggestion": {"example":"Can I make a suggestion?","russianAliases":"предложение|идея"},
-  "opinion": {"example":"In my opinion, this book is exciting.","russianAliases":"мнение"},
-  "confused": {"example":"I feel confused when the instructions are unclear.","russianAliases":"растерянный|растерянная|сбитый с толку|сбитая с толку|растерян"},
-  "advice": {"example":"My teacher gave me some useful advice.","russianAliases":"совет|советы"},
-  "now and then": {"example":"I play chess now and then.","russianAliases":"время от времени|иногда|изредка"},
-  "hardly ever": {"example":"I hardly ever watch TV before school.","russianAliases":"почти никогда|очень редко"},
-  "frequently": {"example":"I frequently talk to my friends after school.","russianAliases":"часто|нередко"},
-  "occasionally": {"example":"I occasionally go swimming, perhaps once a month.","russianAliases":"иногда|время от времени|изредка"},
-  "in the middle of the day": {"example":"I have lunch in the middle of the day.","russianAliases":"в середине дня|среди дня"},
-  "variety of things": {"example":"We do a variety of things in our English lessons.","russianAliases":"разнообразие вещей|разные вещи|разные занятия|разнообразные вещи"},
-  "quite": {"example":"This exercise is quite difficult.","russianAliases":"довольно|вполне"},
-  "quite interested": {"example":"I am quite interested in photography.","russianAliases":"довольно заинтересован|довольно заинтересована|довольно заинтересованный|довольно заинтересованная"},
-  "can't stand": {"example":"I can't stand getting up early on Sundays.","answers":"cannot stand","russianAliases":"терпеть не могу|не выносить|не могу терпеть|терпеть не мочь"},
-  "be keen on": {"example":"I am keen on playing computer games.","answers":"am keen on|is keen on|are keen on","russianAliases":"увлекаться|очень любить|сильно увлекаться"},
-  "kind of": {"example":"This film is kind of strange.","russianAliases":"своего рода|немного|вроде|типа"},
-  "different": {"example":"My brother and I like different kinds of music.","russianAliases":"другой|отличающийся|разный|разные|различный"},
-  "what are ... like": {"example":"What are your new classmates like?","russianAliases":"какие|какие они|что собой представляют|какие ...|что ... собой представляют"}
+  "mean": {
+    "example": "What does this word mean?",
+    "russianAliases": "значить|иметь в виду|означать",
+    "exampleRu": "Что значит это слово?",
+    "usage": "mean + слово / фраза. В вопросе: What does ... mean?"
+  },
+  "upset": {
+    "example": "I feel upset when my friends argue.",
+    "russianAliases": "расстроенный|расстроенная|расстроен|расстроена",
+    "exampleRu": "Я расстраиваюсь, когда мои друзья ссорятся.",
+    "usage": "be / feel upset — быть расстроенным, расстраиваться."
+  },
+  "agreement": {
+    "example": "We reached an agreement about the project.",
+    "russianAliases": "согласие|соглашение",
+    "exampleRu": "Мы пришли к соглашению по поводу проекта.",
+    "usage": "reach an agreement — прийти к соглашению; an agreement about something — соглашение о чём-либо."
+  },
+  "suggestion": {
+    "example": "Can I make a suggestion?",
+    "russianAliases": "предложение|идея",
+    "exampleRu": "Можно я кое-что предложу?",
+    "usage": "make a suggestion — внести предложение, предложить идею."
+  },
+  "opinion": {
+    "example": "In my opinion, this book is exciting.",
+    "russianAliases": "мнение",
+    "exampleRu": "По моему мнению, эта книга захватывающая.",
+    "usage": "In my opinion, ... — по моему мнению. После выражения обычно ставится запятая."
+  },
+  "confused": {
+    "example": "I feel confused when the instructions are unclear.",
+    "russianAliases": "растерянный|растерянная|сбитый с толку|сбитая с толку|растерян",
+    "exampleRu": "Я теряюсь, когда инструкции непонятны.",
+    "usage": "be / feel confused — быть в замешательстве. confused about something — не понимать что-либо."
+  },
+  "advice": {
+    "example": "My teacher gave me some useful advice.",
+    "russianAliases": "совет|советы",
+    "exampleRu": "Учитель дал мне полезный совет.",
+    "usage": "give someone advice — дать кому-то совет. advice — неисчисляемое: some advice, a piece of advice."
+  },
+  "now and then": {
+    "example": "I play chess now and then.",
+    "russianAliases": "время от времени|иногда|изредка",
+    "exampleRu": "Я время от времени играю в шахматы.",
+    "usage": "Для действий, которые происходят иногда. Часто ставится в конце предложения."
+  },
+  "hardly ever": {
+    "example": "I hardly ever watch TV before school.",
+    "russianAliases": "почти никогда|очень редко",
+    "exampleRu": "Я почти никогда не смотрю телевизор перед школой.",
+    "usage": "Обычно перед смысловым глаголом: I hardly ever watch ... С be: He is hardly ever late."
+  },
+  "frequently": {
+    "example": "I frequently talk to my friends after school.",
+    "russianAliases": "часто|нередко",
+    "exampleRu": "Я часто разговариваю с друзьями после школы.",
+    "usage": "Обычно перед смысловым глаголом: I frequently talk ... Описывает частое действие."
+  },
+  "occasionally": {
+    "example": "I occasionally go swimming, perhaps once a month.",
+    "russianAliases": "иногда|время от времени|изредка",
+    "exampleRu": "Я иногда хожу плавать — примерно раз в месяц.",
+    "usage": "Описывает действие, которое происходит иногда. Обычно перед смысловым глаголом."
+  },
+  "in the middle of the day": {
+    "example": "I have lunch in the middle of the day.",
+    "russianAliases": "в середине дня|среди дня",
+    "exampleRu": "Я обедаю в середине дня.",
+    "usage": "Обозначает время действия. В этом примере стоит в конце предложения."
+  },
+  "variety of things": {
+    "example": "We do a variety of things in our English lessons.",
+    "russianAliases": "разнообразие вещей|разные вещи|разные занятия|разнообразные вещи",
+    "exampleRu": "На уроках английского мы занимаемся самыми разными вещами.",
+    "usage": "a variety of + существительное во множественном числе: a variety of things / activities."
+  },
+  "quite": {
+    "example": "This exercise is quite difficult.",
+    "russianAliases": "довольно|вполне",
+    "exampleRu": "Это упражнение довольно трудное.",
+    "usage": "quite + прилагательное / наречие: quite difficult, quite slowly."
+  },
+  "quite interested": {
+    "example": "I am quite interested in photography.",
+    "russianAliases": "довольно заинтересован|довольно заинтересована|довольно заинтересованный|довольно заинтересованная",
+    "exampleRu": "Я довольно сильно интересуюсь фотографией.",
+    "usage": "be quite interested in + существительное / -ing: interested in photography / learning languages."
+  },
+  "can't stand": {
+    "example": "I can't stand getting up early on Sundays.",
+    "answers": "cannot stand",
+    "russianAliases": "терпеть не могу|не выносить|не могу терпеть|терпеть не мочь",
+    "exampleRu": "Терпеть не могу рано вставать по воскресеньям.",
+    "usage": "can't stand + существительное / -ing: can't stand noise / getting up early."
+  },
+  "be keen on": {
+    "example": "I am keen on playing computer games.",
+    "answers": "am keen on|is keen on|are keen on",
+    "russianAliases": "увлекаться|очень любить|сильно увлекаться",
+    "exampleRu": "Я очень люблю играть в компьютерные игры.",
+    "usage": "be keen on + существительное / -ing. Меняй be по подлежащему: I am, she is, they are."
+  },
+  "kind of": {
+    "example": "This film is kind of strange.",
+    "russianAliases": "своего рода|немного|вроде|типа",
+    "exampleRu": "Этот фильм какой-то странный.",
+    "usage": "Разговорное kind of + прилагательное смягчает оценку: kind of strange — немного странный."
+  },
+  "different": {
+    "example": "My brother and I like different kinds of music.",
+    "russianAliases": "другой|отличающийся|разный|разные|различный",
+    "exampleRu": "Мы с братом любим разные музыкальные жанры.",
+    "usage": "different + существительное: different kinds of music. different from — отличающийся от."
+  },
+  "what are ... like": {
+    "example": "What are your new classmates like?",
+    "russianAliases": "какие|какие они|что собой представляют|какие ...|что ... собой представляют",
+    "exampleRu": "Какие у тебя новые одноклассники?",
+    "usage": "What is / are ... like? — вопрос о том, какой человек или предмет. Ответ: They are friendly."
+  }
 }

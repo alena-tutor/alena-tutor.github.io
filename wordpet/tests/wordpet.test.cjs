@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.5.0'/);
+ assert.match(code,/version: '1.6.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -431,4 +431,33 @@ test('letter controls keep duplicate tiles distinct and allow undo and reset bef
 test('navigation has no removed recording callback and sound settings list only English voices',async()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('stopRecording('),false);assert.match(html,/id="audioPreferences"/);assert.equal(html.includes('getUserMedia'),false);
  const u=petUi();await u.context.openAudioPreferences();const markup=u.element('dialogs').innerHTML;assert.match(markup,/id="audioVoice"/);assert.match(markup,/id="testAudioVoice"/);assert.match(markup,/Словарные записи/);
+});
+
+test('bilingual examples and usage survive teacher edits and glossary sync without crossing pupils',()=>{
+ const b=backend();b.api('teacher','addWord',{studentId:'learner_b',english:'occasionally',russian:'иногда',example:'I occasionally visit my grandparents.',exampleRu:'Я иногда навещаю бабушку и дедушку.',usage:'occasionally + смысловой глагол',answers:'occasionally',hard:true});
+ b.api('teacher','sync');const w=b.api('learner_b','bootstrap').words.find(w=>w.english==='occasionally');
+ assert.equal(w.example,'I occasionally visit my grandparents.');assert.equal(w.exampleRu,'Я иногда навещаю бабушку и дедушку.');assert.equal(w.usage,'occasionally + смысловой глагол');assert.equal(w.exampleFocus,'occasionally');
+ assert.equal(JSON.stringify(b.api('learner_a','bootstrap')).includes('навещаю бабушку'),false);
+ const teacher=b.api('teacher','bootstrap');assert.ok(teacher.students.find(s=>s.id==='learner_b').words.some(w=>w.exampleRu==='Я иногда навещаю бабушку и дедушку.'));
+});
+test('existing sessions receive example translations only when their saved English example matches',()=>{
+ const b=backend();let s=b.api('learner_b','start');assert.ok(s.studyWords.every(w=>w.example&&w.exampleRu&&w.usage));
+ const rows=b.data.get('Тренировки'),payload=JSON.parse(rows[1][6]);const target=payload.studyWords[0];delete target.exampleRu;delete target.usage;delete target.exampleFocus;
+ rows[1][6]=JSON.stringify(payload);const resumed=b.api('learner_b','start');assert.equal(resumed.id,s.id);assert.ok(resumed.studyWords[0].exampleRu);
+ target.example='A different saved sentence.';rows[1][6]=JSON.stringify(payload);const old=b.api('learner_b','start');assert.equal(old.studyWords[0].example,target.example);assert.equal(old.studyWords[0].exampleRu,'');
+});
+test('the old fourteen-column word table remains readable with common context defaults',()=>{
+ const b=backend();b.data.set('Слова',b.data.get('Слова').map(row=>row.slice(0,14)));
+ const d=b.api('learner_b','bootstrap');assert.equal(d.words.length,11);assert.ok(d.words.every(w=>w.exampleRu&&w.usage));
+});
+test('dictionary and study cards show highlighted bilingual context; unanswered questions hide it',()=>{
+ const u=petUi();const word={id:'w',english:'be keen on',russian:'увлекаться',example:'I am keen on chess.',exampleRu:'Я увлекаюсь шахматами.',usage:'be keen on + существительное / -ing',exampleFocus:'am keen on',category:'recent'};
+ u.context.word=word;
+ const card=vm.runInContext('exampleHTML(word)',u.context);assert.match(card,/<mark[^>]*>am keen on<\/mark>/);assert.match(card,/Я увлекаюсь шахматами/);assert.match(card,/Как использовать:/);assert.match(card,/Послушать пример/);
+ vm.runInContext('state.data.words=[word];state.session={id:"s",index:0,total:10,status:"active",task:{id:"t",wordId:"w",kind:"gap",prompt:"I ______ chess.",russian:word.russian,category:"recent"},studyWords:[word]};',u.context);
+ assert.match(vm.runInContext('wordsPage()',u.context),/Я увлекаюсь шахматами/);assert.match(vm.runInContext('studyPage()',u.context),/Я увлекаюсь шахматами/);
+ assert.equal(vm.runInContext('lessonPage()',u.context).includes('Я увлекаюсь шахматами'),false);
+ vm.runInContext('state.feedback={task:state.session.task,result:{correct:false,unknown:true,expected:"am keen on"}};',u.context);
+ assert.match(vm.runInContext('lessonPage()',u.context),/Я увлекаюсь шахматами/);
+ u.context.word={...word,example:'I am keen on <script>alert(1)</script>.'};const safe=vm.runInContext('exampleHTML(word)',u.context);assert.equal(safe.includes('<script>'),false);assert.match(safe,/&lt;script&gt;/);
 });

@@ -1,11 +1,11 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.5.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.6.0',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
   'Ученики': ['id','name','sourceId','sourceSheet','lastSync','syncStatus'],
-  'Слова': ['id','studentId','english','russian','addedOn','lessonOn','hardOn','active','example','answers','topic','source','notes','russianAliases'],
+  'Слова': ['id','studentId','english','russian','addedOn','lessonOn','hardOn','active','example','answers','topic','source','notes','russianAliases','exampleRu','usage'],
   'Прогресс': ['studentId','wordId','skill','streak','correct','wrong','nextReview','lastAt','lastEventId'],
   'Питомцы': ['studentId','name','species','xp','food','clean','coins','rations','lastDecay','lastRewardDay','lastBonusDay','accessory'],
   'Тренировки': ['id','studentId','createdAt','day','mode','status','payload'],
@@ -181,7 +181,23 @@ function api(request) {
   if (!Object.prototype.hasOwnProperty.call(methods,action)) throw Error('Действие недоступно.');
   return methods[action]();
 }
-function words_(studentId) { return rows_('Слова').filter(w => w.studentId === studentId && bool_(w.active)); }
+function exampleContext_(word) {
+  const known = WORD_EXAMPLES_[WordPetCore.norm(word.english)] || {};
+  const example = String(word.example || known.example || '');
+  return {example,exampleRu:String(word.exampleRu || (WordPetCore.norm(example) === WordPetCore.norm(known.example) ? known.exampleRu || '' : '')),
+    usage:String(word.usage || known.usage || ''),exampleFocus:WordPetCore.gapData({...word,example})?.gapAnswer || ''};
+}
+function words_(studentId) { return rows_('Слова').filter(w => w.studentId === studentId && bool_(w.active)).map(w=>({...w,...exampleContext_(w)})); }
+function studyWord_(word) { return {id:word.id,english:word.english,russian:word.russian,...exampleContext_(word)}; }
+function sessionStudyWords_(payload,studentId) {
+  const current = words_(studentId);
+  return (payload.studyWords || WordPetCore.studyWords(payload.tasks)).map(saved=>{
+    const live=current.find(w=>w.id === saved.id);
+    const example=saved.example || live?.example || '';
+    return {...saved,example,exampleRu:saved.exampleRu || (example === live?.example ? live.exampleRu : '') || '',
+      usage:saved.usage || live?.usage || '',exampleFocus:saved.exampleFocus || (example === live?.example ? live.exampleFocus : '') || ''};
+  });
+}
 function progress_(studentId) { return rows_('Прогресс').filter(p => p.studentId === studentId); }
 function pet_(studentId) {
   const p = rows_('Питомцы').find(p => p.studentId === studentId);
@@ -207,7 +223,7 @@ function studentDashboard_(studentId) {
   const byCategory = {hard:0,recent:0,review:0};
   words.forEach(w => byCategory[WordPetCore.category(w,progress,today)]++);
   return {role:'student',name:student.name,studentId,today,pet:publicPet_(pet_(studentId)),
-    words:words.map(w => ({id:w.id,english:w.english,russian:w.russian,example:w.example,topic:w.topic,category:WordPetCore.category(w,progress,today),mastered:WordPetCore.mastered(w,progress)})),
+    words:words.map(w => ({id:w.id,english:w.english,russian:w.russian,...exampleContext_(w),topic:w.topic,category:WordPetCore.category(w,progress,today),mastered:WordPetCore.mastered(w,progress)})),
     counts:byCategory,stats:{total:words.length,seen:seen.size,mastered:words.filter(w => WordPetCore.mastered(w,progress)).length,
       completed:sessions.filter(s => s.status === 'completed' && s.mode === 'daily').length+archiveTotal_(studentId,sessions).completed,
       pending:answers.filter(a => a.status === 'pending').length},
@@ -226,7 +242,7 @@ function sessionResponse_(s) {
   }
   return {id:s.id,mode:s.mode,status:s.status,index:payload.results.length,total:payload.tasks.length,
     task:WordPetCore.publicTask(payload.tasks[payload.results.length]),score:sessionScore_(payload),
-    studyWords:payload.studyWords || WordPetCore.studyWords(payload.tasks),
+    studyWords:sessionStudyWords_(payload,s.studentId),
     previous:payload.results.length ? payload.results[payload.results.length-1] : null,
     summary:s.status === 'completed' ? payload.summary : null};
 }
@@ -247,7 +263,7 @@ function start_(studentId,data) {
   }
   const picked = WordPetCore.selectWords(candidates,progress,today_());
   let tasks = WordPetCore.makeTasks(picked,words,progress,today_());
-  const studyWords = picked.map(w => ({id:w.id,english:w.english,russian:w.russian,example:w.example || ''}));
+  const studyWords = picked.map(studyWord_);
   const s = {id:Utilities.getUuid(),studentId,createdAt:now_(),day:today_(),mode:daily?'retry':'daily',status:'active',payload:JSON.stringify({tasks,studyWords,results:[]})};
   put_('Тренировки',s); return sessionResponse_(s);
 }
@@ -343,7 +359,7 @@ function teacherDashboard_() {
     return {id:s.id,name:s.name,total:ws.length,mastered:ws.filter(w => WordPetCore.mastered(w,ps)).length,
       doneToday:ss.some(t => t.day === today_()),lastPractice:ss.length ? ss[ss.length-1].createdAt : archiveTotal_(s.id,sessions).lastPractice,
       syncStatus:s.syncStatus,lastSync:s.lastSync,pending:answers.filter(a => a.studentId===s.id && a.status==='pending').length,
-      words:ws.map(w => ({id:w.id,english:w.english,russian:w.russian,example:w.example,answers:w.answers,russianAliases:w.russianAliases,hardOn:WordPetCore.day(w.hardOn),category:WordPetCore.category(w,ps,today_())})),
+      words:ws.map(w => ({id:w.id,english:w.english,russian:w.russian,...exampleContext_(w),answers:w.answers,russianAliases:w.russianAliases,hardOn:WordPetCore.day(w.hardOn),category:WordPetCore.category(w,ps,today_())})),
       history:ss.slice(-7).map(t => ({day:t.day,score:sessionScore_(JSON.parse(t.payload))}))};
   }),pending:answers.filter(a => a.status === 'pending').map(a => ({id:a.id,studentId:a.studentId,wordId:a.wordId,
     english:words.find(w=>w.id===a.wordId)?.english || a.wordId,kind:a.kind,text:a.text,date:a.submittedAt,hasAudio:Boolean(a.audioId)})),
@@ -357,6 +373,8 @@ function teacherWord_(data) {
   const id = WordPetCore.key(student.id,english), old = rows_('Слова').find(w => w.id === id);
   put_('Слова',{...(old || {}),id,studentId:student.id,english,russian,addedOn:old?.addedOn || today_(),lessonOn:today_(),
     hardOn:data.hard ? today_() : old?.hardOn || '',active:true,example:String(data.example || '').slice(0,500),
+    exampleRu:data.exampleRu === undefined ? (String(data.example || '') === String(old?.example || '') ? old?.exampleRu || '' : '') : String(data.exampleRu || '').slice(0,500),
+    usage:data.usage === undefined ? old?.usage || '' : String(data.usage || '').slice(0,500),
     answers:String(data.answers || '').slice(0,400),russianAliases:String(data.russianAliases || '').slice(0,400),topic:'С урока',source:'teacher',notes:old?.notes || ''});
   return {ok:true};
 }
