@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.6.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.7.0',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
@@ -147,6 +147,7 @@ function syncGlossaries_() {
       results.push({student:student.name,ok:false,error:'Не удалось прочитать глоссарий. Проверьте доступ владельца.'});
     }
   });
+  refreshSpeechQueue_();
   return results;
 }
 function authenticate_(key) {
@@ -163,7 +164,7 @@ function api(request) {
   const data = request.data || {};
   // Never dispatch arbitrary function names from user input.
   const methods = access.role === 'teacher' ? {
-    bootstrap:() => teacherDashboard_(), sync:() => withLock_(syncGlossaries_),
+    bootstrap:() => teacherDashboard_(), speech:() => speech_('',data,true), sync:() => withLock_(syncGlossaries_),
     addWord:() => withLock_(() => teacherWord_(data)),
     markHard:() => withLock_(() => teacherHard_(data)),
     review:() => withLock_(() => review_(data)), audio:() => audio_(data),
@@ -171,6 +172,7 @@ function api(request) {
     archiveStatus:() => archiveStatus_(), archiveHistory:() => withLock_(archiveScheduled_)
   } : {
     bootstrap:() => withLock_(() => studentDashboard_(access.personId)),
+    speech:() => speech_(access.personId,data,false),
     start:() => withLock_(() => start_(access.personId,data)),
     answer:() => withLock_(() => answer_(access.personId,data)),
     care:() => withLock_(() => care_(access.personId,data)),
@@ -376,6 +378,7 @@ function teacherWord_(data) {
     exampleRu:data.exampleRu === undefined ? (String(data.example || '') === String(old?.example || '') ? old?.exampleRu || '' : '') : String(data.exampleRu || '').slice(0,500),
     usage:data.usage === undefined ? old?.usage || '' : String(data.usage || '').slice(0,500),
     answers:String(data.answers || '').slice(0,400),russianAliases:String(data.russianAliases || '').slice(0,400),topic:'С урока',source:'teacher',notes:old?.notes || ''});
+  refreshSpeechQueue_();
   return {ok:true};
 }
 function teacherHard_(data) {

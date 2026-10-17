@@ -29,7 +29,7 @@ const IS_GOOGLE = Boolean(window.google?.script?.run);
 const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,assembly:[]};
 let audioStatus={};
 let audioStore;try{audioStore=globalThis.localStorage;}catch{}
-const pronunciation=WordPetAudio.create({store:audioStore,onStatus:status=>{audioStatus=status;updateAudioStatus();}});
+const pronunciation=WordPetAudio.create({store:audioStore,fetchClip:loadAppRecording,onStatus:status=>{audioStatus=status;updateAudioStatus();}});
 const icons = {
  paw:'<path d="M7 15c-2 2-1 6 2 5l3-1 3 1c3 1 4-3 2-5l-3-3c-1-1-3-1-4 0Z"/><ellipse cx="5" cy="9" rx="2" ry="2.5"/><ellipse cx="10" cy="5.5" rx="2" ry="2.5"/><ellipse cx="15.5" cy="6" rx="2" ry="2.5"/><ellipse cx="20" cy="10" rx="2" ry="2.5"/>',
  home:'<path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/>',
@@ -220,18 +220,25 @@ function updateAudioStatus() {
 }
 function stopPronunciation(){pronunciation.stop();audioStatus={};updateAudioStatus();}
 function speak(text){void pronunciation.speak(text);}
-async function openAudioPreferences() {
-  const available=await pronunciation.ready(),prefs=pronunciation.preferences();
-  const preferred=WordPetAudio.chooseVoice(available,prefs.voiceURI);
-  dialog(`<h2>Как звучат слова</h2><p class="subtitle">Для отдельных слов сначала ищем словарную запись. Если её нет, используем выбранный английский голос. В словарных записях предпочитаем британское произношение.</p><form id="audioForm"><label class="field-label">Озвучивание<select class="field" id="audioMode"><option value="auto" ${prefs.mode==='auto'?'selected':''}>Словарные записи + голос для фраз</option><option value="voice" ${prefs.mode==='voice'?'selected':''}>Только выбранный голос</option></select></label><label class="field-label">Английский голос для фраз<select class="field" id="audioVoice">${available.length?available.map(v=>`<option value="${esc(v.voiceURI)}" ${v.voiceURI===preferred?.voiceURI?'selected':''}>${esc(v.name)} · ${esc(v.lang)}</option>`).join(''):'<option value="">Английский голос пока не найден</option>'}</select></label><label class="field-label">Скорость голоса<select class="field" id="audioRate">${[[0.85,'Медленнее'],[0.95,'Обычная'],[1.05,'Быстрее']].map(([rate,label])=>`<option value="${rate}" ${Math.abs(prefs.rate-rate)<0.04?'selected':''}>${label}</option>`).join('')}</select></label><button class="button secondary full" type="button" id="testAudioVoice">${icon('sound')}Послушать голос: I enjoy learning English.</button><p class="tiny muted" id="voiceTestStatus" aria-live="polite"></p><button class="button full" type="submit">Сохранить</button><p class="footer-note">Голоса зависят от устройства. Настройка сохраняется в этом браузере. Записей для некоторых слов и выражений в словаре нет.</p></form>`);
-  const choice=()=>({mode:document.getElementById('audioMode').value,voiceURI:document.getElementById('audioVoice').value,rate:document.getElementById('audioRate').value});
+function loadAppRecording(text){
+  const normalized=WordPetAudio.clean(text);
+  if(normalized===WordPetAudio.SAMPLE)return rpc('speech',{kind:'sample'});
+  const words=[...(state.session?.studyWords || []),...(state.data?.words || []),...(state.data?.students || []).flatMap(s=>s.words || [])];
+  const word=words.find(w=>WordPetAudio.clean(w.english)===normalized);
+  if(word)return rpc('speech',{kind:'word',wordId:word.id,text:normalized});
+  const example=words.find(w=>WordPetAudio.clean(w.example)===normalized);
+  if(example)return rpc('speech',{kind:'example',wordId:example.id,text:normalized});
+  return Promise.resolve({ready:false});
+}
+async function openAudioPreferences(){
+  const prefs=pronunciation.preferences();
+  dialog(`<h2>Британская озвучка</h2><p class="subtitle">Слова, выражения и примеры звучат одним нейроголосом Emma. Записи проигрываются прямо в игре.</p><form id="audioForm"><label class="field-label">Скорость<select class="field" id="audioRate">${[[0.9,'Медленнее'],[1,'Обычная'],[1.1,'Быстрее']].map(([rate,label])=>`<option value="${rate}" ${Math.abs(prefs.rate-rate)<0.04?'selected':''}>${label}</option>`).join('')}</select></label><button class="button secondary full" type="button" id="testAudioVoice">${icon('sound')}Послушать пример голоса</button><p class="tiny muted" id="voiceTestStatus" aria-live="polite"></p><button class="button full" type="submit">Сохранить</button><p class="footer-note">Для новых слов запись готовится отдельно. Пока она готовится, задание на слух можно заменить.</p></form>`);
   document.getElementById('testAudioVoice').onclick=async()=>{
-    const old=pronunciation.preferences();pronunciation.updatePreferences(choice());
-    try {const success=await pronunciation.speak('I enjoy learning English.',{forceVoice:true});
-      const result=document.getElementById('voiceTestStatus');if(result)result.textContent=success?'Если голос не нравится, выбери другой из списка.':'Английский голос недоступен. Попробуй другой браузер.';
-    } finally {pronunciation.updatePreferences(old);}
+    const old=pronunciation.preferences();pronunciation.updatePreferences({rate:document.getElementById('audioRate').value});
+    try{const success=await pronunciation.speak(WordPetAudio.SAMPLE);const el=document.getElementById('voiceTestStatus');if(el)el.textContent=success?'Это голос для слов и предложений в игре.':'Запись пока не загрузилась. Попробуй ещё раз.';}
+    finally{pronunciation.updatePreferences(old);}
   };
-  document.getElementById('audioForm').onsubmit=e=>{e.preventDefault();stopPronunciation();pronunciation.updatePreferences(choice());closeDialog();toast('Озвучка настроена.');};
+  document.getElementById('audioForm').onsubmit=e=>{e.preventDefault();const rate=document.getElementById('audioRate').value;stopPronunciation();pronunciation.updatePreferences({rate});closeDialog();toast('Скорость озвучки сохранена.');};
 }
 function openPetPicker() {
   const current=state.data.pet;
@@ -274,8 +281,8 @@ function renderLogin(){
   document.getElementById('loginForm').onsubmit=e=>{e.preventDefault();connect(document.getElementById('accessKey').value.trim());};
 
 }
-async function connect(key){return busy(async()=>{state.key=key;try{await reload();}catch(e){state.data=null;renderLogin();throw e;}try{localStorage.setItem('wordpet-key',key);}catch{}state.page='home';render();});}
-function logout(){stopPronunciation();state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
+async function connect(key){return busy(async()=>{if(state.key!==key){pronunciation.clear();state.session=null;state.feedback=null;}state.key=key;try{await reload();}catch(e){state.data=null;renderLogin();throw e;}try{localStorage.setItem('wordpet-key',key);}catch{}state.page='home';render();});}
+function logout(){pronunciation.clear();stopPronunciation();state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
 
 async function boot(){
   if(!IS_GOOGLE){document.getElementById('demoBanner').classList.remove('hidden');document.getElementById('demoSwitch').onclick=chooseDemo;}

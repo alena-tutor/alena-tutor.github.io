@@ -28,7 +28,7 @@ def main():
     for index, item in enumerate(plan['items']):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             samples, rate = engine.create(item['text'], voice='bf_emma', speed=0.98, lang='en-gb')
-        if not np.isfinite(samples).all() or len(samples) < rate * 0.1 or len(samples) > rate * 40 or np.max(np.abs(samples)) < 0.001:
+        if not np.isfinite(samples).all() or len(samples) < rate * 0.1 or len(samples) > rate * 60 or np.max(np.abs(samples)) < 0.001:
             raise ValueError('Invalid generated recording')
         wav = work / (item['hash'] + '.wav')
         mp3 = work / (item['hash'] + '.mp3')

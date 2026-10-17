@@ -21,7 +21,7 @@ function backend(){
  const sheet=name=>({getLastRow:()=>data.get(name)?.length||0,getLastColumn:()=>data.get(name)?.[0]?.length||0,getRange:(r,c,nr,nc)=>range(name,r,c,nr,nc),setFrozenRows(){},deleteRows:(start,count)=>{if(failDelete===name){failDelete='';throw Error('SIMULATED_DELETE_FAILURE');}data.get(name).splice(start-1,count);}});
  const db={getSheetByName:name=>data.has(name)?sheet(name):null,getOwner:()=>({getEmail:()=> 'owner@example.test'}),setSpreadsheetTimeZone(){},insertSheet:name=>{data.set(name,[]);return sheet(name);}};
  const sourceDb=id=>{const s=source.find(s=>s.id===id);if(!s)throw Error('Source not found');return {getSheetByName:name=>name===s.sheet?{getLastRow:()=>s.rows.length,getLastColumn:()=>5,getRange:()=>({getValues:()=>s.rows.map(r=>Array.from({length:5},(_,i)=>r[i]??''))})}:null};};
- const blob=(bytes,mime,name)=>{const buffer=typeof bytes==='string'?Buffer.from(bytes):Buffer.from(bytes);return {getBytes:()=>Array.from(buffer),getDataAsString:()=>buffer.toString('utf8'),mime,name};};
+ const blob=(bytes,mime,name)=>{const buffer=typeof bytes==='string'?Buffer.from(bytes):Buffer.from(bytes);return {getBytes:()=>Array.from(buffer),getDataAsString:()=>buffer.toString('utf8'),getContentType:()=>mime,mime,name};};
  const folder=id=>({getId:()=>id,createFolder:()=>folder(crypto.randomUUID()),createFile:b=>{if(failFile){failFile=false;throw Error('SIMULATED_DRIVE_FAILURE');}const id=crypto.randomUUID();files.set(id,b);return {getId:()=>id};}});
  const context=vm.createContext({console,Date,JSON,Math,Error,Set,Map,Array,String,Number,Boolean,Object,RegExp,
   SpreadsheetApp:{openById:id=>id==='__DATABASE_ID__'?db:sourceDb(id)},
@@ -29,11 +29,11 @@ function backend(){
   Session:{getActiveUser:()=>({getEmail:()=>activeEmail})},
   LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},
   Utilities:{getUuid:()=>crypto.randomUUID(),formatDate:()=> '2026-10-16',base64Decode:s=>Array.from(Buffer.from(s,'base64')),base64Encode:b=>Buffer.from(b).toString('base64'),newBlob:blob,DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(algo,text)=>Array.from(crypto.createHash('sha256').update(text).digest()),gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),ungzip:b=>blob(zlib.gunzipSync(Buffer.from(b.getBytes())))},
-  DriveApp:{createFolder:()=>folder('new-folder'),getFolderById:folder,getFileById:id=>({getBlob:()=>files.get(id)})},
+  DriveApp:{createFolder:()=>folder('new-folder'),getFolderById:folder,getFileById:id=>({getId:()=>id,getBlob:()=>files.get(id),setContent:text=>files.set(id,blob(text,'application/json',id))}),getFilesByName:()=>({hasNext:()=>false})},
   ScriptApp:{getService:()=>({getUrl:()=> 'https://script.google.com/macros/s/TEST/exec'}),getProjectTriggers:()=>[{getHandlerFunction:()=> 'syncScheduled_'}]},
   HtmlService:{createHtmlOutput:()=>({setTitle(){return this;},addMetaTag(){return this;}})}
  });
- vm.runInContext(fs.readFileSync(root+'/src/Core.js','utf8')+'\n'+fs.readFileSync(root+'/src/Server.js','utf8')+'\n'+fs.readFileSync(root+'/src/Archive.js','utf8')+'\nconst WORD_EXAMPLES_='+JSON.stringify(examples)+';',context);
+ vm.runInContext(fs.readFileSync(root+'/src/Core.js','utf8')+'\n'+fs.readFileSync(root+'/src/Server.js','utf8')+'\n'+fs.readFileSync(root+'/src/Archive.js','utf8')+'\n'+fs.readFileSync(root+'/src/Speech.js','utf8')+'\nconst WORD_EXAMPLES_='+JSON.stringify(examples)+';',context);
  const schema=JSON.parse(vm.runInContext('JSON.stringify(SCHEMA)',context));
  Object.entries(schema).forEach(([name,headers])=>data.set(name,[headers]));
  const insert=(name,obj)=>data.get(name).push(schema[name].map(k=>obj[k]??''));
@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.6.0'/);
+ assert.match(code,/version: '1.7.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -428,9 +428,9 @@ test('letter controls keep duplicate tiles distinct and allow undo and reset bef
  u.element('undoLetter').click();letters[2].onclick();letters[0].onclick();u.element('checkLetters').click();assert.equal(u.context.sent,'all');
  u.element('resetLetters').click();assert.equal(vm.runInContext('state.assembly.length',u.context),0);
 });
-test('navigation has no removed recording callback and sound settings list only English voices',async()=>{
+test('navigation and settings use prepared British recordings without device voices',async()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('stopRecording('),false);assert.match(html,/id="audioPreferences"/);assert.equal(html.includes('getUserMedia'),false);
- const u=petUi();await u.context.openAudioPreferences();const markup=u.element('dialogs').innerHTML;assert.match(markup,/id="audioVoice"/);assert.match(markup,/id="testAudioVoice"/);assert.match(markup,/Словарные записи/);
+ const u=petUi();await u.context.openAudioPreferences();const markup=u.element('dialogs').innerHTML;assert.match(markup,/Британская озвучка/);assert.match(markup,/id="testAudioVoice"/);assert.match(markup,/нейроголосом Emma/);
 });
 
 test('bilingual examples and usage survive teacher edits and glossary sync without crossing pupils',()=>{
@@ -460,4 +460,29 @@ test('dictionary and study cards show highlighted bilingual context; unanswered 
  vm.runInContext('state.feedback={task:state.session.task,result:{correct:false,unknown:true,expected:"am keen on"}};',u.context);
  assert.match(vm.runInContext('lessonPage()',u.context),/Я увлекаюсь шахматами/);
  u.context.word={...word,example:'I am keen on <script>alert(1)</script>.'};const safe=vm.runInContext('exampleHTML(word)',u.context);assert.equal(safe.includes('<script>'),false);assert.match(safe,/&lt;script&gt;/);
+});
+
+function installSpeech(b,{wrongDatabase=false}={}){
+ const voice='kokoro-v1.0-bf_emma-en-gb';
+ const blob=(text,mime='application/json')=>({getBytes:()=>Array.from(Buffer.from(text)),getDataAsString:()=>text,getContentType:()=>mime});
+ const word=b.records('Слова').find(w=>w.studentId==='learner_b');
+ const index={databaseId:wrongDatabase?'OTHER_DB':'__DATABASE_ID__',voice,clips:{[word.english]:{id:'prepared-word',voice},[word.example]:{id:'prepared-example',voice},'I enjoy learning English. A little practice every day makes a difference.':{id:'prepared-word',voice}}};
+ b.files.set('speech-index',blob(JSON.stringify(index)));b.files.set('prepared-word',blob('x'.repeat(1000),'audio/mpeg'));b.files.set('prepared-example',blob('y'.repeat(1000),'audio/mpeg'));b.properties.set('SPEECH_INDEX_ID','speech-index');return {word,index,blob};
+}
+test('prepared pronunciation is authorized by pupil and word and does not expose Drive identifiers',()=>{
+ const b=backend(),{word}=installSpeech(b);
+ for(const kind of ['word','example']){const response=b.api('learner_b','speech',{kind,wordId:word.id});assert.equal(response.ready,true);assert.equal(response.mime,'audio/mpeg');assert.ok(response.audio);assert.equal(JSON.stringify(response).includes('prepared-word'),false);}
+ assert.throws(()=>b.api('learner_a','speech',{kind:'word',wordId:word.id,studentId:'learner_b',fileId:'prepared-word'}),/недоступна/);
+ assert.equal(b.api('teacher','speech',{kind:'word',wordId:word.id}).ready,true);assert.equal(b.api('learner_a','speech',{kind:'sample'}).ready,true);
+ assert.equal(b.api('learner_b','speech',{kind:'example',wordId:word.id,text:'Some other private phrase'}).ready,false);
+});
+test('missing or mismatched speech indexes return pending instead of another project’s audio',()=>{
+ const b=backend(),{word}=installSpeech(b,{wrongDatabase:true});assert.equal(b.api('learner_b','speech',{kind:'word',wordId:word.id}).ready,false);
+ const other=backend(),prepared=installSpeech(other);other.files.delete('prepared-word');assert.equal(other.api('learner_b','speech',{kind:'word',wordId:prepared.word.id}).ready,false);
+});
+test('the pronunciation queue contains only words, examples and the sample and updates with glossary edits',()=>{
+ const b=backend(),{blob}=installSpeech(b);b.files.set('speech-queue',blob(JSON.stringify({databaseId:'__DATABASE_ID__',texts:[]})));b.properties.set('SPEECH_QUEUE_ID','speech-queue');
+ b.api('teacher','sync');let queue=JSON.parse(b.files.get('speech-queue').getDataAsString());assert.ok(queue.texts.includes('occasionally'));assert.equal(JSON.stringify(queue).includes(keys.teacher),false);assert.equal(JSON.stringify(queue).includes('learner_b'),false);
+ b.api('teacher','addWord',{studentId:'learner_b',english:'a new expression',russian:'новое выражение',example:'I use a new expression today.'});
+ queue=JSON.parse(b.files.get('speech-queue').getDataAsString());assert.ok(queue.texts.includes('a new expression'));assert.ok(queue.texts.includes('I use a new expression today.'));
 });
