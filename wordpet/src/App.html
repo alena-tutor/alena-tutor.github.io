@@ -9,6 +9,8 @@
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{box-shadow:0 0 0 12px #c3654620}}@keyframes bob{50%{transform:translateY(-4px)}}@keyframes care{50%{transform:scale(1.025);filter:brightness(1.08)}}
 @media(min-width:900px){.nav{left:50%;right:auto;transform:translateX(-50%);bottom:18px;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:7px}.teacher-page .app{max-width:1240px}}@media(max-width:700px){.app{padding:20px 17px 105px}.topbar{margin-bottom:25px}.brand{font-size:19px}.brand small{font-size:11px}.student-layout{grid-template-columns:1fr;gap:17px}.hero-heading{margin-bottom:19px}.card{padding:20px;border-radius:21px}.pet-card{padding:0}.pet-room{aspect-ratio:1.6}.pet-info{padding:18px}.pet-actions{margin-top:16px}.mission-top{margin-bottom:10px}.mission h2{font-size:24px}.chips{margin-top:15px}.word-grid{grid-template-columns:1fr}.task-card{padding:24px 20px}.task-heading.english{font-size:34px}.teacher-grid{grid-template-columns:1fr}.teacher-tabs{overflow-x:auto;margin:0 -4px 20px;padding:0 4px}.teacher-tabs button{white-space:nowrap;font-size:14px}.review-form{grid-template-columns:1fr 1fr}.review-form textarea{grid-column:1/-1}.access-row{grid-template-columns:1fr auto}.access-row input{grid-column:1/-1;grid-row:2}.page-top h1{font-size:28px}.topbar .button.ghost{font-size:12px;padding:7px}.login{margin-top:3vh}.nav button{width:100px}.gap{font-size:21px}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .study-page{max-width:850px;margin:0 auto}.study-start{margin-top:24px;padding:18px 0;background:var(--bg)}
+
+.dialog.dialog-wide{max-width:760px}.pet-choices{border:0;padding:0;margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pet-option{position:relative;display:block;border:2px solid var(--line);border-radius:18px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}.pet-option:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 2px #c3654620}.pet-option:has(input:focus-visible){outline:3px solid #6189aa;outline-offset:3px}.pet-option input{position:absolute;top:12px;right:12px;width:20px;height:20px;accent-color:var(--accent);z-index:1}.pet-option img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}.pet-option-copy{display:grid;gap:3px;padding:12px}.pet-option-copy strong{font-size:16px}.pet-option-copy>span{font-size:12px;color:var(--muted)}@media(max-width:360px){.pet-choices{gap:8px}.pet-option-copy{padding:9px}.pet-option-copy>span{font-size:11px}}
 </style>
 </head>
 <body>
@@ -18,7 +20,10 @@
 <script>
 /*__CORE__*/
 /*__DEMO__*/
-const FOX_ART = '/*__FOX_DATA__*/';
+const PET_ART = /*__PET_ART__*/;
+const FOX_ART = PET_ART.fox;
+function petType(species){return WordPetCore.petSpecies.find(p=>p.id===species)||WordPetCore.petSpecies[0];}
+function petImage(species){return PET_ART[petType(species).id]||FOX_ART;}
 const IS_GOOGLE = Boolean(window.google?.script?.run);
 const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,recording:false,blob:null,blobUrl:'',recorder:null,stream:null,timer:null,seconds:0};
 const icons = {
@@ -76,7 +81,8 @@ function homePage() {
   const d=state.data,p=d.pet;
   const done=d.history.some(h=>h.day===d.today&&h.mode==='daily');
   return `<section class="hero-heading"><div class="label">${esc(date(d.today))} · твоё пространство</div><h1 style="margin-top:8px">Привет, ${esc(d.name)}!</h1><p class="muted">${done?'Ты уже позанимался сегодня. Загляни к питомцу.':'Твой питомец ждёт. Давай вспомним несколько слов?'}</p></section>
-  <div class="student-layout"><section class="card pet-card" aria-label="Питомец"><div class="pet-room" id="petRoom"><img src="${FOX_ART}" alt="Лисёнок в уютной комнате на зелёной подушке"><span class="level-pill">Уровень ${p.level}</span><span class="pet-name">${esc(p.name)}<button id="renamePet" aria-label="Переименовать питомца">${icon('edit')}</button></span>${p.accessory==='ball'?'<span class="toy" aria-label="Мячик"></span>':''}</div><div class="pet-info">
+  <div class="student-layout"><section class="card pet-card" aria-label="Питомец"><div class="pet-room" id="petRoom"><img src="${petImage(p.species)}" alt="${esc(petType(p.species).label)} в уютной комнате на зелёной подушке"><span class="level-pill">Уровень ${p.level}</span><span class="pet-name">${esc(p.name)}<button id="renamePet" aria-label="Переименовать питомца">${icon('edit')}</button></span>${p.accessory==='ball'?'<span class="toy" aria-label="Мячик"></span>':''}</div><div class="pet-info">
+  <div class="row between wrap" style="margin-bottom:18px"><span class="label">${esc(petType(p.species).label)}</span><button class="button secondary small" id="choosePet">Выбрать питомца</button></div>
   <div class="meter-row"><span>Сытость</span><div class="meter warm"><i style="width:${p.food}%"></i></div><span>${p.food}%</span></div><div class="meter-row"><span>Чистота</span><div class="meter"><i style="width:${p.clean}%"></i></div><span>${p.clean}%</span></div>
   <div class="row between tiny muted"><span>${p.xp%100} / 100 опыта до следующего уровня</span><span>${p.coins} монет · ${p.rations} корма</span></div>
   <div class="pet-actions"><button data-care="feed">${icon('food')}Кормить</button><button data-care="clean">${icon('spark')}Убрать</button><button data-care="toy">${icon('ball')}${p.accessory==='ball'?'Мячик куплен':'Мячик · 20'}</button></div><p class="pet-note">Питомец всегда дождётся тебя. Награды сохраняются.</p></div></section>
@@ -155,6 +161,7 @@ function bindStudent() {
   document.querySelectorAll('[data-speak]').forEach(b=>b.onclick=()=>speak(b.dataset.speak));
   document.querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>busy(async()=>{state.data.pet=await rpc('care',{kind:b.dataset.care});render();document.getElementById('petRoom')?.classList.add('animate-care');toast(b.dataset.care==='feed'?'Питомец накормлен!':b.dataset.care==='clean'?'В комнате чисто!':'У питомца появился мячик!');}));
   document.getElementById('renamePet')?.addEventListener('click',()=>renamePet());
+  document.getElementById('choosePet')?.addEventListener('click',openPetPicker);
   document.getElementById('startMission')?.addEventListener('click',()=>startMission(false));
   document.getElementById('retryMission')?.addEventListener('click',()=>startMission(true));
   document.getElementById('beginExercises')?.addEventListener('click',()=>{state.page='lesson';render();window.scrollTo(0,0);document.getElementById('typedAnswer')?.focus();});
@@ -194,6 +201,16 @@ function speak(text) {
   speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='en-GB';u.rate=.85;
   const voices=speechSynthesis.getVoices();u.voice=voices.find(v=>v.lang==='en-GB')||voices.find(v=>v.lang.startsWith('en'))||null;
   u.onerror=()=>toast('Не удалось озвучить слово. Задание на слух можно заменить.',true);speechSynthesis.speak(u);
+}
+function openPetPicker() {
+  const current=state.data.pet;
+  dialog(`<h2>Кто будет учиться с тобой?</h2><p class="subtitle">Выбери напарника и придумай ему имя. Можно менять питомца — опыт, монеты, корм и мячик сохранятся.</p><form id="petForm"><fieldset class="pet-choices"><legend class="visually-hidden">Выбери питомца</legend>${WordPetCore.petSpecies.map(p=>`<label class="pet-option"><input type="radio" name="petSpecies" value="${p.id}" ${petType(current.species).id===p.id?'checked':''} required><img src="${petImage(p.id)}" alt=""><span class="pet-option-copy"><strong>${esc(p.label)}</strong><span>${esc(p.description)}</span></span></label>`).join('')}</fieldset><label class="field-label">Имя питомца<input class="field" id="chosenPetName" minlength="2" maxlength="20" value="${esc(current.name)}" required autocomplete="off"></label><button class="button full" type="submit" style="margin-top:18px">Сохранить питомца ${icon('paw')}</button><p class="footer-note">Выбор сохранится в твоём профиле.</p></form>`,true);
+  document.getElementById('petForm').onsubmit=e=>{e.preventDefault();busy(async()=>{
+    const selected=document.querySelector('input[name="petSpecies"]:checked');
+    if(!selected)throw Error('Выбери питомца.');
+    const pet=await rpc('savePet',{name:document.getElementById('chosenPetName').value,species:selected.value});
+    state.data.pet=pet;closeDialog();render();toast('Питомец сохранён!');
+  });};
 }
 function renamePet() {
   dialog(`<h2>Как зовут питомца?</h2><form id="renameForm"><label class="field-label">Имя<input class="field" id="petName" minlength="2" maxlength="20" value="${esc(state.data.pet.name)}" required></label><button class="button" type="submit">Сохранить</button></form>`);
@@ -255,7 +272,7 @@ function wordDialog(word){
   dialog(`<h2>${word?'Изменить слово':'Добавить слово'}</h2><p class="subtitle">${esc(s.name)} · слово сохраняется в приложении. Подключённый глоссарий остаётся источником остальных слов.</p><form id="wordForm"><label class="field-label">Слово или выражение<input class="field" id="newEnglish" value="${esc(word?.english||'')}" required maxlength="160" ${word?'readonly':''}></label><label class="field-label">Перевод<input class="field" id="newRussian" value="${esc(word?.russian||'')}" required maxlength="300"></label><label class="field-label">Пример предложения для задания с пропуском<input class="field" id="newExample" value="${esc(word?.example||'')}" maxlength="500" placeholder="I occasionally go swimming."></label><label class="field-label">Другие допустимые формы английского слова<input class="field" id="newAnswers" value="${esc(word?.answers||'')}" placeholder="am keen on | is keen on | are keen on"></label><label class="field-label">Допустимые русские переводы<input class="field" id="newAliases" value="${esc(word?.russianAliases||'')}" placeholder="изредка | иногда | время от времени"></label><label class="check-label"><input type="checkbox" id="newHard" ${!word?'checked':''}>Возникли трудности на сегодняшнем уроке</label><button class="button" type="submit">Сохранить слово</button></form>`);
   document.getElementById('wordForm').onsubmit=e=>{e.preventDefault();busy(async()=>{await rpc('addWord',{studentId:s.id,english:document.getElementById('newEnglish').value,russian:document.getElementById('newRussian').value,example:document.getElementById('newExample').value,answers:document.getElementById('newAnswers').value,russianAliases:document.getElementById('newAliases').value,hard:document.getElementById('newHard').checked});closeDialog();await reload();render();toast('Слово сохранено.');});};
 }
-function dialog(html){document.getElementById('dialogs').innerHTML=`<div class="dialog-backdrop"><section class="dialog" role="dialog" aria-modal="true"><div class="row between"><span class="label">WordPet</span><button class="button ghost small" id="closeDialog" aria-label="Закрыть">Закрыть</button></div><div style="margin-top:14px">${html}</div></section></div>`;document.getElementById('closeDialog').onclick=closeDialog;setTimeout(()=>document.querySelector('.dialog input')?.focus(),50);}
+function dialog(html,wide=false){document.getElementById('dialogs').innerHTML=`<div class="dialog-backdrop"><section class="dialog ${wide?'dialog-wide':''}" role="dialog" aria-modal="true"><div class="row between"><span class="label">WordPet</span><button class="button ghost small" id="closeDialog" aria-label="Закрыть">Закрыть</button></div><div style="margin-top:14px">${html}</div></section></div>`;document.getElementById('closeDialog').onclick=closeDialog;setTimeout(()=>document.querySelector('.dialog input')?.focus(),50);}
 function closeDialog(){document.getElementById('dialogs').replaceChildren();}
 async function copyText(text){if(!text){toast('Сначала опубликуй приложение и обнови ссылки.',true);return;}try{await navigator.clipboard.writeText(text);toast('Скопировано.');}catch{dialog(`<h3>Скопируй ссылку</h3><textarea class="field" readonly style="margin-top:15px">${esc(text)}</textarea>`);document.querySelector('.dialog textarea').select();}}
 async function reload(){state.data=await rpc('bootstrap');}

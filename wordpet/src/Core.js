@@ -1,5 +1,11 @@
 /* Shared learning rules. No Google APIs, DOM or credentials. */
 const WordPetCore = (() => {
+  const petSpecies = Object.freeze([
+    Object.freeze({id:'fox',label:'Лисёнок',description:'Любопытный исследователь'}),
+    Object.freeze({id:'cat',label:'Котёнок',description:'Уютный напарник'}),
+    Object.freeze({id:'dog',label:'Щенок',description:'Верный друг'}),
+    Object.freeze({id:'dragon',label:'Дракончик',description:'Маленький любитель приключений'})
+  ]);
   const dayMs = 86400000;
   const norm = value => String(value == null ? '' : value).normalize('NFKC').toLowerCase()
     .replace(/[‘’ʼ`]/g, "'").replace(/[‐‑–—]/g, '-').replace(/\s+/g, ' ').trim()
@@ -157,6 +163,6 @@ const WordPetCore = (() => {
     const p = progress.filter(x => x.wordId === word.id && ['write_en','listen','gap'].includes(x.skill));
     return p.some(x => Number(x.streak) >= 2);
   };
-  return { norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
+  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
 })();
 if (typeof module !== 'undefined') module.exports = WordPetCore;

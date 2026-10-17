@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.2.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.3.0',
   sourceSheet: 'Глоссарий', maxAudioBytes: 3 * 1024 * 1024,
   maxUploadsPerDay: 8
 };
@@ -340,7 +340,7 @@ function care_(studentId,data) {
   const pet = pet_(studentId);
   if (data.kind === 'feed') {
     if (Number(pet.rations) < 1) throw Error('Корм закончился. Пройди тренировку, чтобы получить порцию.');
-    if (Number(pet.food) >= 100) throw Error('Рыжик уже сыт. Сохрани корм на потом.');
+    if (Number(pet.food) >= 100) throw Error('Питомец уже сыт. Сохрани корм на потом.');
     pet.rations = Number(pet.rations) - 1; pet.food = Math.min(100,Number(pet.food)+30);
   } else if (data.kind === 'clean') {
     if (pet.lastRewardDay !== today_()) throw Error('Сначала выполни сегодняшнюю тренировку — откроется уборка комнаты.');
@@ -353,9 +353,14 @@ function care_(studentId,data) {
   put_('Питомцы',pet); return publicPet_(pet);
 }
 function savePet_(studentId,data) {
-  const name = String(data.name || '').trim();
-  if (name.length < 2 || name.length > 20) throw Error('Имя должно содержать от 2 до 20 символов.');
-  const pet = pet_(studentId); pet.name = name; put_('Питомцы',pet); return publicPet_(pet);
+  if (data.name === undefined && data.species === undefined) throw Error('Выбери питомца или укажи имя.');
+  const name = data.name === undefined ? null : typeof data.name === 'string' ? data.name.trim() : '';
+  if (name !== null && (name.length < 2 || name.length > 20)) throw Error('Имя должно содержать от 2 до 20 символов.');
+  if (data.species !== undefined && !WordPetCore.petSpecies.some(p => p.id === data.species)) throw Error('Выбери питомца из списка.');
+  const pet = pet_(studentId);
+  if (name !== null) pet.name = name;
+  if (data.species !== undefined) pet.species = data.species;
+  put_('Питомцы',pet); return publicPet_(pet);
 }
 function teacherDashboard_() {
   const words = rows_('Слова'), progress = rows_('Прогресс'), sessions = rows_('Тренировки'), answers = rows_('Ответы');

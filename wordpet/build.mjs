@@ -9,7 +9,13 @@ if(!/^[a-zA-Z0-9_-]+$/.test(config.spreadsheetId)||!/^https:\/\/script\.google\.
 const core=await read('src/Core.js'),archive=await read('src/Archive.js');
 const artwork=(await read('src/fox-room.base64')).trim();
 if(!/^[A-Za-z0-9+/=]+$/.test(artwork))throw Error('Invalid artwork');
-const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__DEMO__*/','').replace('/*__FOX_DATA__*/',()=>`data:image/jpeg;base64,${artwork}`);
+const petArt={fox:`data:image/jpeg;base64,${artwork}`};
+for(const id of ['cat','dog','dragon']){
+  const encoded=(await read(`src/${id}-room.base64`)).trim();
+  if(!/^[A-Za-z0-9+/=]+$/.test(encoded))throw Error('Invalid pet artwork: '+id);
+  petArt[id]=`data:image/jpeg;base64,${encoded}`;
+}
+const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__DEMO__*/','').replace('/*__PET_ART__*/',()=>JSON.stringify(petArt));
 const server=(await read('src/Server.js')).replace('__DATABASE_ID__',()=>config.spreadsheetId).replace("webAppUrl: ''",()=>`webAppUrl: ${JSON.stringify(config.webAppUrl)}`);
 const code=core.replace(/if \(typeof module[^\n]+\n?/,'')+'\n'+server+'\n'+archive+'\nconst WORD_EXAMPLES_ = '+JSON.stringify(JSON.parse(await read('src/examples.json')))+';\nconst APP_HTML_ = '+JSON.stringify(html)+';\n';
 new vm.Script(code);

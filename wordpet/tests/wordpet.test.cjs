@@ -159,7 +159,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.2.0'/);
+ assert.match(code,/version: '1.3.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -281,4 +281,56 @@ test('abandoned sessions older than retention are archived without counting them
 });
 test('the old eight-tab database can open before the archive trigger creates its extra tabs',()=>{
  const b=backend();b.data.delete('Итоги');b.data.delete('Архивы');assert.equal(b.api('learner_b','bootstrap').stats.completed,0);assert.equal(b.api('teacher','bootstrap').archive.items.length,0);b.context.syncScheduled_();assert.ok(b.data.has('Архивы'));
+});
+
+test('pet choice persists per pupil without changing earned rewards, vocabulary, progress or active training',()=>{
+ const b=backend(),earned=finish(b,'learner_b');
+ const before={words:JSON.stringify(b.records('Слова')),progress:JSON.stringify(b.records('Прогресс')),answers:JSON.stringify(b.records('Ответы')),sessions:JSON.stringify(b.records('Тренировки')),other:JSON.stringify(b.records('Питомцы').find(p=>p.studentId==='learner_a'))};
+ for(const species of ['cat','dog','dragon','fox']){
+  const selected=b.api('learner_b','savePet',{species,studentId:'learner_a',xp:99999,coins:99999});
+  assert.equal(selected.species,species);assert.equal(selected.name,earned.pet.name);
+  for(const key of ['xp','coins','rations','food','clean','accessory'])assert.equal(selected[key],earned.pet[key]);
+  assert.equal(b.api('learner_b','bootstrap').pet.species,species);
+ }
+ assert.equal(JSON.stringify(b.records('Слова')),before.words);assert.equal(JSON.stringify(b.records('Прогресс')),before.progress);assert.equal(JSON.stringify(b.records('Ответы')),before.answers);assert.equal(JSON.stringify(b.records('Тренировки')),before.sessions);assert.equal(JSON.stringify(b.records('Питомцы').find(p=>p.studentId==='learner_a')),before.other);
+ const active=b.api('learner_a','start');b.api('learner_a','savePet',{species:'dragon',name:'Листик'});assert.equal(b.api('learner_a','start').id,active.id);
+});
+test('pet name and species edits are compatible, validated atomically, and cannot be used from a teacher key',()=>{
+ const b=backend();b.api('learner_b','savePet',{name:'Туман',species:'cat'});
+ assert.equal(b.api('learner_b','savePet',{name:'Луна'}).species,'cat');assert.equal(b.api('learner_b','savePet',{species:'dog'}).name,'Луна');
+ const before=JSON.stringify(b.records('Питомцы'));
+ for(const data of [{name:'Изменить',species:'invalid'},{name:'x',species:'dragon'},{name:42,species:'dragon'},{species:{id:'fox'}},{}])assert.throws(()=>b.api('learner_b','savePet',data));
+ assert.equal(JSON.stringify(b.records('Питомцы')),before);assert.throws(()=>b.api('teacher','savePet',{name:'Туман',species:'cat'}),/недоступно/);
+});
+function petUi(){
+ const elements=new Map();
+ const element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',replaceChildren(){this.innerHTML='';}});return elements.get(id);};
+ const context=vm.createContext({console,Date,JSON,Math,Error,Set,Map,Array,String,Number,Boolean,Object,RegExp,Intl,URLSearchParams,
+  window:{google:{script:{run:{}}},addEventListener(){}},document:{getElementById:element,querySelector:selector=>selector==='input[name="petSpecies"]:checked'?{value:'dog'}:null,querySelectorAll:()=>[]},setTimeout(){}});
+ const html=fs.readFileSync(root+'/output/App.html','utf8');
+ const code=html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nboot\(\);\s*$/,'');
+ vm.runInContext(code,context);
+ vm.runInContext("state.data={pet:{species:'cat',name:'<Луна>',xp:75,coins:10,rations:2}};render=()=>{};toast=(message)=>{globalThis.lastToast=message;};",context);
+ return {context,elements,element};
+}
+test('pet picker renders accessible choices with distinct images and escapes an existing name',()=>{
+ const u=petUi();u.context.openPetPicker();const html=u.element('dialogs').innerHTML;
+ assert.equal((html.match(/type="radio"/g)||[]).length,4);assert.match(html,/value="cat" checked/);assert.match(html,/value="&lt;Луна&gt;"/);assert.equal(html.includes('value="<Луна>"'),false);assert.match(html,/dialog-wide/);
+ assert.equal(vm.runInContext('new Set(WordPetCore.petSpecies.map(p=>petImage(p.id))).size',u.context),4);
+ for(const id of ['fox','cat','dog','dragon']){
+  const image=vm.runInContext('petImage('+JSON.stringify(id)+')',u.context);assert.equal(Buffer.from(image.split(',')[1],'base64').subarray(0,2).toString('hex'),'ffd8');
+ }
+});
+test('pet picker saves the selected species and name only after a successful server response',async()=>{
+ const u=petUi();u.context.openPetPicker();u.element('chosenPetName').value='Облачко';
+ vm.runInContext("rpc=async(action,data)=>{globalThis.request={action,data};return {...state.data.pet,...data};};",u.context);
+ u.element('petForm').onsubmit({preventDefault(){}});await new Promise(setImmediate);
+ const result=JSON.parse(vm.runInContext('JSON.stringify({request,pet:state.data.pet})',u.context));
+ assert.deepEqual(result.request,{action:'savePet',data:{name:'Облачко',species:'dog'}});assert.equal(result.pet.species,'dog');assert.equal(result.pet.xp,75);assert.equal(u.element('dialogs').innerHTML,'');
+});
+test('failed pet saving leaves the previous profile intact and the choice dialog open',async()=>{
+ const u=petUi();u.context.openPetPicker();u.element('chosenPetName').value='Облачко';
+ vm.runInContext("rpc=async()=>{throw Error('Нет соединения');};",u.context);
+ u.element('petForm').onsubmit({preventDefault(){}});await new Promise(setImmediate);
+ assert.equal(vm.runInContext('state.data.pet.species',u.context),'cat');assert.equal(vm.runInContext('state.data.pet.name',u.context),'<Луна>');assert.match(u.element('dialogs').innerHTML,/petForm/);assert.equal(u.context.lastToast,'Нет соединения');
 });
