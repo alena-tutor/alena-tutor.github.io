@@ -1,8 +1,7 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.3.0',
-  sourceSheet: 'Глоссарий', maxAudioBytes: 3 * 1024 * 1024,
-  maxUploadsPerDay: 8
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.4.0',
+  sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
   'Ученики': ['id','name','sourceId','sourceSheet','lastSync','syncStatus'],
@@ -91,10 +90,6 @@ function setupWordPet() {
       if (actual.join('|') !== SCHEMA[name].join('|')) throw Error('Структура листа «' + name + '» изменена. Сверьте заголовки.');
       sh.setFrozenRows(1);
     });
-    if (!props_().getProperty('RECORDINGS_FOLDER')) {
-      const folder = DriveApp.createFolder('WordPet — устные ответы');
-      props_().setProperty('RECORDINGS_FOLDER', folder.getId());
-    }
     const access = rows_('Доступ');
     if (!access.some(a => a.role === 'teacher')) put_('Доступ',{personId:'alena',role:'teacher',token:token_(),link:''});
     const pets = rows_('Питомцы');
@@ -226,6 +221,9 @@ function sessionScore_(payload) {
 }
 function sessionResponse_(s) {
   const payload = JSON.parse(s.payload);
+  if (s.status === 'active' && WordPetCore.migrateTasks(payload)) {
+    s.payload = JSON.stringify(payload); put_('Тренировки',s);
+  }
   return {id:s.id,mode:s.mode,status:s.status,index:payload.results.length,total:payload.tasks.length,
     task:WordPetCore.publicTask(payload.tasks[payload.results.length]),score:sessionScore_(payload),
     studyWords:payload.studyWords || WordPetCore.studyWords(payload.tasks),
@@ -249,7 +247,6 @@ function start_(studentId,data) {
   }
   const picked = WordPetCore.selectWords(candidates,progress,today_());
   let tasks = WordPetCore.makeTasks(picked,words,progress,today_());
-  if (daily) tasks = tasks.filter(t => !['sentence','voice'].includes(t.kind));
   const studyWords = picked.map(w => ({id:w.id,english:w.english,russian:w.russian,example:w.example || ''}));
   const s = {id:Utilities.getUuid(),studentId,createdAt:now_(),day:today_(),mode:daily?'retry':'daily',status:'active',payload:JSON.stringify({tasks,studyWords,results:[]})};
   put_('Тренировки',s); return sessionResponse_(s);
@@ -258,57 +255,32 @@ function answer_(studentId,data) {
   const s = rows_('Тренировки').find(s => s.id === data.sessionId && s.studentId === studentId);
   if (!s) throw Error('Тренировка не найдена. Открой её заново.');
   const p = JSON.parse(s.payload);
+  if (s.status === 'active' && WordPetCore.migrateTasks(p)) {
+    s.payload = JSON.stringify(p); put_('Тренировки',s);
+  }
   const old = p.results.find(r => r.taskId === data.taskId);
   if (old) return {result:old,session:sessionResponse_(s),pet:publicPet_(pet_(studentId))};
   if (s.status !== 'active' || s.day !== today_()) throw Error('Эта тренировка завершена или относится к другому дню. Начни новую.');
   const task = p.tasks[p.results.length];
   if (!task || task.id !== data.taskId) throw Error('Порядок заданий изменился. Обнови тренировку.');
   const unknown = data.unknown === true;
-  if (unknown && ['sentence','voice'].includes(task.kind)) throw Error('Для своего предложения или записи нужен ответ.');
   const timestamp = now_();
-  let correct, text = String(data.answer || '').trim().slice(0,1500), audioId = '', mime = '';
-  if (task.kind === 'sentence') {
-    if (text.length < 8 || !/[a-z]/i.test(text)) throw Error('Напиши своё предложение по-английски.');
-    correct = null;
-  } else if (task.kind === 'voice') {
-    const priorUploads = rows_('Ответы').filter(a => a.studentId === studentId && a.kind === 'voice' && Utilities.formatDate(new Date(a.submittedAt),APP_CONFIG.timezone,'yyyy-MM-dd') === today_());
-    if (priorUploads.length >= APP_CONFIG.maxUploadsPerDay) throw Error('Лимит записей на сегодня исчерпан. Обратись к преподавателю.');
-    if (!data.audio || typeof data.audio !== 'string' || data.audio.length > Math.ceil(APP_CONFIG.maxAudioBytes * 4/3) + 8) throw Error('Прикрепи запись до 3 МБ.');
-    mime = String(data.mime || '').split(';')[0].toLowerCase();
-    const extensions = {'audio/webm':'webm','audio/mp4':'m4a','audio/mpeg':'mp3','audio/ogg':'ogg','audio/wav':'wav','audio/x-wav':'wav','audio/aac':'aac','audio/x-m4a':'m4a','video/mp4':'mp4'};
-    if (!extensions[mime]) throw Error('Формат записи не поддерживается. Используй M4A, MP3, WAV, OGG или WEBM.');
-    const bytes = Utilities.base64Decode(data.audio);
-    if (!bytes.length || bytes.length > APP_CONFIG.maxAudioBytes) throw Error('Запись должна быть не больше 3 МБ.');
-    const folderId = props_().getProperty('RECORDINGS_FOLDER');
-    if (!folderId) throw Error('Преподавателю нужно завершить настройку папки записей.');
-    const saved = rows_('Ответы').find(a=>a.id===s.id+':'+task.id && a.audioId);
-    if (saved) { audioId = saved.audioId; mime = saved.mime; }
-    else {
-      const file = DriveApp.getFolderById(folderId).createFile(Utilities.newBlob(bytes,mime,studentId+'-'+s.id+'-'+task.id+'.'+extensions[mime]));
-      audioId = file.getId();
-    }
-    correct = null;
-  } else {
-    if (!text && !unknown) throw Error('Сначала введи или выбери ответ.');
-    if (unknown) text = 'Не знаю';
-    correct = unknown ? false : WordPetCore.grade(task,text);
-    const records = progress_(studentId);
-    const previous = records.find(r => r.wordId === task.wordId && r.skill === task.kind);
-    const eventId = s.id + ':' + task.id;
-    if (previous?.lastEventId !== eventId) {
-      const record = {...WordPetCore.updateProgress(previous,task,correct,timestamp,today_()),studentId,lastEventId:eventId};
-      put_('Прогресс',record);
-    }
+  let text = String(data.answer || '').trim().slice(0,1500);
+  if (!text && !unknown) throw Error('Сначала введи или выбери ответ.');
+  if (unknown) text = 'Не знаю';
+  const correct = unknown ? false : WordPetCore.grade(task,text);
+  if (typeof correct !== 'boolean') throw Error('Задание изменилось. Обнови тренировку.');
+  const records = progress_(studentId);
+  const previous = records.find(r => r.wordId === task.wordId && r.skill === task.kind);
+  const eventId = s.id + ':' + task.id;
+  if (previous?.lastEventId !== eventId) {
+    const record = {...WordPetCore.updateProgress(previous,task,correct,timestamp,today_()),studentId,lastEventId:eventId};
+    put_('Прогресс',record);
   }
-  let answerId = '';
-  if (correct === null) {
-    answerId = s.id + ':' + task.id;
-    const existingAnswer = rows_('Ответы').find(a=>a.id===answerId);
-    put_('Ответы',{...existingAnswer,id:answerId,sessionId:s.id,studentId,wordId:task.wordId,kind:task.kind,submittedAt:timestamp,text,audioId,mime,status:'pending',correct:'',feedback:'',reviewedAt:''});
-  }
+  const answerId = '';
   const result = {taskId:task.id,wordId:task.wordId,kind:task.kind,correct,answerId,unknown,isReview:Boolean(task.isReview),
-    answer:task.kind === 'voice' ? 'Аудиозапись' : text,
-    expected:correct === false ? (task.kind === 'write_ru' || task.kind === 'choose' ? task.russian : task.gapAnswer || task.english) : '',timestamp};
+    answer:text,
+    expected:correct === false ? (task.kind === 'write_ru' || task.kind === 'choose' ? task.russian : task.sentenceAnswer || task.gapAnswer || task.english) : '',timestamp};
   p.results.push(result);
   WordPetCore.queueReview(p,task,correct);
   if (p.results.length === p.tasks.length) { s.status = 'completed'; p.summary = reward_(studentId,s,p); }

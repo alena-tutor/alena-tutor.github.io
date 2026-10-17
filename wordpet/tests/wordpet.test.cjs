@@ -51,9 +51,7 @@ function finish(b,student,{wrong=0,retry=false}={}){
  while(session.status!=='completed'){
   assert.ok(++guard<100,'mission must finish when review answers are correct');
   const t=b.tasks(session.id)[session.index];const input={sessionId:session.id,taskId:t.id};
-  if(t.kind==='voice'){input.audio=Buffer.from('recorded-audio-bytes').toString('base64');input.mime='audio/webm';}
-  else if(t.kind==='sentence')input.answer='I occasionally play chess with my friends.';
-  else {input.answer=!t.isReview&&original++<wrong?'definitely incorrect':t.kind==='choose'?t.russian:t.answers[0];}
+  {input.answer=!t.isReview&&original++<wrong?'definitely incorrect':t.kind==='choose'?t.russian:t.answers[0];}
   latest=b.api(student,'answer',input);session=latest.session;
  }
  return latest;
@@ -80,7 +78,7 @@ test('typed answers accept curated variants, punctuation and apostrophe forms',(
  assert.equal(core.grade({kind:'write_en',answers:["can't stand",'cannot stand']},'CAN’T STAND.'),true);
  assert.equal(core.grade({kind:'write_ru',answers:['иногда','изредка']},'изредка'),true);
  assert.equal(core.grade({kind:'sentence'},'Any valid sentence'),null);
- assert.equal(tasks.length,12);assert.equal(tasks.filter(t=>t.kind==='voice').length,1);
+ assert.equal(tasks.length,10);assert.equal(tasks.some(t=>['sentence','voice'].includes(t.kind)),false);
  assert.ok(word.example);
 });
 test('public tasks hide expected answers and use genuine authored gaps',()=>{
@@ -116,14 +114,14 @@ test('saved mission resumes and one pupil cannot answer another pupil’s sessio
  const t=b.tasks(s.id)[0];assert.throws(()=>b.api('learner_a','answer',{sessionId:s.id,taskId:t.id,answer:'x'}),/не найдена/);
  assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:'t500',answer:'x'}),/Порядок/);
 });
-test('90 percent excludes pending own speech; rewards and audio persist once',()=>{
+test('ten automatic answers give the 90 percent bonus once without files or review work',()=>{
  const b=backend(),result=finish(b,'learner_b',{wrong:1});
  assert.equal(result.session.status,'completed');assert.equal(result.session.summary.score,90);
- assert.equal(result.session.summary.pending,2);assert.equal(result.session.summary.rations,2);assert.equal(result.pet.coins,10);
- assert.equal(b.files.size,1);assert.equal(b.records('Ответы').length,2);
+ assert.equal(result.session.summary.pending,0);assert.equal(result.session.summary.rations,2);assert.equal(result.pet.coins,10);
+ assert.equal(b.files.size,0);assert.equal(b.records('Ответы').length,0);
  const s=b.api('learner_b','start');assert.equal(s.id,result.session.id);assert.equal(s.status,'completed');
  const before=result.pet.xp;const duplicate=b.api('learner_b','answer',{sessionId:s.id,taskId:b.tasks(s.id).at(-1).id,audio:'eA==',mime:'audio/webm'});
- assert.equal(duplicate.pet.xp,before);assert.equal(b.files.size,1);
+ assert.equal(duplicate.pet.xp,before);assert.equal(b.files.size,0);
  const retry=finish(b,'learner_b',{retry:true});assert.equal(retry.session.summary.xp,0);assert.equal(retry.pet.coins,10);assert.equal(retry.pet.xp,before);
 });
 test('a later retry can earn 90 percent bonus once without extra base rewards',()=>{
@@ -136,8 +134,12 @@ test('same answer after interrupted session write does not count twice',()=>{
  b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer});
  assert.equal(b.records('Прогресс').find(p=>p.wordId===t.wordId&&p.skill===t.kind).correct,1);
 });
-test('teacher reviews own speech, learner sees feedback, repeat review is blocked',()=>{
- const b=backend();finish(b,'learner_b');const teacher=b.api('teacher','bootstrap');assert.equal(teacher.pending.length,2);
+test('historical recordings stay accessible to their owner and can still receive feedback',()=>{
+ const b=backend();
+ const add=(name,obj)=>b.data.get(name).push(b.data.get(name)[0].map(k=>obj[k]??''));
+ b.files.set('old-audio',{getBytes:()=>[1,2,3]});
+ for(const kind of ['voice','sentence'])add('Ответы',{id:'legacy-'+kind,sessionId:'legacy',studentId:'learner_b',wordId:'learner_b:occasionally',kind,submittedAt:'2026-10-15',status:'pending',audioId:kind==='voice'?'old-audio':'',mime:'audio/webm',text:'I occasionally walk.'});
+ const teacher=b.api('teacher','bootstrap');assert.equal(teacher.pending.length,2);
  const a=teacher.pending.find(a=>a.kind==='voice');const recording=b.api('teacher','audio',{answerId:a.id});assert.equal(recording.mime,'audio/webm');assert.ok(recording.audio);
  b.api('teacher','review',{answerId:a.id,correct:true,feedback:'Хорошее предложение. Обрати внимание на ударение.'});
  assert.equal(b.api('learner_b','bootstrap').reviews.length,1);assert.equal(b.api('learner_b','bootstrap').stats.pending,1);
@@ -159,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.3.0'/);
+ assert.match(code,/version: '1.4.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -213,14 +215,13 @@ test('an interrupted unknown send does not double-count failures or create two r
  assert.equal(b.tasks(s.id).filter(t=>t.isReview).length,1);
 });
 
-test('mistakes on the last objective task repeat before speech; speech cannot be skipped as unknown',()=>{
+test('a mistake on the last task repeats before completion without requiring speech',()=>{
  const b=backend();let s=b.api('learner_b','start');
  while(s.index<9){const t=b.tasks(s.id)[s.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;}
  const bad=b.api('learner_b','answer',{sessionId:s.id,taskId:s.task.id,unknown:true});
  assert.equal(bad.session.task.isReview,true);
  const t=b.tasks(s.id)[bad.session.index];s=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,answer:t.kind==='choose'?t.russian:t.answers[0]}).session;
- assert.equal(s.task.kind,'sentence');
- assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:s.task.id,unknown:true}),/нужен ответ/);
+ assert.equal(s.status,'completed');assert.equal(s.summary.pending,0);assert.equal(s.summary.score,90);
 });
 
 function oldSession(b,id,{studentId='learner_b',status='completed',day='2026-01-01',mode='daily',answerStatus}={}){
@@ -304,7 +305,7 @@ test('pet name and species edits are compatible, validated atomically, and canno
 });
 function petUi(){
  const elements=new Map();
- const element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',replaceChildren(){this.innerHTML='';}});return elements.get(id);};
+ const element=id=>{if(!elements.has(id))elements.set(id,{innerHTML:'',value:'',addEventListener(name,handler){this[name]=handler;},replaceChildren(){this.innerHTML='';}});return elements.get(id);};
  const context=vm.createContext({console,Date,JSON,Math,Error,Set,Map,Array,String,Number,Boolean,Object,RegExp,Intl,URLSearchParams,
   window:{google:{script:{run:{}}},addEventListener(){}},document:{getElementById:element,querySelector:selector=>selector==='input[name="petSpecies"]:checked'?{value:'dog'}:null,querySelectorAll:()=>[]},setTimeout(){}});
  const html=fs.readFileSync(root+'/output/App.html','utf8');
@@ -333,4 +334,53 @@ test('failed pet saving leaves the previous profile intact and the choice dialog
  vm.runInContext("rpc=async()=>{throw Error('Нет соединения');};",u.context);
  u.element('petForm').onsubmit({preventDefault(){}});await new Promise(setImmediate);
  assert.equal(vm.runInContext('state.data.pet.species',u.context),'cat');assert.equal(vm.runInContext('state.data.pet.name',u.context),'<Луна>');assert.match(u.element('dialogs').innerHTML,/petForm/);assert.equal(u.context.lastToast,'Нет соединения');
+});
+
+
+test('sentence assembly uses an authored example, hides its order and falls back without an example',()=>{
+ const w={id:'a',english:'occasionally',russian:'иногда',example:'I occasionally play chess with my friends.',lessonOn:'2026-10-16'};
+ const ts=core.makeTasks([w],[w],[],'2026-10-16',()=>.5),t=ts.find(t=>t.kind==='assemble');
+ assert.ok(t);assert.equal(core.grade(t,w.example),true);assert.equal(core.grade(t,'I occasionally with my play chess friends.'),false);
+ const visible=core.publicTask(t);assert.equal(visible.opening,'I occasionally');
+ assert.equal(Object.hasOwn(visible,'answers'),false);assert.equal(Object.hasOwn(visible,'sentenceAnswer'),false);
+ assert.notEqual([visible.opening,...visible.parts].join(' '),w.example);
+ assert.equal(core.makeTasks([{...w,example:''}],[w],[],'2026-10-16',()=>.5).some(t=>t.kind==='assemble'),false);
+});
+test('assembly unknown shows the full sentence and repeats until correct, with automatic grading',()=>{
+ const b=backend();let s=b.api('learner_b','start');
+ // Install a deterministic authored task to exercise the API independently of selection randomness.
+ const w={id:'learner_b:occasionally',english:'occasionally',russian:'иногда',example:'I occasionally play chess with my friends.',lessonOn:'2026-10-16'};
+ const t=core.makeTasks([w],[w],[],'2026-10-16',()=>.5).find(t=>t.kind==='assemble');
+ const rows=b.data.get('Тренировки');rows[1][6]=JSON.stringify({tasks:[t],results:[],studyWords:[w]});
+ const r=b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,unknown:true});
+ assert.equal(r.result.expected,w.example);assert.equal(r.result.correct,false);assert.equal(r.session.task.kind,'assemble');assert.equal(r.session.task.isReview,true);
+ const done=b.api('learner_b','answer',{sessionId:s.id,taskId:r.session.task.id,answer:w.example});
+ assert.equal(done.result.correct,true);assert.equal(done.session.status,'completed');assert.equal(done.session.summary.pending,0);assert.equal(b.records('Ответы').length,0);
+});
+function installLegacy(b){
+ const s=b.api('learner_b','start');const rows=b.data.get('Тренировки'),p=JSON.parse(rows[1][6]);
+ for(const kind of ['sentence','voice'])p.tasks.push({id:'legacy-'+kind,kind,wordId:'learner_b:occasionally',english:'occasionally',russian:'иногда',category:'review'});
+ rows[1][6]=JSON.stringify(p);return s;
+}
+test('unfinished old sessions replace pending speech without resetting answers, score or rewards',()=>{
+ const b=backend(),s=installLegacy(b),before=b.tasks(s.id).map(t=>t.id);
+ const resumed=b.api('learner_b','start');assert.equal(resumed.id,s.id);assert.equal(resumed.total,12);
+ assert.deepEqual(b.tasks(s.id).map(t=>t.id),before);assert.ok(b.tasks(s.id).slice(-2).every(t=>t.kind==='write_en'&&t.isReview));
+ const result=finish(b,'learner_b');assert.equal(result.session.summary.score,100);assert.equal(result.session.summary.xp,80);assert.equal(result.session.summary.pending,0);assert.equal(b.files.size,0);assert.equal(b.records('Ответы').length,0);
+});
+test('stale voice submissions cannot upload files or create review work after migration',()=>{
+ const b=backend(),s=installLegacy(b),rows=b.data.get('Тренировки'),p=JSON.parse(rows[1][6]);
+ p.results=p.tasks.slice(0,10).map(t=>({taskId:t.id,correct:true,kind:t.kind,wordId:t.wordId}));rows[1][6]=JSON.stringify(p);
+ assert.throws(()=>b.api('learner_b','answer',{sessionId:s.id,taskId:'legacy-sentence',audio:'eA==',mime:'audio/webm'}),/введи или выбери/);
+ const resumed=b.api('learner_b','start');assert.equal(resumed.index,10);assert.equal(resumed.task.kind,'write_en');assert.equal(resumed.score,100);
+ assert.equal(b.files.size,0);assert.equal(b.records('Ответы').length,0);
+});
+test('assembly controls add and return parts, submit their order, and never request a microphone',()=>{
+ const u=petUi(),parts=[{dataset:{part:'0'}},{dataset:{part:'1'}}],remove=[{dataset:{removePart:'0'}}];
+ u.context.document.querySelectorAll=selector=>selector==='[data-part]'?parts:selector==='[data-remove-part]'?remove:[];
+ vm.runInContext("state.session={id:'s',task:{id:'t',kind:'assemble',english:'play',opening:'I often',parts:['play chess','after school.']}};submitAnswer=(answer)=>{globalThis.sent=answer;};",u.context);
+ const initial=vm.runInContext('taskBody(state.session.task)',u.context);assert.match(initial,/id="checkAssembly" disabled/);assert.match(initial,/unknownAnswer/);
+ u.context.bindStudent();parts[0].onclick();parts[1].onclick();remove[0].onclick();parts[0].onclick();
+ u.element('checkAssembly').click();assert.equal(u.context.sent,'I often after school. play chess');
+ const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('getUserMedia'),false);assert.equal(html.includes('MediaRecorder'),false);assert.equal(html.includes('sendVoice'),false);
 });

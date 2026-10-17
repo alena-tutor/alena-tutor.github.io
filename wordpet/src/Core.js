@@ -96,11 +96,13 @@ const WordPetCore = (() => {
   }
   function makeTasks(selected, allWords, records, today, random = Math.random) {
     if (!selected.length) return [];
-    const types = ['choose', 'write_en', 'write_ru', 'listen', 'gap'];
+    const types = ['choose', 'write_en', 'write_ru', 'listen', 'gap', 'assemble', 'write_en', 'write_ru', 'listen', 'gap'];
     const tasks = [];
     for (let i = 0; i < 10; i++) {
       const word = selected[i % selected.length];
       let kind = types[i % types.length];
+      const assembly = kind === 'assemble' ? sentenceParts(word,random) : null;
+      if (kind === 'assemble' && !assembly) kind = 'write_en';
       // A meaningful gap needs an authored example containing the literal target or alternatives.
       const match = [word.english, ...String(word.answers || '').split('|')].filter(Boolean)
         .find(answer => word.example && norm(word.example).includes(norm(answer)));
@@ -115,23 +117,43 @@ const WordPetCore = (() => {
         if (options.length < 2) kind = 'write_en';
       }
       tasks.push({ id: 't' + i, wordId: word.id, kind, english: word.english, russian: word.russian,
-        answers: kind === 'write_ru' ? russianAnswers(word) : englishAnswers(word), options, prompt,
+        answers: kind === 'assemble' ? [norm(assembly.answer)] : kind === 'write_ru' ? russianAnswers(word) : englishAnswers(word), options, prompt,
+        ...(assembly || {}),
         gapAnswer: kind === 'gap' ? match : '', category: category(word, records, today) });
     }
-    const words = shuffle(selected, random);
-    ['sentence', 'voice'].forEach((kind,i) => {
-      const w = words[i % words.length];
-      tasks.push({ id: 't' + tasks.length, wordId: w.id, kind, english: w.english, russian: w.russian,
-        prompt: 'Расскажи о себе: используй слово или выражение в своём предложении.', category: category(w,records,today) });
+    return shuffle(tasks, random);
+  }
+  function sentenceParts(word, random = Math.random) {
+    const example = String(word.example || '').trim().replace(/\s+/g,' ');
+    const tokens = example.split(' ');
+    const targets = englishAnswers(word);
+    if (tokens.length < 4 || tokens.length > 20 || !targets.some(t => norm(example).includes(t))) return null;
+    // Keep the opening and each pair of words together to guide the intended order.
+    const opening = tokens.slice(0,2).join(' '), chunks = [];
+    for (let i = 2; i < tokens.length; i += 2) chunks.push(tokens.slice(i,i+2).join(' '));
+    if (chunks.length < 2) return null;
+    let parts = shuffle(chunks,random);
+    if (parts.every((v,i) => v === chunks[i])) parts = parts.slice(1).concat(parts[0]);
+    return {opening,parts,sentenceAnswer:example,answer:example};
+  }
+  function migrateTasks(payload) {
+    let changed = false;
+    payload.tasks.forEach((task,i) => {
+      if (i < payload.results.length || !['sentence','voice'].includes(task.kind)) return;
+      // Extra legacy tasks are practice: retain the original ten-question score and reward.
+      payload.tasks[i] = {id:task.id,wordId:task.wordId,kind:'write_en',english:task.english,russian:task.russian,
+        answers:[norm(task.english)],options:[],prompt:'',category:task.category,isReview:true,reviewOf:task.id};
+      changed = true;
     });
-    return shuffle(tasks.slice(0,10), random).concat(tasks.slice(10));
+    return changed;
   }
   function publicTask(task) {
     if (!task) return null;
     const t = { id: task.id, wordId: task.wordId, kind: task.kind, options: task.options || [], prompt: task.prompt || '', category: task.category, isReview: Boolean(task.isReview) };
-    if (['choose','write_ru','sentence','voice'].includes(task.kind)) t.english = task.english;
+    if (['choose','write_ru','assemble'].includes(task.kind)) t.english = task.english;
     if (['write_en','gap'].includes(task.kind)) t.russian = task.russian;
     if (task.kind === 'listen') t.speak = task.english;
+    if (task.kind === 'assemble') { t.opening = task.opening; t.parts = task.parts.slice(); }
     return t;
   }
   function grade(task, answer) {
@@ -163,6 +185,6 @@ const WordPetCore = (() => {
     const p = progress.filter(x => x.wordId === word.id && ['write_en','listen','gap'].includes(x.skill));
     return p.some(x => Number(x.streak) >= 2);
   };
-  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
+  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, makeTasks, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
 })();
 if (typeof module !== 'undefined') module.exports = WordPetCore;

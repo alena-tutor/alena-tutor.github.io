@@ -25,7 +25,7 @@ const FOX_ART = PET_ART.fox;
 function petType(species){return WordPetCore.petSpecies.find(p=>p.id===species)||WordPetCore.petSpecies[0];}
 function petImage(species){return PET_ART[petType(species).id]||FOX_ART;}
 const IS_GOOGLE = Boolean(window.google?.script?.run);
-const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,recording:false,blob:null,blobUrl:'',recorder:null,stream:null,timer:null,seconds:0};
+const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,assembly:[]};
 const icons = {
  paw:'<path d="M7 15c-2 2-1 6 2 5l3-1 3 1c3 1 4-3 2-5l-3-3c-1-1-3-1-4 0Z"/><ellipse cx="5" cy="9" rx="2" ry="2.5"/><ellipse cx="10" cy="5.5" rx="2" ry="2.5"/><ellipse cx="15.5" cy="6" rx="2" ry="2.5"/><ellipse cx="20" cy="10" rx="2" ry="2.5"/>',
  home:'<path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/>',
@@ -86,7 +86,7 @@ function homePage() {
   <div class="meter-row"><span>Сытость</span><div class="meter warm"><i style="width:${p.food}%"></i></div><span>${p.food}%</span></div><div class="meter-row"><span>Чистота</span><div class="meter"><i style="width:${p.clean}%"></i></div><span>${p.clean}%</span></div>
   <div class="row between tiny muted"><span>${p.xp%100} / 100 опыта до следующего уровня</span><span>${p.coins} монет · ${p.rations} корма</span></div>
   <div class="pet-actions"><button data-care="feed">${icon('food')}Кормить</button><button data-care="clean">${icon('spark')}Убрать</button><button data-care="toy">${icon('ball')}${p.accessory==='ball'?'Мячик куплен':'Мячик · 20'}</button></div><p class="pet-note">Питомец всегда дождётся тебя. Награды сохраняются.</p></div></section>
-  <div class="stack"><section class="card mission"><div class="mission-top"><div><div class="label">${done?'Миссия выполнена':'Твоя миссия сегодня'}</div><h2>${done?'Можно ещё немного':'Помоги питомцу'}</h2></div><span class="mission-icon">${icon(done?'check':'book')}</span></div><p class="muted subtitle">Сначала список слов, затем 10 вопросов, своё предложение и голосовая запись. Незнакомые слова повторим ещё раз.</p>
+  <div class="stack"><section class="card mission"><div class="mission-top"><div><div class="label">${done?'Миссия выполнена':'Твоя миссия сегодня'}</div><h2>${done?'Можно ещё немного':'Помоги питомцу'}</h2></div><span class="mission-icon">${icon(done?'check':'book')}</span></div><p class="muted subtitle">Сначала список слов, затем 10 заданий с автоматической проверкой. Незнакомые слова повторим ещё раз.</p>
   <div class="chips"><div class="chip recent"><b>${d.counts.recent}</b>с урока</div><div class="chip hard"><b>${d.counts.hard}</b>трудные</div><div class="chip"><b>${d.counts.review}</b>на повторение</div></div>
   <button class="button full" id="startMission" ${!d.words.length?'disabled':''}>${icon('play')}${done?'Посмотреть результат':'Начать тренировку'}</button>
   ${!d.words.length?'<p class="subtitle">В глоссарии пока нет слов. Они появятся после добавления преподавателем.</p>':''}
@@ -101,7 +101,7 @@ function wordsPage() {
 }
 function progressPage() {
   const d=state.data;
-  return `<section class="page-top"><div class="label">Шаг за шагом</div><h1 style="margin-top:7px">Твой прогресс</h1><p class="subtitle">Сравнивай себя с собой. Здесь важны повторения и самостоятельные ответы.</p></section><div class="student-layout"><div class="stack"><section class="card"><div class="mini-stats"><div><strong>${d.stats.seen}</strong><span>слов повторял</span></div><div><strong>${d.stats.mastered}</strong><span>вспоминаешь сам</span></div><div><strong>${d.stats.completed}</strong><span>дней практики</span></div></div><p class="footer-note">«Вспоминаешь сам» — минимум два правильных ответа подряд в одном из заданий без вариантов. Устные и письменные предложения проверяются отдельно.</p></section><section class="card"><h3>Последние тренировки</h3><div class="history-list" style="margin-top:10px">${d.history.length?d.history.slice().reverse().map(h=>`<div class="history-row"><span class="score-dot">${h.score??'—'}%</span><div class="grow">${esc(date(h.day))}<div class="tiny muted">${h.mode==='daily'?'Первая тренировка дня':'Повторная попытка'}</div></div></div>`).join(''):'<p class="subtitle">Здесь появится результат первой миссии.</p>'}</div></section></div><section class="card"><h3>Обратная связь</h3><p class="subtitle">Ответов на проверке: ${d.stats.pending}</p>${d.reviews.length?d.reviews.map(r=>`<div class="review-item"><div class="row between"><b>${esc(r.english)}</b><span class="tiny">${esc(date(r.date))}</span></div><div class="tiny muted">${r.kind==='voice'?'Устное предложение':'Письменное предложение'} · ${r.correct===true?'получилось':'ещё потренируем'}</div><p class="feedback-text" style="margin-top:10px">${esc(r.feedback||'Проверено преподавателем.')}</p></div>`).join(''):'<p class="subtitle">После проверки здесь появятся комментарии преподавателя.</p>'}</section></div>`;
+  return `<section class="page-top"><div class="label">Шаг за шагом</div><h1 style="margin-top:7px">Твой прогресс</h1><p class="subtitle">Сравнивай себя с собой. Здесь важны повторения и самостоятельные ответы.</p></section><div class="student-layout"><div class="stack"><section class="card"><div class="mini-stats"><div><strong>${d.stats.seen}</strong><span>слов повторял</span></div><div><strong>${d.stats.mastered}</strong><span>вспоминаешь сам</span></div><div><strong>${d.stats.completed}</strong><span>дней практики</span></div></div><p class="footer-note">«Вспоминаешь сам» — минимум два правильных ответа подряд в одном из заданий без вариантов. Все новые задания проверяются автоматически.</p></section><section class="card"><h3>Последние тренировки</h3><div class="history-list" style="margin-top:10px">${d.history.length?d.history.slice().reverse().map(h=>`<div class="history-row"><span class="score-dot">${h.score??'—'}%</span><div class="grow">${esc(date(h.day))}<div class="tiny muted">${h.mode==='daily'?'Первая тренировка дня':'Повторная попытка'}</div></div></div>`).join(''):'<p class="subtitle">Здесь появится результат первой миссии.</p>'}</div></section></div><section class="card"><h3>Обратная связь</h3><p class="subtitle">Ответов на проверке: ${d.stats.pending}</p>${d.reviews.length?d.reviews.map(r=>`<div class="review-item"><div class="row between"><b>${esc(r.english)}</b><span class="tiny">${esc(date(r.date))}</span></div><div class="tiny muted">${r.kind==='voice'?'Устное предложение':'Письменное предложение'} · ${r.correct===true?'получилось':'ещё потренируем'}</div><p class="feedback-text" style="margin-top:10px">${esc(r.feedback||'Проверено преподавателем.')}</p></div>`).join(''):'<p class="subtitle">В новых тренировках результат каждого ответа виден сразу.</p>'}</section></div>`;
 }
 function studyPage() {
   const words=state.session?.studyWords || [];
@@ -114,18 +114,21 @@ function lessonPage() {
   const t=s.task;
   if(!t&&!state.feedback)return summaryPage();
   const task=state.feedback?.task || t;
-  const headings={choose:task.english,write_en:task.russian,write_ru:task.english,listen:'Какое слово ты слышишь?',gap:task.prompt,sentence:task.english,voice:task.english};
-  const instructions={choose:'Выбери перевод',write_en:'Напиши по-английски',write_ru:'Напиши перевод на русский',listen:'Послушай и напиши по-английски',gap:'Вставь нужное слово или выражение',sentence:'Составь своё предложение по-английски',voice:'Составь своё предложение и запиши голосом'};
-  return `<section class="lesson"><div class="row between"><button class="button ghost" id="leaveLesson">${icon('back')}На главную</button><span class="muted tiny">${Math.min(s.index+(!state.feedback?1:0),s.total)} / ${s.total}</span></div><div class="lesson-progress"><i style="width:${s.index/s.total*100}%"></i></div><div class="card task-card"><span class="pill ${task.category}">${catName(task.category)}</span>${task.isReview?'<span class="pill hard" style="margin-left:7px">Повторим ещё раз</span>':''}<div class="task-heading ${['choose','write_ru','sentence','voice'].includes(task.kind)?'english':''} ${task.kind==='gap'?'gap':''}">${esc(headings[task.kind])}</div><p class="task-instruction">${instructions[task.kind]}</p>
-  ${['choose','write_ru','sentence','voice'].includes(task.kind)?`<button class="speak" style="margin:-7px auto 20px" data-speak="${esc(task.english)}" aria-label="Послушать слово">${icon('sound')}</button>`:''}
+  const headings={choose:task.english,write_en:task.russian,write_ru:task.english,listen:'Какое слово ты слышишь?',gap:task.prompt,assemble:task.english};
+  const instructions={choose:'Выбери перевод',write_en:'Напиши по-английски',write_ru:'Напиши перевод на русский',listen:'Послушай и напиши по-английски',gap:'Вставь нужное слово или выражение',assemble:'Восстанови пример из списка слов: добавь части по порядку'};
+  return `<section class="lesson"><div class="row between"><button class="button ghost" id="leaveLesson">${icon('back')}На главную</button><span class="muted tiny">${Math.min(s.index+(!state.feedback?1:0),s.total)} / ${s.total}</span></div><div class="lesson-progress"><i style="width:${s.index/s.total*100}%"></i></div><div class="card task-card"><span class="pill ${task.category}">${catName(task.category)}</span>${task.isReview?'<span class="pill hard" style="margin-left:7px">Повторим ещё раз</span>':''}<div class="task-heading ${['choose','write_ru','assemble'].includes(task.kind)?'english':''} ${task.kind==='gap'?'gap':''}">${esc(headings[task.kind])}</div><p class="task-instruction">${instructions[task.kind]}</p>
+  ${['choose','write_ru','assemble'].includes(task.kind)?`<button class="speak" style="margin:-7px auto 20px" data-speak="${esc(task.english)}" aria-label="Послушать слово">${icon('sound')}</button>`:''}
   ${state.feedback?feedbackHTML():taskBody(task)}</div><p class="footer-note" style="text-align:center">Ответ сохраняется в Google после нажатия кнопки. Можно вернуться к незавершённой тренировке сегодня.</p></section>`;
 }
 function taskBody(t) {
-  const unknown= !['sentence','voice'].includes(t.kind) ? '<button class="button secondary full" id="unknownAnswer" data-save style="margin-top:12px">Не знаю</button>' : '';
+  const unknown= '<button class="button secondary full" id="unknownAnswer" data-save style="margin-top:12px">Не знаю</button>';
   if(t.kind==='choose')return `<div class="options">${t.options.map(x=>`<button class="option" data-option="${esc(x)}">${esc(x)}</button>`).join('')}</div>${unknown}`;
-  if(t.kind==='voice')return `<p class="muted tiny">${esc(t.prompt)} До 60 секунд.</p><button class="mic" id="recordButton" aria-label="Начать запись">${icon('mic')}</button><div id="recordTimer" aria-live="polite">00:00</div><audio id="recordPreview" class="audio-player hidden" controls></audio><p class="record-hint" id="recordHint">Нажми на микрофон. Говори своим голосом, затем останови запись.</p><div class="row wrap" style="justify-content:center"><label class="file-upload">${icon('upload')}Прикрепить аудио<input type="file" id="audioFile" accept=".webm,.wav,.mp3,.ogg,.m4a,.mp4,audio/webm,audio/wav,audio/mpeg,audio/ogg,audio/mp4,video/mp4"></label><button id="clearAudio" class="button ghost small hidden">Записать заново</button></div><p class="record-hint">Если микрофон недоступен в Google, запиши ответ диктофоном телефона и прикрепи файл до 3 МБ.</p><button class="button full" id="sendVoice" style="margin-top:16px" data-save disabled>Отправить на проверку ${icon('arrow')}</button>`;
+  if(t.kind==='assemble') {
+    const chosen=state.assembly || [];
+    return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:16px;margin-bottom:12px;background:var(--soft);border-radius:15px;text-align:left" class="assembly-answer" aria-label="Твоё предложение"><b>${esc(t.opening)}</b> ${chosen.map((index,pos)=>`<button class="button secondary small" data-remove-part="${pos}" aria-label="Убрать часть ${esc(t.parts[index])}">${esc(t.parts[index])}</button>`).join(' ')}</div><p class="tiny muted">Нажимай на части. Нажми на выбранную часть, чтобы вернуть её.</p><div class="row wrap" style="justify-content:center;margin:18px 0">${t.parts.map((part,index)=>`<button class="button secondary small" data-part="${index}" ${chosen.includes(index)?'disabled':''}>${esc(part)}</button>`).join('')}</div><button class="button full" id="checkAssembly" ${chosen.length!==t.parts.length?'disabled':''}>Проверить ${icon('arrow')}</button>${unknown}`;
+  }
   const listen=t.kind==='listen'?`<button class="button secondary full" id="listenWord" style="margin-bottom:14px">${icon('sound')}Послушать</button><button class="button ghost small" id="noAudio" style="margin-bottom:15px">Не слышу — заменить задание</button>`:'';
-  return `${listen}<form class="answer-form" id="answerForm">${t.kind==='sentence'?`<textarea class="field" id="typedAnswer" maxlength="1500" required placeholder="Напиши о себе, своих интересах или обычном дне" aria-label="Своё предложение"></textarea><p class="tiny muted">${esc(t.prompt)} Ответ увидит преподаватель.</p>`:`<input class="field" id="typedAnswer" required maxlength="300" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${t.kind==='write_ru'?'Перевод':'Твой ответ'}" aria-label="Твой ответ">`}<button class="button full" type="submit">${t.kind==='sentence'?'Отправить на проверку':'Проверить'}${icon('arrow')}</button></form>${unknown}`;
+  return `${listen}<form class="answer-form" id="answerForm"><input class="field" id="typedAnswer" required maxlength="300" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${t.kind==='write_ru'?'Перевод':'Твой ответ'}" aria-label="Твой ответ"><button class="button full" type="submit">Проверить${icon('arrow')}</button></form>${unknown}`;
 }
 function feedbackHTML() {
   const r=state.feedback.result;
@@ -148,7 +151,7 @@ function teacherWords() {
   return `<div class="row teacher-actions">${studentSelect()}<button class="button" id="addWord">Добавить слово</button></div><p class="subtitle" style="margin-bottom:18px">Отметь слово как трудное — оно попадёт в ближайшую тренировку. Новые слова можно добавить прямо здесь.</p><section class="card">${s?.words.length?s.words.map(w=>`<div class="teacher-word-row"><div><strong>${esc(w.english)}</strong><p>${esc(w.russian)}</p>${w.example?`<p style="margin-top:5px;font-style:italic">${esc(w.example)}</p>`:''}<span class="pill ${w.category}" style="margin-top:8px">${catName(w.category)}</span></div><div class="stack" style="gap:6px"><button class="button secondary small" data-hard="${esc(w.id)}">Трудное сегодня</button><button class="button ghost small" data-edit="${esc(w.id)}">Изменить</button></div></div>`).join(''):'<div class="empty"><h3>Глоссарий пока пуст</h3>Добавь слова или обнови подключённый глоссарий.</div>'}</section>`;
 }
 function teacherReviews() {
-  return state.data.pending.length?`<div class="stack">${state.data.pending.map(a=>`<article class="card pending-card" data-review-id="${esc(a.id)}"><div class="row between wrap"><div><span class="label">${esc(state.data.students.find(s=>s.id===a.studentId)?.name||a.studentId)} · ${esc(date(a.date))}</span><h3 style="margin-top:8px">${esc(a.english)}</h3></div><span class="pill">${a.kind==='voice'?'Устный ответ':'Письменное предложение'}</span></div>${a.kind==='voice'?`<button class="button secondary small" data-audio="${esc(a.id)}">${icon('play')}Загрузить запись</button><div data-audio-player></div>`:`<p class="feedback-text">${esc(a.text)}</p>`}<div class="review-form"><textarea class="field" rows="2" maxlength="1500" aria-label="Комментарий преподавателя" placeholder="Что получилось и что поправить"></textarea><button class="button sage small" data-review="yes">Получилось</button><button class="button secondary small" data-review="no">Повторить</button></div></article>`).join('')}</div>`:'<div class="empty"><h3>Всё проверено</h3>Здесь появятся собственные предложения и голосовые записи учеников.</div>';
+  return state.data.pending.length?`<div class="stack">${state.data.pending.map(a=>`<article class="card pending-card" data-review-id="${esc(a.id)}"><div class="row between wrap"><div><span class="label">${esc(state.data.students.find(s=>s.id===a.studentId)?.name||a.studentId)} · ${esc(date(a.date))}</span><h3 style="margin-top:8px">${esc(a.english)}</h3></div><span class="pill">${a.kind==='voice'?'Устный ответ':'Письменное предложение'}</span></div>${a.kind==='voice'?`<button class="button secondary small" data-audio="${esc(a.id)}">${icon('play')}Загрузить запись</button><div data-audio-player></div>`:`<p class="feedback-text">${esc(a.text)}</p>`}<div class="review-form"><textarea class="field" rows="2" maxlength="1500" aria-label="Комментарий преподавателя" placeholder="Что получилось и что поправить"></textarea><button class="button sage small" data-review="yes">Получилось</button><button class="button secondary small" data-review="no">Повторить</button></div></article>`).join('')}</div>`:'<div class="empty"><h3>Всё проверено</h3>Новые задания проверяются автоматически. Здесь остаются только ответы из прежних тренировок.</div>';
 }
 function teacherArchive() {
  const a=state.data.archive||{items:[]};
@@ -166,7 +169,7 @@ function bindStudent() {
   document.getElementById('retryMission')?.addEventListener('click',()=>startMission(true));
   document.getElementById('beginExercises')?.addEventListener('click',()=>{state.page='lesson';render();window.scrollTo(0,0);document.getElementById('typedAnswer')?.focus();});
   document.getElementById('backHome')?.addEventListener('click',()=>busy(async()=>{await reload();state.page='home';state.session=null;render();}));
-  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{if(state.recording){toast('Сначала останови запись.',true);return;}if(state.blob&&!confirm('Запись ещё не отправлена. Выйти без неё?'))return;clearRecording();await reload();state.page='home';state.feedback=null;render();}));
+  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{state.assembly=[];await reload();state.page='home';state.feedback=null;render();}));
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;render();});
   document.getElementById('wordSearch')?.addEventListener('input',e=>{state.search=e.target.value;const position=e.target.selectionStart;render();const el=document.getElementById('wordSearch');el.focus();el.setSelectionRange(position,position);});
   document.querySelectorAll('[data-option]').forEach(b=>b.onclick=()=>submitAnswer(b.dataset.option));
@@ -174,26 +177,19 @@ function bindStudent() {
   document.getElementById('unknownAnswer')?.addEventListener('click',()=>submitAnswer('',{unknown:true}));
   document.getElementById('listenWord')?.addEventListener('click',()=>speak(state.session.task.speak));
   document.getElementById('noAudio')?.addEventListener('click',()=>busy(async()=>{state.session=await rpc('noAudio',{sessionId:state.session.id});render();}));
-  document.getElementById('nextTask')?.addEventListener('click',()=>{state.feedback=null;clearRecording();render();document.getElementById('typedAnswer')?.focus();});
-  document.getElementById('recordButton')?.addEventListener('click',recordToggle);
-  document.getElementById('audioFile')?.addEventListener('change',e=>{const f=e.target.files[0];if(f)selectAudio(f);});
-  document.getElementById('clearAudio')?.addEventListener('click',()=>{clearRecording();render();});
-  document.getElementById('sendVoice')?.addEventListener('click',()=>submitVoice());
-  if(state.page==='lesson'&&state.session?.task?.kind==='voice'&&!state.feedback) {
-    if(document.permissionsPolicy?.allowsFeature&&!document.permissionsPolicy.allowsFeature('microphone')) {
-      document.getElementById('recordButton').classList.add('hidden');
-      document.getElementById('recordHint').textContent='Google ограничил доступ к микрофону. Прикрепи запись с диктофона телефона.';
-    }
-  }
+  document.getElementById('nextTask')?.addEventListener('click',()=>{state.feedback=null;state.assembly=[];render();document.getElementById('typedAnswer')?.focus();});
+  document.querySelectorAll('[data-part]').forEach(b=>b.onclick=()=>{state.assembly.push(Number(b.dataset.part));render();});
+  document.querySelectorAll('[data-remove-part]').forEach(b=>b.onclick=()=>{state.assembly.splice(Number(b.dataset.removePart),1);render();});
+  document.getElementById('checkAssembly')?.addEventListener('click',()=>{const t=state.session.task;submitAnswer([t.opening,...state.assembly.map(i=>t.parts[i])].join(' '));});
 }
 async function startMission(retry) {
-  return busy(async()=>{const session=await rpc('start',{retry});clearRecording();state.session=session;state.feedback=null;state.page=session.status==='completed'?'lesson':'study';render();window.scrollTo(0,0);});
+  return busy(async()=>{const session=await rpc('start',{retry});state.assembly=[];state.session=session;state.feedback=null;state.page=session.status==='completed'?'lesson':'study';render();window.scrollTo(0,0);});
 }
 async function submitAnswer(answer,extra={}) {
   return busy(async()=>{
     const task=state.session.task;
     const result=await rpc('answer',{sessionId:state.session.id,taskId:task.id,answer,...extra});
-    state.session=result.session;state.data.pet=result.pet;state.feedback={result:result.result,task};clearRecording();render();
+    state.session=result.session;state.data.pet=result.pet;state.feedback={result:result.result,task};state.assembly=[];render();
   });
 }
 function speak(text) {
@@ -216,44 +212,6 @@ function renamePet() {
   dialog(`<h2>Как зовут питомца?</h2><form id="renameForm"><label class="field-label">Имя<input class="field" id="petName" minlength="2" maxlength="20" value="${esc(state.data.pet.name)}" required></label><button class="button" type="submit">Сохранить</button></form>`);
   document.getElementById('renameForm').onsubmit=e=>{e.preventDefault();busy(async()=>{state.data.pet=await rpc('savePet',{name:document.getElementById('petName').value});closeDialog();render();});};
 }
-async function recordToggle() {
-  if(state.recording){stopRecording();return;}
-  try {
-    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw Error('Запись в этом браузере недоступна. Прикрепи аудио с диктофона телефона.');
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});state.stream=stream;
-    state.blob=null;if(state.blobUrl)URL.revokeObjectURL(state.blobUrl);state.blobUrl='';
-    document.getElementById('recordPreview')?.classList.add('hidden');document.getElementById('sendVoice').disabled=true;
-    const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(m=>MediaRecorder.isTypeSupported(m));
-    const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);state.recorder=recorder;
-    const chunks=[];let bytes=0;
-    recorder.ondataavailable=e=>{if(e.data.size){chunks.push(e.data);bytes+=e.data.size;if(bytes>3*1024*1024)stopRecording();}};
-    recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());state.stream=null;state.recording=false;clearInterval(state.timer);state.timer=null;
-      if(chunks.length)selectAudio(new Blob(chunks,{type:recorder.mimeType||'audio/webm'}));
-      const b=document.getElementById('recordButton');if(b){b.classList.remove('recording');b.setAttribute('aria-label','Начать запись');}
-    };
-    recorder.start(1000);state.recording=true;state.seconds=0;
-    const button=document.getElementById('recordButton');button.classList.add('recording');button.setAttribute('aria-label','Остановить запись');
-    document.getElementById('recordHint').textContent='Идёт запись. Нажми ещё раз, чтобы остановить.';
-    state.timer=setInterval(()=>{state.seconds++;const timer=document.getElementById('recordTimer');if(timer)timer.textContent='00:'+String(state.seconds).padStart(2,'0');if(state.seconds>=60)stopRecording();},1000);
-  }catch(e){state.stream?.getTracks().forEach(t=>t.stop());state.recording=false;toast(e.name==='NotAllowedError'?'Нет доступа к микрофону. Прикрепи запись с диктофона телефона.':e.message,true);}
-}
-function stopRecording(){if(state.recorder?.state==='recording')state.recorder.stop();else state.stream?.getTracks().forEach(t=>t.stop());clearInterval(state.timer);state.timer=null;}
-function clearRecording(){stopRecording();state.blob=null;if(state.blobUrl)URL.revokeObjectURL(state.blobUrl);state.blobUrl='';state.recorder=null;state.seconds=0;}
-function selectAudio(blob){
-  if(blob.size>3*1024*1024){toast('Запись больше 3 МБ. Сделай её короче.',true);return;}
-  if(!blob.size){toast('Пустая запись. Попробуй ещё раз.',true);return;}
-  state.blob=blob;if(state.blobUrl)URL.revokeObjectURL(state.blobUrl);state.blobUrl=URL.createObjectURL(blob);
-  const player=document.getElementById('recordPreview');if(!player)return;player.src=state.blobUrl;player.classList.remove('hidden');
-  document.getElementById('sendVoice').disabled=false;document.getElementById('clearAudio').classList.remove('hidden');
-  document.getElementById('recordHint').textContent='Прослушай запись перед отправкой. Она сохранится только после нажатия «Отправить».';
-}
-async function submitVoice(){
-  if(!state.blob){toast('Сначала запиши или прикрепи ответ.',true);return;}
-  const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=()=>reject(Error('Не удалось прочитать запись.'));r.readAsDataURL(state.blob);});
-  let mime=state.blob.type||'audio/mp4';
-  if(!mime&&state.blob.name?.endsWith('.mp3'))mime='audio/mpeg';
-  await submitAnswer('',{audio:base64,mime});
-}
 function bindTeacher(){
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.teacherTab=b.dataset.tab;render();});
   document.querySelectorAll('[data-student]').forEach(b=>b.onclick=()=>{state.studentId=b.dataset.student;state.teacherTab='words';render();});
@@ -269,7 +227,7 @@ function bindTeacher(){
 }
 function wordDialog(word){
   const s=state.data.students.find(s=>s.id===(state.studentId||state.data.students[0].id));
-  dialog(`<h2>${word?'Изменить слово':'Добавить слово'}</h2><p class="subtitle">${esc(s.name)} · слово сохраняется в приложении. Подключённый глоссарий остаётся источником остальных слов.</p><form id="wordForm"><label class="field-label">Слово или выражение<input class="field" id="newEnglish" value="${esc(word?.english||'')}" required maxlength="160" ${word?'readonly':''}></label><label class="field-label">Перевод<input class="field" id="newRussian" value="${esc(word?.russian||'')}" required maxlength="300"></label><label class="field-label">Пример предложения для задания с пропуском<input class="field" id="newExample" value="${esc(word?.example||'')}" maxlength="500" placeholder="I occasionally go swimming."></label><label class="field-label">Другие допустимые формы английского слова<input class="field" id="newAnswers" value="${esc(word?.answers||'')}" placeholder="am keen on | is keen on | are keen on"></label><label class="field-label">Допустимые русские переводы<input class="field" id="newAliases" value="${esc(word?.russianAliases||'')}" placeholder="изредка | иногда | время от времени"></label><label class="check-label"><input type="checkbox" id="newHard" ${!word?'checked':''}>Возникли трудности на сегодняшнем уроке</label><button class="button" type="submit">Сохранить слово</button></form>`);
+  dialog(`<h2>${word?'Изменить слово':'Добавить слово'}</h2><p class="subtitle">${esc(s.name)} · слово сохраняется в приложении. Подключённый глоссарий остаётся источником остальных слов.</p><form id="wordForm"><label class="field-label">Слово или выражение<input class="field" id="newEnglish" value="${esc(word?.english||'')}" required maxlength="160" ${word?'readonly':''}></label><label class="field-label">Перевод<input class="field" id="newRussian" value="${esc(word?.russian||'')}" required maxlength="300"></label><label class="field-label">Пример для пропуска и сборки предложения<input class="field" id="newExample" value="${esc(word?.example||'')}" maxlength="500" placeholder="I occasionally go swimming."></label><label class="field-label">Другие допустимые формы английского слова<input class="field" id="newAnswers" value="${esc(word?.answers||'')}" placeholder="am keen on | is keen on | are keen on"></label><label class="field-label">Допустимые русские переводы<input class="field" id="newAliases" value="${esc(word?.russianAliases||'')}" placeholder="изредка | иногда | время от времени"></label><label class="check-label"><input type="checkbox" id="newHard" ${!word?'checked':''}>Возникли трудности на сегодняшнем уроке</label><button class="button" type="submit">Сохранить слово</button></form>`);
   document.getElementById('wordForm').onsubmit=e=>{e.preventDefault();busy(async()=>{await rpc('addWord',{studentId:s.id,english:document.getElementById('newEnglish').value,russian:document.getElementById('newRussian').value,example:document.getElementById('newExample').value,answers:document.getElementById('newAnswers').value,russianAliases:document.getElementById('newAliases').value,hard:document.getElementById('newHard').checked});closeDialog();await reload();render();toast('Слово сохранено.');});};
 }
 function dialog(html,wide=false){document.getElementById('dialogs').innerHTML=`<div class="dialog-backdrop"><section class="dialog ${wide?'dialog-wide':''}" role="dialog" aria-modal="true"><div class="row between"><span class="label">WordPet</span><button class="button ghost small" id="closeDialog" aria-label="Закрыть">Закрыть</button></div><div style="margin-top:14px">${html}</div></section></div>`;document.getElementById('closeDialog').onclick=closeDialog;setTimeout(()=>document.querySelector('.dialog input')?.focus(),50);}
@@ -282,7 +240,7 @@ function renderLogin(){
 
 }
 async function connect(key){return busy(async()=>{state.key=key;try{await reload();}catch(e){state.data=null;renderLogin();throw e;}try{localStorage.setItem('wordpet-key',key);}catch{}state.page='home';render();});}
-function logout(){stopRecording();clearRecording();state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
+function logout(){state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
 
 async function boot(){
   if(!IS_GOOGLE){document.getElementById('demoBanner').classList.remove('hidden');document.getElementById('demoSwitch').onclick=chooseDemo;}
@@ -290,7 +248,6 @@ async function boot(){
   if(IS_GOOGLE){google.script.url.getLocation(location=>{const params=new URLSearchParams(location.hash||'');const key=params.get('key')||saved;if(key&&!key.startsWith('demo-'))connect(key);else renderLogin();});}
   else {const key=new URLSearchParams(window.location.hash.slice(1)).get('key')||saved;if(key.startsWith('demo-'))connect(key);else {renderLogin();chooseDemo();}}
 }
-window.addEventListener('beforeunload',e=>{if(state.recording||state.blob){e.preventDefault();e.returnValue='';}});
 boot();
 </script>
 </body></html>
