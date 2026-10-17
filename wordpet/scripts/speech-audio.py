@@ -41,6 +41,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Exception:
-        print('Speech generation failed. Private vocabulary was not logged.', file=sys.stderr)
+    except Exception as error:
+        import traceback
+        frame = traceback.extract_tb(error.__traceback__)[-1]
+        print('Speech generation failed: ' + type(error).__name__ + ' at ' + Path(frame.filename).name + ':' + str(frame.lineno) + '. Private vocabulary was not logged.', file=sys.stderr)
         sys.exit(1)

@@ -43,7 +43,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/wordpet-voice-env"
           "$RUNNER_TEMP/wordpet-voice-env/bin/pip" install --disable-pip-version-check kokoro-onnx==0.4.9 onnxruntime==1.22.1 numpy==2.2.6 soundfile==0.13.1
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng libespeak-ng1
           command -v ffmpeg
       - name: Fetch the released model and voice pack
         if: steps.plan.outputs.pending != '0'
