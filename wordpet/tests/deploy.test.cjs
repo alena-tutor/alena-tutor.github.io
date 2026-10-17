@@ -14,10 +14,12 @@ function fixture(t){
  fs.writeFileSync(path.join(root,'deployment.json'),JSON.stringify(config));fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({version:'1.2.0'}));
  fs.writeFileSync(path.join(root,'output/Code.gs'),'function doGet(){}');fs.writeFileSync(path.join(root,'output/appsscript.json'),'{}');
  fs.writeFileSync(path.join(cli,'index.js'),`const fs=require('fs'),path=require('path');
-const args=process.argv.slice(2),command=args.find(a=>['list-deployments','push','create-version','update-deployment'].includes(a));
+const args=process.argv.slice(2),command=args.find(a=>['list-deployments','pull','push','create-version','update-deployment'].includes(a));
 const trace=process.env.WORDPET_TEST_TRACE,events=fs.existsSync(trace)?JSON.parse(fs.readFileSync(trace)):[];
 events.push({command,mode:fs.statSync(args[args.indexOf('--auth')+1]).mode&511,files:fs.readdirSync(process.cwd())});fs.writeFileSync(trace,JSON.stringify(events));
-if(command==='list-deployments') {const updated=events.some(e=>e.command==='update-deployment');console.log(JSON.stringify(process.env.WORDPET_TEST_MISSING?[]:[{deploymentId:'DEPLOY_TEST',versionNumber:updated?Number(process.env.WORDPET_TEST_TARGET||17):4}]));}
+if(command==='list-deployments') {const updated=events.some(e=>e.command==='update-deployment');console.log(JSON.stringify(process.env.WORDPET_TEST_MISSING?[]:[{deploymentId:'DEPLOY_TEST',versionNumber:updated&&!(process.env.WORDPET_TEST_STALE&&events.filter(e=>e.command==='list-deployments').length===2)?Number(process.env.WORDPET_TEST_TARGET||17):Number(process.env.WORDPET_TEST_BASE||4)}]));}
+if(command==='pull')fs.writeFileSync('Code.js',process.env.WORDPET_TEST_CURRENT_MATCH||Number(args[args.indexOf('--versionNumber')+1])>=17?'function doGet(){}':'function oldCode(){}');
+if(command==='update-deployment')console.log(JSON.stringify({versionNumber:Number(args[args.indexOf('--versionNumber')+1])}));
 if(command==='create-version')console.log(JSON.stringify({versionNumber:17}));
 if(command==='push'&&process.env.WORDPET_TEST_FAIL){console.error('example-token-must-not-leak');process.exit(1);}
 `);
@@ -27,7 +29,7 @@ if(command==='push'&&process.env.WORDPET_TEST_FAIL){console.error('example-token
 }
 test('publisher updates the existing URL, verifies the version, and isolates credentials and upload files',t=>{
  const f=fixture(t),r=f.run({});assert.equal(r.status,0,r.stderr);
- const events=f.events();assert.deepEqual(events.map(e=>e.command),['list-deployments','push','create-version','update-deployment','list-deployments']);
+ const events=f.events();assert.deepEqual(events.map(e=>e.command),['list-deployments','pull','push','create-version','update-deployment','list-deployments','pull']);
  assert.ok(events.every(e=>e.mode===0o600));
  const pushed=events.find(e=>e.command==='push');assert.ok(pushed.files.includes('Code.gs'));assert.equal(pushed.files.includes('App.html'),false);
  const receipt=JSON.parse(fs.readFileSync(path.join(f.root,'deploy-receipt.json')));assert.equal(receipt.url,f.config.webAppUrl);assert.equal(receipt.previousVersion,4);assert.equal(receipt.version,17);
@@ -44,6 +46,18 @@ test('rollback selects an immutable Google version without uploading source',t=>
 });
 test('failed source upload neither deploys nor exposes raw authentication errors',t=>{
  const f=fixture(t),r=f.run({WORDPET_TEST_FAIL:'1'});assert.notEqual(r.status,0);
- assert.deepEqual(f.events().map(e=>e.command),['list-deployments','push']);assert.equal(fs.existsSync(path.join(f.root,'deploy-receipt.json')),false);
+ assert.deepEqual(f.events().map(e=>e.command),['list-deployments','pull','push']);assert.equal(fs.existsSync(path.join(f.root,'deploy-receipt.json')),false);
  assert.equal(r.stderr.includes('example-token-must-not-leak'),false);
+});
+
+test('publisher inspects the current immutable source and skips an already applied release',t=>{
+ const f=fixture(t),r=f.run({WORDPET_TEST_BASE:'17',WORDPET_TEST_CURRENT_MATCH:'1'});assert.equal(r.status,0,r.stderr);
+ assert.deepEqual(f.events().map(e=>e.command),['list-deployments','pull']);
+ const receipt=JSON.parse(fs.readFileSync(path.join(f.root,'deploy-receipt.json')));assert.equal(receipt.reused,true);assert.equal(receipt.sourceVerified,true);assert.equal(receipt.version,17);
+});
+
+test('a stale deployment listing is rechecked without uploading or creating a second version',t=>{
+ const f=fixture(t),r=f.run({WORDPET_TEST_STALE:'1'});assert.equal(r.status,0,r.stderr);
+ assert.equal(f.events().filter(e=>e.command==='push').length,1);assert.equal(f.events().filter(e=>e.command==='create-version').length,1);assert.equal(f.events().filter(e=>e.command==='list-deployments').length,3);
+ assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,'deploy-receipt.json'))).sourceVerified,true);
 });

@@ -22,10 +22,10 @@ if(!deploymentId||!/^[A-Za-z0-9_-]+$/.test(config.scriptProjectId))throw Error('
 const rollback=process.env.WORDPET_ROLLBACK_VERSION||'';
 if(rollback&&!/^[1-9][0-9]*$/.test(rollback))throw Error('Rollback version must be a positive integer.');
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'wordpet-deploy-'));
-const authPath=path.join(temp,'.clasprc.json'),projectPath=path.join(temp,'.clasp.json');
+const authPath=path.join(temp,'.clasprc.json'),uploadDirectory=path.join(temp,'upload'),inspectionDirectory=path.join(temp,'inspect');
 const cli=path.join(root,'node_modules/@google/clasp/build/src/index.js');
-function clasp(args,json=false){
-  const result=spawnSync(process.execPath,[cli,'--auth',authPath,'--project',projectPath,...(json?['--json']:[]),...args],{cwd:temp,encoding:'utf8',timeout:180000,env:{...process.env,WORDPET_CLASPRC_JSON:'',WORDPET_CONFIG_JSON:''}});
+function clasp(args,json=false,directory=uploadDirectory){
+  const result=spawnSync(process.execPath,[cli,'--auth',authPath,'--project',path.join(directory,'.clasp.json'),...(json?['--json']:[]),...args],{cwd:directory,encoding:'utf8',timeout:180000,env:{...process.env,WORDPET_CLASPRC_JSON:'',WORDPET_CONFIG_JSON:''}});
   if(result.status!==0){
     // The OAuth response may contain credentials. Only return a fixed diagnosis.
     if(/401|invalid_grant|invalid credentials|invalid authentication|not logged in/i.test(result.stderr+result.stdout))throw Error('Google authorization expired or was revoked. Reconnect using WordPet setup.');
@@ -34,26 +34,53 @@ function clasp(args,json=false){
   }
   if(json){try{return JSON.parse(result.stdout);}catch {throw Error('Unexpected clasp response. Check deployment state before retrying.');}}
 }
+const normalizeSource=text=>text.replace(/\r\n/g,'\n').trimEnd();
+async function matchesPublishedSource(version,expected){
+  await fs.rm(inspectionDirectory,{recursive:true,force:true});
+  await fs.mkdir(inspectionDirectory);
+  await fs.writeFile(path.join(inspectionDirectory,'.clasp.json'),JSON.stringify({scriptId:config.scriptProjectId,rootDir:'.'}));
+  clasp(['pull','--versionNumber',String(version)],false,inspectionDirectory);
+  for(const name of ['Code.js','Code.gs']){
+    try {return normalizeSource(await fs.readFile(path.join(inspectionDirectory,name),'utf8'))===normalizeSource(expected);}
+    catch(e){if(e.code!=='ENOENT')throw e;}
+  }
+  throw Error('Google did not return the deployed Code file. No new upload was attempted.');
+}
 try{
   await fs.writeFile(authPath,credential,{mode:0o600});
-  await fs.writeFile(projectPath,JSON.stringify({scriptId:config.scriptProjectId,rootDir:'.'}));
+  await fs.mkdir(uploadDirectory);
+  await fs.writeFile(path.join(uploadDirectory,'.clasp.json'),JSON.stringify({scriptId:config.scriptProjectId,rootDir:'.'}));
   const before=clasp(['list-deployments'],true).find(d=>d.deploymentId===deploymentId);
   if(!before?.versionNumber)throw Error('The existing published deployment was not found. No code was changed.');
+  console.log('Current Google deployment version: '+Number(before.versionNumber));
   let version;
   const commit=process.env.GITHUB_SHA?.slice(0,12)||'local';
-  if(rollback)version=Number(rollback);
+  const expected=rollback?'':await fs.readFile(path.join(root,'output/Code.gs'),'utf8');
+  const alreadyPublished=!rollback&&await matchesPublishedSource(before.versionNumber,expected);
+  if(alreadyPublished){version=Number(before.versionNumber);console.log('Published source already matches this build; no upload or redeployment was needed.');}
+  else if(rollback)version=Number(rollback);
   else{
-    for(const name of ['Code.gs','appsscript.json'])await fs.copyFile(path.join(root,'output',name),path.join(temp,name));
+    for(const name of ['Code.gs','appsscript.json'])await fs.copyFile(path.join(root,'output',name),path.join(uploadDirectory,name));
     clasp(['push','--force']);
     const created=clasp(['create-version',`WordPet ${pkg.version} · ${commit}`],true);
     version=Number(created.versionNumber);
     if(!version)throw Error('Google did not return a new immutable version. Published deployment was not changed.');
   }
-  // Update the existing deployment; pupil links and the private spreadsheet stay in place.
-  clasp(['update-deployment',deploymentId,'--versionNumber',String(version),'--description',`WordPet ${rollback?'rollback':pkg.version} · ${commit}`]);
-  const after=clasp(['list-deployments'],true).find(d=>d.deploymentId===deploymentId);
-  if(Number(after?.versionNumber)!==version)throw Error('Publication was not verified. Inspect the Google deployment before another attempt.');
-  const receipt={previousVersion:before.versionNumber,version,commit,url:config.webAppUrl,verifiedAt:new Date().toISOString()};
+  if(!alreadyPublished){
+    // Update the existing deployment; pupil links and the private spreadsheet stay in place.
+    const acknowledged=clasp(['update-deployment',deploymentId,'--versionNumber',String(version),'--description',`WordPet ${rollback?'rollback':pkg.version} · ${commit}`],true);
+    if(Number(acknowledged.versionNumber)!==version)throw Error('Google acknowledged a different version. Inspect the deployment before another attempt.');
+    let verified=false;
+    for(let attempt=0;attempt<5;attempt++){
+      if(attempt)await new Promise(resolve=>setTimeout(resolve,1500));
+      const after=clasp(['list-deployments'],true).find(d=>d.deploymentId===deploymentId);
+      console.log('Observed Google deployment version: '+Number(after?.versionNumber||0));
+      if(Number(after?.versionNumber)===version){verified=true;break;}
+    }
+    if(!verified)throw Error('Publication was not verified. Inspect the Google deployment before another attempt.');
+    if(!rollback&&!await matchesPublishedSource(version,expected))throw Error('The deployed source does not match the compiled application. Inspect the deployment before another attempt.');
+  }
+  const receipt={previousVersion:before.versionNumber,version,commit,url:config.webAppUrl,sourceVerified:!rollback,reused:alreadyPublished,verifiedAt:new Date().toISOString()};
   await fs.writeFile(path.join(root,'deploy-receipt.json'),JSON.stringify(receipt,null,2));
   console.log(`Verified Google deployment version ${version}; previous version ${before.versionNumber}.`);
   if(process.env.GITHUB_STEP_SUMMARY)await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,`\nPublished WordPet${rollback?' (rollback)':' '+pkg.version}. Google version: ${version}. Previous Google version: ${before.versionNumber}.\n\n${config.webAppUrl}\n`);
