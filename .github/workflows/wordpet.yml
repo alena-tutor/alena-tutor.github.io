@@ -71,3 +71,6 @@ jobs:
         run: npm run build
       - name: Publish and verify the existing deployment
         run: node scripts/deploy.mjs
+
+      - name: Verify the public WordPet page without a personal key
+        run: node scripts/check-web.mjs

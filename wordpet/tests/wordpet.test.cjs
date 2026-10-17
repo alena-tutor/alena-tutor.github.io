@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.4.0'/);
+ assert.match(code,/version: '1.4.1'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -383,4 +383,9 @@ test('assembly controls add and return parts, submit their order, and never requ
  u.context.bindStudent();parts[0].onclick();parts[1].onclick();remove[0].onclick();parts[0].onclick();
  u.element('checkAssembly').click();assert.equal(u.context.sent,'I often after school. play chess');
  const html=fs.readFileSync(root+'/output/App.html','utf8');assert.equal(html.includes('getUserMedia'),false);assert.equal(html.includes('MediaRecorder'),false);assert.equal(html.includes('sendVoice'),false);
+});
+
+test('production manifest publishes a web app that pupils can open without a Google account',()=>{
+ const manifest=JSON.parse(fs.readFileSync(root+'/output/appsscript.json','utf8'));
+ assert.deepEqual(manifest.webapp,{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'});
 });

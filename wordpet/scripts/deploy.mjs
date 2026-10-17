@@ -35,13 +35,21 @@ function clasp(args,json=false,directory=uploadDirectory){
   if(json){try{return JSON.parse(result.stdout);}catch {throw Error('Unexpected clasp response. Check deployment state before retrying.');}}
 }
 const normalizeSource=text=>text.replace(/\r\n/g,'\n').trimEnd();
+const canonical=value=>Array.isArray(value)?value.map(canonical).sort():value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const expectedManifest=JSON.parse(await fs.readFile(path.join(root,'output/appsscript.json'),'utf8'));
+
 async function matchesPublishedSource(version,expected){
   await fs.rm(inspectionDirectory,{recursive:true,force:true});
   await fs.mkdir(inspectionDirectory);
   await fs.writeFile(path.join(inspectionDirectory,'.clasp.json'),JSON.stringify({scriptId:config.scriptProjectId,rootDir:'.'}));
   clasp(['pull','--versionNumber',String(version)],false,inspectionDirectory);
   for(const name of ['Code.js','Code.gs']){
-    try {return normalizeSource(await fs.readFile(path.join(inspectionDirectory,name),'utf8'))===normalizeSource(expected);}
+    try {
+      const code=await fs.readFile(path.join(inspectionDirectory,name),'utf8');
+      if(normalizeSource(code)!==normalizeSource(expected))return false;
+      const manifest=JSON.parse(await fs.readFile(path.join(inspectionDirectory,'appsscript.json'),'utf8'));
+      return JSON.stringify(canonical(manifest))===JSON.stringify(canonical(expectedManifest));
+    }
     catch(e){if(e.code!=='ENOENT')throw e;}
   }
   throw Error('Google did not return the deployed Code file. No new upload was attempted.');

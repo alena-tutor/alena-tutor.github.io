@@ -22,5 +22,5 @@ new vm.Script(code);
 await fs.mkdir(path.join(root,'output'),{recursive:true});
 await fs.writeFile(path.join(root,'output/Code.gs'),code);
 await fs.writeFile(path.join(root,'output/App.html'),html);
-await fs.writeFile(path.join(root,'output/appsscript.json'),JSON.stringify({timeZone:'Asia/Irkutsk',runtimeVersion:'V8',exceptionLogging:'STACKDRIVER',oauthScopes:['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/userinfo.email']},null,2));
+await fs.writeFile(path.join(root,'output/appsscript.json'),JSON.stringify({timeZone:'Asia/Irkutsk',runtimeVersion:'V8',exceptionLogging:'STACKDRIVER',webapp:{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'},oauthScopes:['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/userinfo.email']},null,2));
 console.log('WordPet production build ready. Student data is read from the private Google spreadsheet.');

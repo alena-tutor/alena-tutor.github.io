@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.4.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.4.1',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {

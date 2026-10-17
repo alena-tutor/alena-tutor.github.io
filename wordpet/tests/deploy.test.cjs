@@ -18,7 +18,10 @@ const args=process.argv.slice(2),command=args.find(a=>['list-deployments','pull'
 const trace=process.env.WORDPET_TEST_TRACE,events=fs.existsSync(trace)?JSON.parse(fs.readFileSync(trace)):[];
 events.push({command,mode:fs.statSync(args[args.indexOf('--auth')+1]).mode&511,files:fs.readdirSync(process.cwd())});fs.writeFileSync(trace,JSON.stringify(events));
 if(command==='list-deployments') {const updated=events.some(e=>e.command==='update-deployment');console.log(JSON.stringify(process.env.WORDPET_TEST_MISSING?[]:[{deploymentId:'DEPLOY_TEST',versionNumber:updated&&!(process.env.WORDPET_TEST_STALE&&events.filter(e=>e.command==='list-deployments').length===2)?Number(process.env.WORDPET_TEST_TARGET||17):Number(process.env.WORDPET_TEST_BASE||4)}]));}
-if(command==='pull')fs.writeFileSync('Code.js',process.env.WORDPET_TEST_CURRENT_MATCH||Number(args[args.indexOf('--versionNumber')+1])>=17?'function doGet(){}':'function oldCode(){}');
+if(command==='pull'){
+fs.writeFileSync('Code.js',process.env.WORDPET_TEST_CURRENT_MATCH||Number(args[args.indexOf('--versionNumber')+1])>=17?'function doGet(){}':'function oldCode(){}');
+fs.writeFileSync('appsscript.json',process.env.WORDPET_TEST_OLD_MANIFEST&&Number(args[args.indexOf('--versionNumber')+1])<17?'{"webapp":{"access":"MYSELF"}}':'{}');
+}
 if(command==='update-deployment')console.log(JSON.stringify({versionNumber:Number(args[args.indexOf('--versionNumber')+1])}));
 if(command==='create-version')console.log(JSON.stringify({versionNumber:17}));
 if(command==='push'&&process.env.WORDPET_TEST_FAIL){console.error('example-token-must-not-leak');process.exit(1);}
@@ -60,4 +63,10 @@ test('a stale deployment listing is rechecked without uploading or creating a se
  const f=fixture(t),r=f.run({WORDPET_TEST_STALE:'1'});assert.equal(r.status,0,r.stderr);
  assert.equal(f.events().filter(e=>e.command==='push').length,1);assert.equal(f.events().filter(e=>e.command==='create-version').length,1);assert.equal(f.events().filter(e=>e.command==='list-deployments').length,3);
  assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,'deploy-receipt.json'))).sourceVerified,true);
+});
+
+test('matching source with a changed manifest is published instead of incorrectly skipped',t=>{
+ const f=fixture(t),r=f.run({WORDPET_TEST_BASE:'4',WORDPET_TEST_CURRENT_MATCH:'1',WORDPET_TEST_OLD_MANIFEST:'1'});
+ assert.equal(r.status,0,r.stderr);assert.equal(f.events().filter(e=>e.command==='push').length,1);
+ assert.equal(JSON.parse(fs.readFileSync(path.join(f.root,'deploy-receipt.json'))).reused,false);
 });
