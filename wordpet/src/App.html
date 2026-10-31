@@ -11,6 +11,7 @@
 .study-page{max-width:850px;margin:0 auto}.study-start{margin-top:24px;padding:18px 0;background:var(--bg)}
 
 .dialog.dialog-wide{max-width:760px}.pet-choices{border:0;padding:0;margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pet-option{position:relative;display:block;border:2px solid var(--line);border-radius:18px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}.pet-option:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 2px #c3654620}.pet-option:has(input:focus-visible){outline:3px solid #6189aa;outline-offset:3px}.pet-option input{position:absolute;top:12px;right:12px;width:20px;height:20px;accent-color:var(--accent);z-index:1}.pet-option img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}.pet-option-copy{display:grid;gap:3px;padding:12px}.pet-option-copy strong{font-size:16px}.pet-option-copy>span{font-size:12px;color:var(--muted)}@media(max-width:360px){.pet-choices{gap:8px}.pet-option-copy{padding:9px}.pet-option-copy>span{font-size:11px}}
+.practice-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:22px 0}.practice-metrics strong{display:block;font-size:24px;line-height:1.2}.practice-metrics span{display:block;font-size:12px;color:var(--muted);margin-top:6px}#practicePeriod{max-width:170px}@media(max-width:700px){.practice-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.teacher-word-row{gap:14px;flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -20,13 +21,39 @@
 <script>
 /*__CORE__*/
 /*__PRONUNCIATION__*/
+/*__ACTIVITY__*/
 /*__DEMO__*/
 const PET_ART = /*__PET_ART__*/;
 const FOX_ART = PET_ART.fox;
 function petType(species){return WordPetCore.petSpecies.find(p=>p.id===species)||WordPetCore.petSpecies[0];}
 function petImage(species){return PET_ART[petType(species).id]||FOX_ART;}
 const IS_GOOGLE = Boolean(window.google?.script?.run);
-const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,busy:false,assembly:[]};
+const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,reportDays:'7',busy:false,assembly:[]};
+const practiceClock=WordPetActivity.create({now:()=>globalThis.performance?.now?.() ?? Date.now()});
+let clockSession='',clockVisit='',clockSent=-1,clockSending=false,pageFocused=true;
+function syncPracticeClock(){
+  const eligible=state.data?.role==='student' && state.session?.status==='active' && ['study','lesson'].includes(state.page);
+  if(eligible && clockSession!==state.session.id){
+    void flushPracticeTime();
+    clockSession=state.session.id;clockVisit=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);clockSent=-1;
+    practiceClock.begin(clockSession,clockVisit);
+  }
+  practiceClock.setActive(eligible && pageFocused && document.visibilityState!=='hidden');
+}
+async function flushPracticeTime(){
+  const sample=practiceClock.sample();
+  if(!sample || clockSending || sample.totalSeconds<=clockSent || !state.key)return;
+  clockSending=true;
+  try{const result=await rpc('activity',sample);if(result.saved && sample.visitId===clockVisit)clockSent=Math.max(clockSent,sample.totalSeconds);}catch{}finally{clockSending=false;}
+}
+function installPracticeClock(){
+  ['pointerdown','keydown','input','scroll'].forEach(name=>document.addEventListener(name,()=>practiceClock.interact(),{passive:true,capture:true}));
+  document.addEventListener('visibilitychange',()=>{syncPracticeClock();void flushPracticeTime();});
+  window.addEventListener('blur',()=>{pageFocused=false;syncPracticeClock();void flushPracticeTime();});
+  window.addEventListener('focus',()=>{pageFocused=true;practiceClock.interact();syncPracticeClock();});
+  window.addEventListener('pagehide',()=>{practiceClock.setActive(false);void flushPracticeTime();});
+  setInterval(()=>{syncPracticeClock();void flushPracticeTime();},20000);
+}
 let audioStatus={};
 let audioStore;try{audioStore=globalThis.localStorage;}catch{}
 const pronunciation=WordPetAudio.create({store:audioStore,fetchClip:loadAppRecording,onStatus:status=>{audioStatus=status;updateAudioStatus();}});
@@ -73,6 +100,7 @@ function nav() {
   return `<nav class="nav" aria-label="Разделы">${[['home','home','Дом'],['words','book','Слова'],['progress','chart','Прогресс']].map(([page,ico,label])=>`<button data-page="${page}" class="${state.page===page?'active':''}" ${state.page===page?'aria-current="page"':''}>${icon(ico)}${label}</button>`).join('')}</nav>`;
 }
 function render() {
+  syncPracticeClock();
   document.body.classList.toggle('teacher-page',state.data?.role==='teacher');
   if (!state.data) { renderLogin(); return; }
   const body = state.data.role==='teacher' ? teacherPage() : state.page==='study' ? studyPage() : state.page==='lesson' ? lessonPage() : state.page==='words' ? wordsPage() : state.page==='progress' ? progressPage() : homePage();
@@ -81,6 +109,7 @@ function render() {
   document.getElementById('audioPreferences').onclick=openAudioPreferences;updateAudioStatus();
   document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{stopPronunciation();state.assembly=[];state.page=b.dataset.page;render();window.scrollTo(0,0);});
   if (state.data.role==='teacher') bindTeacher(); else bindStudent();
+  void flushPracticeTime();
 }
 function homePage() {
   const d=state.data,p=d.pet;
@@ -158,7 +187,7 @@ function summaryPage() {
 }
 function teacherPage() {
   const d=state.data;
-  return `<section class="page-top row between wrap"><div><div class="label">Кабинет преподавателя</div><h1 style="margin-top:7px">Слова, которые оживают</h1><p class="subtitle">Глоссарии, практика и собственная речь учеников.</p></div><button class="button secondary small" id="syncNow">Обновить глоссарии</button></section><div class="teacher-tabs">${[['students','Ученики'],['reviews','На проверке ('+d.pending.length+')'],['words','Слова с урока'],['access','Личные ссылки'],['archive','Архив']].map(([key,label])=>`<button data-tab="${key}" class="${state.teacherTab===key?'active':''}">${label}</button>`).join('')}</div>${state.teacherTab==='reviews'?teacherReviews():state.teacherTab==='words'?teacherWords():state.teacherTab==='access'?teacherAccess():state.teacherTab==='archive'?teacherArchive():`<div class="teacher-grid">${d.students.map(s=>`<section class="card teacher-student"><h3>${esc(s.name)}</h3><div class="teacher-status"><i class="status-dot ${s.doneToday?'done':''}"></i>${s.doneToday?'Миссия сегодня выполнена':'Сегодня ещё не занимался'}</div><div class="row between"><div><div class="teacher-number">${s.total}</div><div class="tiny muted">слов в глоссарии</div></div><div><div class="teacher-number">${s.mastered}</div><div class="tiny muted">вспоминает сам</div></div></div><p class="subtitle">На проверке: ${s.pending}</p><p class="tiny muted" style="margin-top:12px">${esc(s.syncStatus)}</p><button class="button secondary full small" data-student="${esc(s.id)}">Слова и трудности ${icon('arrow')}</button>${s.history.length?`<div class="tiny muted" style="margin-top:14px">Последняя практика: ${date(s.history[s.history.length-1].day)} · ${s.history[s.history.length-1].score}%</div>`:''}</section>`).join('')}</div><p class="footer-note">Глоссарии обновляются по расписанию после настройки Google и по кнопке. Исходные таблицы остаются без изменений.</p>`}`;
+  return `<section class="page-top row between wrap"><div><div class="label">Кабинет преподавателя</div><h1 style="margin-top:7px">Слова, которые оживают</h1><p class="subtitle">Слова, время практики и трудности учеников.</p></div><button class="button secondary small" id="syncNow">Обновить глоссарии</button></section><div class="teacher-tabs">${[['students','Ученики'],['practice','Практика и трудности'],['reviews','На проверке ('+d.pending.length+')'],['words','Слова с урока'],['access','Личные ссылки'],['archive','Архив']].map(([key,label])=>`<button data-tab="${key}" class="${state.teacherTab===key?'active':''}">${label}</button>`).join('')}</div>${state.teacherTab==='practice'?teacherPractice():state.teacherTab==='reviews'?teacherReviews():state.teacherTab==='words'?teacherWords():state.teacherTab==='access'?teacherAccess():state.teacherTab==='archive'?teacherArchive():`<div class="teacher-grid">${d.students.map(s=>`<section class="card teacher-student"><h3>${esc(s.name)}</h3><div class="teacher-status"><i class="status-dot ${s.doneToday?'done':''}"></i>${s.doneToday?'Миссия сегодня выполнена':'Сегодня ещё не занимался'}</div><div class="row between"><div><div class="teacher-number">${s.total}</div><div class="tiny muted">слов в глоссарии</div></div><div><div class="teacher-number">${s.mastered}</div><div class="tiny muted">вспоминает сам</div></div></div><p class="subtitle">На проверке: ${s.pending}</p><p class="tiny muted" style="margin-top:12px">${esc(s.syncStatus)}</p><button class="button secondary full small" data-student="${esc(s.id)}">Практика и трудности ${icon('arrow')}</button>${s.history.length?`<div class="tiny muted" style="margin-top:14px">Последняя практика: ${date(s.history[s.history.length-1].day)} · ${s.history[s.history.length-1].score}%</div>`:''}</section>`).join('')}</div><p class="footer-note">Глоссарии обновляются по расписанию после настройки Google и по кнопке. Исходные таблицы остаются без изменений.</p>`}`;
 }
 function studentSelect(id='teacherStudent') {
   const selected=state.studentId||state.data.students[0]?.id;
@@ -167,6 +196,17 @@ function studentSelect(id='teacherStudent') {
 function teacherWords() {
   const s=state.data.students.find(s=>s.id===(state.studentId||state.data.students[0]?.id));
   return `<div class="row teacher-actions">${studentSelect()}<button class="button" id="addWord">Добавить слово</button></div><p class="subtitle" style="margin-bottom:18px">Отметь слово как трудное — оно попадёт в ближайшую тренировку. Новые слова можно добавить прямо здесь.</p><section class="card">${s?.words.length?s.words.map(w=>`<div class="teacher-word-row"><div><strong>${esc(w.english)}</strong><p>${esc(w.russian)}</p>${w.example?`<p style="margin-top:5px;font-style:italic">${esc(w.example)}</p>`:''}<span class="pill ${w.category}" style="margin-top:8px">${catName(w.category)}</span></div><div class="stack" style="gap:6px"><button class="button secondary small" data-hard="${esc(w.id)}">Трудное сегодня</button><button class="button ghost small" data-edit="${esc(w.id)}">Изменить</button></div></div>`).join(''):'<div class="empty"><h3>Глоссарий пока пуст</h3>Добавь слова или обнови подключённый глоссарий.</div>'}</section>`;
+}
+function practiceDuration(seconds){
+  if(seconds===null || seconds===undefined)return 'Нет данных';
+  const total=Math.max(0,Math.floor(seconds));
+  return total<60?total+' сек':Math.floor(total/60)+' мин'+(total%60?' '+total%60+' сек':'');
+}
+function teacherPractice(){
+  const student=state.data.students.find(s=>s.id===(state.studentId||state.data.students[0]?.id));
+  const report=student?.practice?.[state.reportDays];
+  const skillNames={choose:'выбор перевода',write_ru:'ввод перевода',write_en:'ввод слова',listen:'на слух',gap:'пропуск без подсказки',gap_choice:'выбор слова в пропуске',letters:'сборка из букв',assemble:'сборка предложения'};
+  return `<div class="row wrap teacher-actions">${studentSelect()}<select class="field" id="practicePeriod" aria-label="Период отчёта">${[['1','Сегодня'],['7','7 дней'],['30','30 дней']].map(([value,label])=>`<option value="${value}" ${state.reportDays===value?'selected':''}>${label}</option>`).join('')}</select><button class="button secondary small" id="refreshPractice">Обновить</button></div>${report?`<section class="card"><h2>Практика · ${esc(student.name)}</h2><div class="practice-metrics"><div><strong>${esc(practiceDuration(report.seconds))}</strong><span>активной практики</span></div><div><strong>${report.completed}</strong><span>завершено тренировок</span></div><div><strong>${report.attempts}</strong><span>ответов, включая повторения</span></div><div><strong>${report.accuracy===null?'—':report.accuracy+'%'}</strong><span>правильных ответов</span></div></div><p class="subtitle">Ошибок: ${report.wrong} · «Не знаю»: ${report.unknown}</p><p class="footer-note">Время приблизительное: чтение списка слов и выполнение заданий. Скрытая страница, другая вкладка и паузы дольше минуты не учитываются. Учёт времени начался с обновления.${report.untrackedSessions?' В выбранном периоде есть тренировки без измерения времени: '+report.untrackedSessions+'.':''}</p></section><section class="card" style="margin-top:20px"><h3>С чем были трудности</h3><p class="subtitle">Ошибки и «Не знаю» за выбранный период, включая повторные попытки.</p>${report.difficulties.length?report.difficulties.map(w=>`<div class="teacher-word-row"><div><strong>${esc(w.english)}</strong><p>${esc(w.russian)}</p><p class="tiny muted" style="margin-top:8px">Ошибок: ${w.wrong} · «Не знаю»: ${w.unknown} · Всего попыток: ${w.attempts}</p><p class="tiny muted">${esc(w.skills.map(k=>skillNames[k]||k).join(', '))}</p><p class="tiny" style="margin-top:5px">${w.lastCorrect?'Последний ответ — верный':'Последний ответ — нужно повторить'} · ${esc(date(w.lastAt))}</p></div><button class="button secondary small" data-hard="${esc(w.wordId)}">Повторить на уроке</button></div>`).join(''):'<div class="empty">'+(report.attempts?'В этом периоде ошибок и «Не знаю» не было.':'За этот период ответов пока нет.')+'</div>'}</section>`:'<div class="empty">Выбери ученика, чтобы посмотреть практику.</div>'}`;
 }
 function teacherReviews() {
   return state.data.pending.length?`<div class="stack">${state.data.pending.map(a=>`<article class="card pending-card" data-review-id="${esc(a.id)}"><div class="row between wrap"><div><span class="label">${esc(state.data.students.find(s=>s.id===a.studentId)?.name||a.studentId)} · ${esc(date(a.date))}</span><h3 style="margin-top:8px">${esc(a.english)}</h3></div><span class="pill">${a.kind==='voice'?'Устный ответ':'Письменное предложение'}</span></div>${a.kind==='voice'?`<button class="button secondary small" data-audio="${esc(a.id)}">${icon('play')}Загрузить запись</button><div data-audio-player></div>`:`<p class="feedback-text">${esc(a.text)}</p>`}<div class="review-form"><textarea class="field" rows="2" maxlength="1500" aria-label="Комментарий преподавателя" placeholder="Что получилось и что поправить"></textarea><button class="button sage small" data-review="yes">Получилось</button><button class="button secondary small" data-review="no">Повторить</button></div></article>`).join('')}</div>`:'<div class="empty"><h3>Всё проверено</h3>Новые задания проверяются автоматически. Здесь остаются только ответы из прежних тренировок.</div>';
@@ -186,8 +226,8 @@ function bindStudent() {
   document.getElementById('startMission')?.addEventListener('click',()=>startMission(false));
   document.getElementById('retryMission')?.addEventListener('click',()=>startMission(true));
   document.getElementById('beginExercises')?.addEventListener('click',()=>{stopPronunciation();state.page='lesson';render();window.scrollTo(0,0);document.getElementById('typedAnswer')?.focus();});
-  document.getElementById('backHome')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();await reload();state.page='home';state.session=null;render();}));
-  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();state.assembly=[];await reload();state.page='home';state.feedback=null;render();}));
+  document.getElementById('backHome')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();await reload();state.page='home';syncPracticeClock();await flushPracticeTime();state.session=null;render();}));
+  document.getElementById('leaveLesson')?.addEventListener('click',()=>busy(async()=>{stopPronunciation();state.assembly=[];state.page='home';syncPracticeClock();await flushPracticeTime();await reload();state.feedback=null;render();}));
   document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;render();});
   document.getElementById('wordSearch')?.addEventListener('input',e=>{state.search=e.target.value;const position=e.target.selectionStart;render();const el=document.getElementById('wordSearch');el.focus();el.setSelectionRange(position,position);});
   document.querySelectorAll('[data-option]').forEach(b=>b.onclick=()=>submitAnswer(b.dataset.option));
@@ -210,7 +250,7 @@ async function startMission(retry) {
 async function submitAnswer(answer,extra={}) {
   return busy(async()=>{
     stopPronunciation();const task=state.session.task;
-    const result=await rpc('answer',{sessionId:state.session.id,taskId:task.id,answer,...extra});
+    const result=await rpc('answer',{sessionId:state.session.id,taskId:task.id,answer,activity:practiceClock.sample(),...extra});
     state.session=result.session;state.data.pet=result.pet;state.feedback={result:result.result,task};state.assembly=[];render();
   });
 }
@@ -256,7 +296,9 @@ function renamePet() {
 }
 function bindTeacher(){
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.teacherTab=b.dataset.tab;render();});
-  document.querySelectorAll('[data-student]').forEach(b=>b.onclick=()=>{state.studentId=b.dataset.student;state.teacherTab='words';render();});
+  document.querySelectorAll('[data-student]').forEach(b=>b.onclick=()=>{state.studentId=b.dataset.student;state.teacherTab='practice';render();});
+  document.getElementById('practicePeriod')?.addEventListener('change',e=>{state.reportDays=e.target.value;render();});
+  document.getElementById('refreshPractice')?.addEventListener('click',()=>busy(async()=>{await reload();render();}));
   document.getElementById('teacherStudent')?.addEventListener('change',e=>{state.studentId=e.target.value;render();});
   document.getElementById('syncNow')?.addEventListener('click',()=>busy(async()=>{const result=await rpc('sync');await reload();render();toast(result.some(r=>!r.ok)?'Часть глоссариев не обновилась. Смотри статус ученика.':'Глоссарии обновлены.');}));
   document.getElementById('addWord')?.addEventListener('click',()=>wordDialog());
@@ -282,9 +324,10 @@ function renderLogin(){
 
 }
 async function connect(key){return busy(async()=>{if(state.key!==key){pronunciation.clear();state.session=null;state.feedback=null;}state.key=key;try{await reload();}catch(e){state.data=null;renderLogin();throw e;}try{localStorage.setItem('wordpet-key',key);}catch{}state.page='home';render();});}
-function logout(){pronunciation.clear();stopPronunciation();state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
+function logout(){practiceClock.setActive(false);void flushPracticeTime();practiceClock.stop();clockSession='';clockVisit='';clockSent=-1;pronunciation.clear();stopPronunciation();state.assembly=[];state.data=null;state.key='';state.session=null;state.feedback=null;try{localStorage.removeItem('wordpet-key');}catch{}renderLogin();}
 
 async function boot(){
+  installPracticeClock();
   if(!IS_GOOGLE){document.getElementById('demoBanner').classList.remove('hidden');document.getElementById('demoSwitch').onclick=chooseDemo;}
   let saved='';try{saved=localStorage.getItem('wordpet-key')||'';}catch{}
   if(IS_GOOGLE){google.script.url.getLocation(location=>{const params=new URLSearchParams(location.hash||'');const key=params.get('key')||saved;if(key&&!key.startsWith('demo-'))connect(key);else renderLogin();});}
@@ -293,3 +336,4 @@ async function boot(){
 boot();
 </script>
 </body></html>
+

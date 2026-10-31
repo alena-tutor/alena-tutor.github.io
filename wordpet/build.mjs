@@ -15,8 +15,8 @@ for(const id of ['cat','dog','dragon']){
   if(!/^[A-Za-z0-9+/=]+$/.test(encoded))throw Error('Invalid pet artwork: '+id);
   petArt[id]=`data:image/jpeg;base64,${encoded}`;
 }
-const pronunciation=await read('src/Pronunciation.js');
-const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__PRONUNCIATION__*/',()=>pronunciation).replace('/*__DEMO__*/','').replace('/*__PET_ART__*/',()=>JSON.stringify(petArt));
+const pronunciation=await read('src/Pronunciation.js'),activity=await read('src/Activity.js');
+const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__PRONUNCIATION__*/',()=>pronunciation).replace('/*__ACTIVITY__*/',()=>activity).replace('/*__DEMO__*/','').replace('/*__PET_ART__*/',()=>JSON.stringify(petArt));
 const server=(await read('src/Server.js')).replace('__DATABASE_ID__',()=>config.spreadsheetId).replace("webAppUrl: ''",()=>`webAppUrl: ${JSON.stringify(config.webAppUrl)}`);
 const code=core.replace(/if \(typeof module[^\n]+\n?/,'')+'\n'+server+'\n'+archive+'\n'+speech+'\nconst WORD_EXAMPLES_ = '+JSON.stringify(JSON.parse(await read('src/examples.json')))+';\nconst APP_HTML_ = '+JSON.stringify(html)+';\n';
 new vm.Script(code);
@@ -25,3 +25,4 @@ await fs.writeFile(path.join(root,'output/Code.gs'),code);
 await fs.writeFile(path.join(root,'output/App.html'),html);
 await fs.writeFile(path.join(root,'output/appsscript.json'),JSON.stringify({timeZone:'Asia/Irkutsk',runtimeVersion:'V8',exceptionLogging:'STACKDRIVER',webapp:{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'},oauthScopes:['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/userinfo.email']},null,2));
 console.log('WordPet production build ready. Student data is read from the private Google spreadsheet.');
+

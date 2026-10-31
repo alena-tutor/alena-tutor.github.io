@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.8.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.9.0',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
@@ -178,6 +178,7 @@ function api(request) {
     care:() => withLock_(() => care_(access.personId,data)),
     savePet:() => withLock_(() => savePet_(access.personId,data)),
     noAudio:() => withLock_(() => noAudio_(access.personId,data)),
+    activity:() => withLock_(() => activity_(access.personId,data)),
     myAudio:() => myAudio_(access.personId,data)
   };
   if (!Object.prototype.hasOwnProperty.call(methods,action)) throw Error('Действие недоступно.');
@@ -301,6 +302,7 @@ function answer_(studentId,data) {
   const result = {taskId:task.id,wordId:task.wordId,kind:task.kind,correct,answerId,unknown,isReview:Boolean(task.isReview),
     answer:text,
     expected:correct === false ? (task.kind === 'write_ru' || task.kind === 'choose' ? task.russian : task.sentenceAnswer || task.gapAnswer || task.english) : '',timestamp};
+  recordActivity_(s,p,data.activity);
   p.results.push(result);
   WordPetCore.queueReview(p,task,correct);
   if (p.results.length === p.tasks.length) { s.status = 'completed'; p.summary = reward_(studentId,s,p); }
@@ -354,6 +356,60 @@ function savePet_(studentId,data) {
   if (data.species !== undefined) pet.species = data.species;
   put_('Питомцы',pet); return publicPet_(pet);
 }
+// Cumulative per-visit checkpoints make retries and late RPCs idempotent.
+// A server wall-clock cap prevents two tabs from doubling recorded time.
+function recordActivity_(session,payload,input,clock = Date.now()) {
+  if (!input || typeof input.visitId !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(input.visitId) ||
+      !Number.isFinite(input.totalSeconds) || input.totalSeconds < 0 || input.totalSeconds > 86400) return false;
+  const total = Math.floor(input.totalSeconds);
+  const activity = payload.activity || {seconds:0,startedAt:new Date(clock).toISOString(),lastAt:session.createdAt,visits:[]};
+  const visit = activity.visits.find(v => v.id === input.visitId);
+  if (visit && total <= visit.total) return false;
+  const elapsed = Math.max(0,Math.min(30,Math.floor((clock - Date.parse(activity.lastAt || session.createdAt)) / 1000) || 0));
+  const delta = Math.max(0,total - (visit?.total || 0));
+  activity.seconds = Math.max(0,Number(activity.seconds) || 0) + Math.min(delta,elapsed);
+  activity.lastAt = new Date(clock).toISOString();
+  activity.visits = activity.visits.filter(v => v.id !== input.visitId).concat({id:input.visitId,total}).slice(-8);
+  payload.activity = activity;
+  return true;
+}
+function activity_(studentId,data) {
+  const s = rows_('Тренировки').find(s => s.id === data.sessionId && s.studentId === studentId);
+  if (!s) throw Error('Тренировка не найдена.');
+  if (s.status !== 'active' || s.day !== today_()) return {saved:false};
+  const payload = JSON.parse(s.payload);
+  if (recordActivity_(s,payload,data)) { s.payload = JSON.stringify(payload); put_('Тренировки',s); }
+  return {saved:true};
+}
+function practiceReport_(studentId,words,sessions,today) {
+  const own = sessions.filter(s => s.studentId === studentId).map(s => ({...s,data:JSON.parse(s.payload)}));
+  const reports = {};
+  [1,7,30].forEach(days => {
+    const cutoff = new Date(WordPetCore.dateValue(today) - (days - 1) * 86400000).toISOString().slice(0,10);
+    const selected = own.filter(s => s.day >= cutoff && s.day <= today);
+    const tracked = selected.filter(s => s.data.activity);
+    const report = {seconds:tracked.length ? tracked.reduce((n,s)=>n+(Number(s.data.activity.seconds)||0),0) : null,
+      untrackedSessions:selected.length-tracked.length,completed:selected.filter(s=>s.status==='completed').length,
+      attempts:0,correct:0,wrong:0,unknown:0,difficulties:[]};
+    const byWord = {};
+    selected.forEach(s => (s.data.results || []).forEach(r => {
+      if (typeof r.correct !== 'boolean') return;
+      report.attempts++; if (r.correct) report.correct++; else if(r.unknown) report.unknown++; else report.wrong++;
+      const word = words.find(w=>w.id===r.wordId);
+      if (!word) return;
+      const entry = byWord[r.wordId] || (byWord[r.wordId]={wordId:word.id,english:word.english,russian:word.russian,
+        attempts:0,wrong:0,unknown:0,lastAt:'',lastCorrect:false,skills:[]});
+      entry.attempts++;
+      if (!r.correct) { if(r.unknown) entry.unknown++; else entry.wrong++; if(!entry.skills.includes(r.kind))entry.skills.push(r.kind); }
+      if ((r.timestamp || s.createdAt) >= entry.lastAt) { entry.lastAt=r.timestamp || s.createdAt; entry.lastCorrect=r.correct; }
+    }));
+    report.difficulties = Object.values(byWord).filter(w=>w.wrong+w.unknown>0)
+      .sort((a,b)=>(b.wrong+b.unknown)-(a.wrong+a.unknown)||b.lastAt.localeCompare(a.lastAt));
+    report.accuracy = report.attempts ? Math.round(report.correct / report.attempts * 100) : null;
+    reports[days] = report;
+  });
+  return reports;
+}
 function teacherDashboard_() {
   const words = rows_('Слова'), progress = rows_('Прогресс'), sessions = rows_('Тренировки'), answers = rows_('Ответы');
   return {role:'teacher',today:today_(),students:rows_('Ученики').map(s => {
@@ -362,6 +418,7 @@ function teacherDashboard_() {
     const ss = sessions.filter(t => t.studentId === s.id && t.status === 'completed' && t.mode === 'daily');
     return {id:s.id,name:s.name,total:ws.length,mastered:ws.filter(w => WordPetCore.mastered(w,ps)).length,
       doneToday:ss.some(t => t.day === today_()),lastPractice:ss.length ? ss[ss.length-1].createdAt : archiveTotal_(s.id,sessions).lastPractice,
+      practice:practiceReport_(s.id,ws,sessions,today_()),
       syncStatus:s.syncStatus,lastSync:s.lastSync,pending:answers.filter(a => a.studentId===s.id && a.status==='pending').length,
       words:ws.map(w => ({id:w.id,english:w.english,russian:w.russian,...exampleContext_(w),answers:w.answers,russianAliases:w.russianAliases,hardOn:WordPetCore.day(w.hardOn),category:WordPetCore.category(w,ps,today_())})),
       history:ss.slice(-7).map(t => ({day:t.day,score:sessionScore_(JSON.parse(t.payload))}))};
@@ -416,3 +473,4 @@ function rotateKey_(data) {
   a.token = token_(); put_('Доступ',a); refreshLinks_();
   return {ok:true,link:rows_('Доступ').find(r=>r.personId===a.personId).link};
 }
+

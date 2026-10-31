@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.8.0'/);
+ assert.match(code,/version: '1.9.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -521,4 +521,83 @@ test('retries use later words and remain available after four sessions without d
  assert.equal(dashboard.history.some(s=>s.mode==='daily'),false,'daily result has left the short history');
  assert.equal(dashboard.pet.xp,80);assert.equal(dashboard.pet.coins,10);
  assert.equal(b.api('learner_b','start',{retry:true}).status,'active');
+});
+
+
+test('active practice saves bounded time without extra rows, duplicate requests or cross-pupil access',()=>{
+ const b=backend();let clock=Date.UTC(2026,9,16,4);
+ b.context.Date=class extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+ const s=b.api('learner_b','start');
+ const tick=(total,visitId='visit_number_one')=>b.api('learner_b','activity',{sessionId:s.id,visitId,totalSeconds:total});
+ tick(0);clock+=20000;tick(20);tick(20);tick(12);
+ let payload=()=>JSON.parse(b.records('Тренировки')[0].payload);
+ assert.equal(payload().activity.seconds,20);
+ tick(20,'visit_number_two');assert.equal(payload().activity.seconds,20,'two tabs cannot claim the same wall time');
+ clock+=20000;tick(40,'visit_number_two');assert.equal(payload().activity.seconds,40);
+ clock+=20000;tick(5000);assert.equal(payload().activity.seconds,60,'large client claims are capped by the server');
+ tick(NaN);tick(-1);tick(90000);tick(10,'bad');assert.equal(payload().activity.seconds,60);
+ assert.equal(b.records('Тренировки').length,1);assert.equal(b.records('Прогресс').length,0);
+ assert.throws(()=>b.api('learner_a','activity',{sessionId:s.id,visitId:'visit_number_one',totalSeconds:100}),/не найдена/);
+ assert.throws(()=>b.api('teacher','activity',{sessionId:s.id}),/недоступно/);
+});
+test('answer flush counts time once and completed or previous-day sessions cannot accumulate time',()=>{
+ const b=backend();let clock=Date.UTC(2026,9,16,4);
+ b.context.Date=class extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}};
+ const s=b.api('learner_b','start'),task=b.tasks(s.id)[0];clock+=12000;
+ const input={sessionId:s.id,taskId:task.id,unknown:true,activity:{visitId:'answer_visit_one',totalSeconds:12}};
+ b.api('learner_b','answer',input);b.api('learner_b','answer',input);
+ assert.equal(JSON.parse(b.records('Тренировки')[0].payload).activity.seconds,12);
+ finish(b,'learner_b');clock+=20000;
+ assert.equal(b.api('learner_b','activity',{sessionId:s.id,visitId:'answer_visit_one',totalSeconds:32}).saved,false);
+ assert.equal(JSON.parse(b.records('Тренировки')[0].payload).activity.seconds,12);
+ const next=b.api('learner_b','start',{retry:true});b.data.get('Тренировки').at(-1)[3]='2026-10-15';
+ assert.equal(b.api('learner_b','activity',{sessionId:next.id,visitId:'answer_visit_two',totalSeconds:20}).saved,false);
+});
+test('teacher report counts mistakes and unknowns separately across unfinished, repeated and older practice',()=>{
+ const b=backend(),s=b.api('learner_b','start'),t=b.tasks(s.id)[0];
+ b.api('learner_b','answer',{sessionId:s.id,taskId:t.id,unknown:true});
+ let report=b.api('teacher','bootstrap').students.find(s=>s.id==='learner_b').practice[1];
+ assert.equal(report.unknown,1);assert.equal(report.wrong,0);assert.equal(report.completed,0);assert.equal(report.seconds,null);
+ assert.equal(report.difficulties[0].english,t.english);assert.equal(report.difficulties[0].unknown,1);
+ const current=b.api('learner_b','start');b.api('learner_b','answer',{sessionId:s.id,taskId:current.task.id,answer:'incorrect answer'});
+ finish(b,'learner_b');finish(b,'learner_b',{retry:true});
+ report=b.api('teacher','bootstrap').students.find(s=>s.id==='learner_b').practice[1];
+ assert.equal(report.unknown,1);assert.equal(report.wrong,1);assert.equal(report.completed,2);assert.equal(report.attempts,22);
+ assert.ok(report.difficulties.every(w=>w.lastCorrect));assert.equal(report.seconds,null);assert.equal(report.untrackedSessions,2);
+ assert.equal(b.api('teacher','bootstrap').students.find(s=>s.id==='learner_a').practice[1].attempts,0);
+ assert.equal(Object.hasOwn(b.api('learner_b','bootstrap'),'practice'),false);
+ // A previous round sits outside today and seven days but inside thirty calendar days.
+ const old=JSON.parse(JSON.stringify(b.data.get('Тренировки')[1]));old[0]='historical-round';old[3]='2026-10-08';b.data.get('Тренировки').push(old);
+ const reports=b.api('teacher','bootstrap').students.find(s=>s.id==='learner_b').practice;
+ assert.equal(reports[1].completed,2);assert.equal(reports[7].completed,2);assert.equal(reports[30].completed,3);
+ assert.equal(reports[30].unknown,2);assert.equal(reports[30].seconds,null,'elapsed timestamps never fabricate old time');
+});
+test('teacher practice view displays period, time and escaped word difficulties without exposing answers',()=>{
+ const u=petUi();
+ vm.runInContext(`state.reportDays='7';state.studentId='learner_b';state.data={students:[{id:'learner_b',name:'<Ученик>',practice:{7:{seconds:125,completed:3,attempts:32,accuracy:90,wrong:2,unknown:1,untrackedSessions:1,difficulties:[{wordId:'word-id',english:'<img src=x>',russian:'слово',wrong:2,unknown:1,attempts:5,lastCorrect:true,lastAt:'2026-10-16',skills:['listen','letters']}]}}}]};`,u.context);
+ const html=vm.runInContext('teacherPractice()',u.context);
+ assert.match(html,/2 мин 5 сек/);assert.match(html,/Сегодня/);assert.match(html,/30 дней/);assert.match(html,/«Не знаю»: 1/);
+ assert.match(html,/на слух, сборка из букв/);assert.match(html,/Последний ответ — верный/);assert.match(html,/&lt;img src=x&gt;/);assert.equal(html.includes('<img src=x>'),false);
+ assert.match(html,/данных|измерения времени/);assert.match(html,/data-hard="word-id"/);
+});
+
+test('browser clock saves practice, pauses on hidden or blurred pages and keeps unsent totals for retry',async()=>{
+ const u=petUi(),events={},requests=[];let time=0,timer;
+ u.context.performance={now:()=>time};u.context.document.visibilityState='visible';
+ u.context.document.addEventListener=(name,handler)=>{events[name]=handler;};
+ u.context.window.addEventListener=(name,handler)=>{events[name]=handler;};
+ u.context.setInterval=(fn,ms)=>{assert.equal(ms,20000);timer=fn;};
+ u.context.capture=async(action,data)=>{requests.push({action,data});return {saved:true};};
+ vm.runInContext("rpc=(action,data)=>capture(action,data);state.key='test-key';state.data={role:'student'};state.session={id:'session-one',status:'active'};state.page='study';installPracticeClock();syncPracticeClock();",u.context);
+ await vm.runInContext('flushPracticeTime()',u.context);assert.equal(requests.at(-1).data.totalSeconds,0);
+ time=20000;timer();await new Promise(r=>setImmediate(r));assert.equal(requests.at(-1).data.totalSeconds,20);
+ u.context.document.visibilityState='hidden';events.visibilitychange();time+=90000;timer();await new Promise(r=>setImmediate(r));assert.equal(requests.at(-1).data.totalSeconds,20);
+ u.context.document.visibilityState='visible';events.visibilitychange();events.pointerdown();time+=10000;
+ await vm.runInContext('flushPracticeTime()',u.context);assert.equal(requests.at(-1).data.totalSeconds,30);
+ events.blur();time+=10000;timer();await new Promise(r=>setImmediate(r));assert.equal(requests.at(-1).data.totalSeconds,30);
+ events.focus();time+=10000;
+ u.context.capture=async()=>{throw Error('offline');};await vm.runInContext('flushPracticeTime()',u.context);
+ u.context.capture=async(action,data)=>{requests.push({action,data});return {saved:true};};await vm.runInContext('flushPracticeTime()',u.context);
+ assert.equal(requests.at(-1).data.totalSeconds,40);assert.ok(requests.every(r=>r.action==='activity'&&r.data.sessionId==='session-one'));
+ vm.runInContext("state.page='home';syncPracticeClock();",u.context);time+=120000;await vm.runInContext('flushPracticeTime()',u.context);assert.equal(requests.at(-1).data.totalSeconds,40);
 });
