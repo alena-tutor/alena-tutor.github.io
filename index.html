@@ -5350,7 +5350,7 @@ const teacherCloud = (() => {
       dirty = localGeneration !== generation;
       cache(); paint(dirty ? 'Есть записи для отправки' : 'Облако · сохранено');
     } catch (error) {
-      if (error?.code === '40001') {blocked = true; paint('Нужна сверка записей');}
+      if (error?.code === 'PT409' || error?.code === '40001') {blocked = true; paint('Нужна сверка записей');}
       else { paint('Без связи · записи в браузере'); status.title = readable(error); }
       cache();
     } finally { busy = false; }
