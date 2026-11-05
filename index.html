@@ -1555,6 +1555,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if(lesson.status==='cancelled')return 'cancelled';
     return lesson.status==='done'||(lesson.attendance||[]).some(a=>a.present===true)?'done':'scheduled';
   }
+  function groupLessonStatusLabel(lesson){
+    return {done:'Проведено',scheduled:'Запланировано',cancelled:'Отменено'}[groupLessonStatus(lesson)];
+  }
   function renderToday(main) {
     const today = todayISO();
     const todaysAll = getIndividualLessons(l=>l.date===today)
@@ -1729,8 +1732,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         top.appendChild(nameSpan);
         top.appendChild(timeSpan);
         row.appendChild(top);
-        const state=groupLessonStatus(gl),stateLabel=deskEl('div','tiny group-lesson-status');
-        stateLabel.textContent=state==='done'?'Проведено':state==='cancelled'?'Отменено':'Запланировано';
+        const stateLabel=deskEl('div','tiny group-lesson-status',groupLessonStatusLabel(gl));
         row.append(stateLabel);
         const carry=lessonCarryover(gl,true,true);if(carry)row.append(carry);
         list.appendChild(row);
@@ -2142,8 +2144,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         grpLessons.forEach(gl=>{
           const grp=getGroup(gl.groupId);
           const mini=document.createElement("div");
-          mini.className="calendar-mini group";
-          mini.draggable=true;
+          const state=groupLessonStatus(gl);
+          mini.className="calendar-mini group "+state;
+          mini.draggable=state!=="cancelled";
           mini.addEventListener("dragstart",e=>{
             e.dataTransfer.setData("text/plain","group:"+String(gl.id));
           });
@@ -2160,7 +2163,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
           const line2=document.createElement("div");
           line2.className="line2";
-          line2.textContent=gl.topic || pluralizeChildren(gl.historicalParticipantsCount??gl.attendance.length);
+          line2.textContent=state==="cancelled" ? groupLessonStatusLabel(gl) : gl.topic || pluralizeChildren(gl.historicalParticipantsCount??gl.attendance.length);
 
           mini.appendChild(line1);
           mini.appendChild(line2);
@@ -4867,13 +4870,13 @@ function deskBillingLessons(studentId){
 function getSubscriptionStats(studentId){
  const lessons=getLessonsByStudent(studentId),sub=getSubscription(studentId);
  const excluded=new Set(sub?.excludedLessonKeys||[]);
- const rawDone=deskBillingLessons(studentId).filter(x=>!excluded.has(x.key)&&(x.group?x.payment.present===true:x.lesson.status==='done')).length;
+ const rawDone=deskBillingLessons(studentId).filter(x=>!excluded.has(x.key)&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present===true:x.lesson.status==='done')).length;
  const doneCount=Math.max(0,rawDone+(Number(sub?.doneOffset)||0)),total=Number(sub?.total)||0;
  const price=Number(sub?.price)||0,paid=Number(sub?.paid)||0;
  return {sub,lessons,rawDone,doneCount,total,remaining:Math.max(total-doneCount,0),price,paid,debt:Math.max(price-paid,0)};
 }
 function getPerLessonStats(studentId,yearMonth){
- const ym=yearMonth||todayISO().slice(0,7);const entries=deskBillingLessons(studentId).filter(x=>x.lesson.date.slice(0,7)===ym&&(x.group?x.payment.present===true:x.lesson.status==='done'));
+ const ym=yearMonth||todayISO().slice(0,7);const entries=deskBillingLessons(studentId).filter(x=>x.lesson.date.slice(0,7)===ym&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present===true:x.lesson.status==='done'));
  const totalPaid=entries.reduce((sum,x)=>sum+(Number(x.payment.paidAmount)||0),0);
  const rate=Number(getStudent(studentId)?.lessonPrice)||0;
  return {ym,lessons:entries.map(x=>x.lesson),entries,totalLessons:entries.length,totalPaid,unpaidCount:entries.filter(x=>!(Number(x.payment.paidAmount)>0)).length,totalDue:Math.max(entries.length*rate-totalPaid,0)};
@@ -4965,13 +4968,42 @@ function groupLessonEditor(gl,isNew=false){
   if(!date.input.value||!time.input.value){message.textContent='Укажи дату и время занятия.';return;}if(data.groupLessons.some(l=>l.groupId===gl.groupId&&l.id!==gl.id&&l.date===date.input.value&&l.time===time.input.value)){message.textContent='У группы уже есть занятие на эту дату и время. Открой его или выбери другое время.';return;}
   if(!groupLessonPaymentsValid(payments,message))return;financeReconcile(null);
   const changedDate=gl.date!==date.input.value||gl.time!==time.input.value;Object.assign(gl,{date:date.input.value,time:time.input.value,topic:topic.input.value,hw:hw.input.value,comment:notes.input.value,lessonPlan:plan.input.value,nextLessonComment:next.input.value,attendance});if(changedDate&&!isNew)gl.wasMoved=true;if(isNew){gl.id=data.groupLessons.length?Math.max(...data.groupLessons.map(l=>l.id))+1:1;data.groupLessons.push(gl);}groupLessonRecordPayments(gl,payments);currentGroupLessonId=gl.id;currentView='groupLessonDetail';save();await groupLessonSaveFeedback(gl.id);
- };const bar=deskEl('div','desk-toolbar group-save-bar'),status=deskEl('span','tiny','Изменения сохраняются по кнопке');status.setAttribute('role','status');bar.append(deskButton('Сохранить все изменения',commit,'btn-main'),status);form.prepend(bar);form.addEventListener('input',()=>status.textContent='Есть несохранённые изменения');form.addEventListener('change',()=>status.textContent='Есть несохранённые изменения');form.prepend(message);form.append(deskButton('Сохранить занятие',commit,'btn-main'));return form;
+ };
+ const bar=deskEl('div','desk-toolbar group-save-bar'),status=deskEl('span','tiny','Изменения сохраняются по кнопке');
+ status.setAttribute('role','status');
+ bar.append(deskButton('Сохранить все изменения',commit,'btn-main'));
+ let edited=false;
+ const onEdit=()=>{edited=true;status.textContent='Есть несохранённые изменения';};
+ form.addEventListener('input',onEdit);
+ form.addEventListener('change',onEdit);
+ if(!isNew){
+  const cancelled=gl.status==='cancelled';
+  bar.append(deskButton(cancelled?'Вернуть занятие':'Отменить занятие',async()=>{
+   if(edited){message.textContent='Сначала сохрани изменения в карточке занятия.';return;}
+   if(cancelled){
+    if(data.groupLessons.some(l=>l.id!==gl.id&&l.groupId===gl.groupId&&l.date===gl.date&&l.time===gl.time&&l.status!=='cancelled')){
+     message.textContent='На это время уже есть другое занятие группы.';return;
+    }
+    gl.status=gl.statusBeforeCancellation==='done'?'done':'scheduled';
+    delete gl.statusBeforeCancellation;
+   }else{
+    if(gl.status==='done')gl.statusBeforeCancellation='done';
+    gl.status='cancelled';
+   }
+   save();
+   await groupLessonSaveFeedback(gl.id);
+  },cancelled?'btn-secondary':'btn-chip danger'));
+ }
+ bar.append(status);
+ form.prepend(message,bar);
+ form.append(deskButton('Сохранить занятие',commit,'btn-main'));
+ return form;
 }
-function renderGroupLessonDetail(main,lessonId){const gl=data.groupLessons.find(l=>l.id===lessonId);if(!gl){main.append(deskEl('div','empty-state','Занятие не найдено.'));return;}const group=getGroup(gl.groupId),page=deskPage(main,(group?.name||'Группа')+' · '+gl.date,'Тема, домашнее задание, посещаемость и оплата','Занятие группы',deskButton('← К группе',()=>{currentView='groupDetail';currentGroupId=gl.groupId;render();}));const carry=lessonCarryover(gl,true);if(carry)page.append(carry);page.append(groupLessonEditor(gl));}
+function renderGroupLessonDetail(main,lessonId){const gl=data.groupLessons.find(l=>l.id===lessonId);if(!gl){main.append(deskEl('div','empty-state','Занятие не найдено.'));return;}const group=getGroup(gl.groupId),page=deskPage(main,(group?.name||'Группа')+' · '+gl.date,'Тема, домашнее задание, посещаемость и оплата',groupLessonStatusLabel(gl)+' · Занятие группы',deskButton('← К группе',()=>{currentView='groupDetail';currentGroupId=gl.groupId;render();}));const carry=lessonCarryover(gl,true);if(carry)page.append(carry);page.append(groupLessonEditor(gl));}
 function groupNewLesson(group){const draft={groupId:group.id,date:todayISO(),time:group.schedule?.[0]?.time||'16:00',topic:'',hw:'',comment:'',attendance:group.memberIds.map(studentId=>({studentId,present:null,comment:''}))};deskModal('Новое занятие · '+group.name,groupLessonEditor(draft,true));}
 function renderGroupDetail(main,groupId){
  renderGroupDetailBase(main,groupId);const group=getGroup(groupId);if(!group)return;const card=main.lastElementChild,head=card.querySelector('.card-header'),summary=deskEl('div','group-schedule-summary');summary.append(deskEl('div','',deskSchedule(group.schedule)||'Расписание пока не задано'),deskButton('Изменить дни и время',()=>deskModal('Расписание · '+group.name,buildGroupForm({group})),'btn-main'));head.after(summary,groupPaymentOverview(group));head.querySelector('.card-subtitle').textContent='Расписание, участники, оплата и журнал занятий';
- const oldList=card.lastElementChild,list=deskEl('div','group-lessons-list'),tools=deskEl('div','desk-toolbar'),filter=groupSelect('Показать занятия',[['upcoming','Сегодня и будущие'],['past','Прошедшие'],['all','Все занятия']],'upcoming');tools.append(deskButton('+ Добавить занятие',()=>groupNewLesson(group),'btn-main'),filter.wrap);list.append(tools);const items=deskEl('div');list.append(items);function draw(){items.replaceChildren();const lessons=data.groupLessons.filter(l=>l.groupId===groupId&&(filter.input.value==='all'||(filter.input.value==='past'?l.date<todayISO():l.date>=todayISO()))).sort((a,b)=>(filter.input.value==='past'?-1:1)*(a.date+' '+a.time).localeCompare(b.date+' '+b.time));if(!lessons.length)items.append(deskEl('div','empty-state','Занятий в этом списке пока нет. Добавь урок или выбери другой период.'));lessons.forEach(gl=>{const row=deskEl('article','lesson-card group-lesson-card'),top=deskEl('div','lesson-top');top.append(deskEl('strong','',gl.date+' · '+gl.time),deskButton('Открыть и редактировать',()=>{currentView='groupLessonDetail';currentGroupLessonId=gl.id;render();}));row.append(top,deskEl('div','group-lesson-topic',gl.topic||'Тема пока не указана'),deskEl('div','tiny','Домашнее задание: '+(gl.hw||'Не задано')));const paidText=(gl.attendance||[]).filter(a=>getStudent(a.studentId)?.paymentMode==='perLesson').map(a=>(getStudent(a.studentId)?.name||'Ученик')+': '+financeMoney(Number(a.paidAmount)||0));if(paidText.length)row.append(deskEl('div','tiny','Оплата: '+paidText.join(' · ')));if(gl.comment)row.append(deskEl('div','tiny','Заметки: '+gl.comment));items.append(row);});}filter.input.onchange=draw;draw();oldList.replaceWith(list);
+ const oldList=card.lastElementChild,list=deskEl('div','group-lessons-list'),tools=deskEl('div','desk-toolbar'),filter=groupSelect('Показать занятия',[['upcoming','Сегодня и будущие'],['past','Прошедшие'],['all','Все занятия']],'upcoming');tools.append(deskButton('+ Добавить занятие',()=>groupNewLesson(group),'btn-main'),filter.wrap);list.append(tools);const items=deskEl('div');list.append(items);function draw(){items.replaceChildren();const lessons=data.groupLessons.filter(l=>l.groupId===groupId&&(filter.input.value==='all'||(filter.input.value==='past'?l.date<todayISO():l.date>=todayISO()))).sort((a,b)=>(filter.input.value==='past'?-1:1)*(a.date+' '+a.time).localeCompare(b.date+' '+b.time));if(!lessons.length)items.append(deskEl('div','empty-state','Занятий в этом списке пока нет. Добавь урок или выбери другой период.'));lessons.forEach(gl=>{const row=deskEl('article','lesson-card group-lesson-card'),top=deskEl('div','lesson-top');top.append(deskEl('strong','',gl.date+' · '+gl.time),deskButton('Открыть и редактировать',()=>{currentView='groupLessonDetail';currentGroupLessonId=gl.id;render();}));row.append(top,deskEl('div','tiny group-lesson-status',groupLessonStatusLabel(gl)),deskEl('div','group-lesson-topic',gl.topic||'Тема пока не указана'),deskEl('div','tiny','Домашнее задание: '+(gl.hw||'Не задано')));const paidText=(gl.attendance||[]).filter(a=>getStudent(a.studentId)?.paymentMode==='perLesson').map(a=>(getStudent(a.studentId)?.name||'Ученик')+': '+financeMoney(Number(a.paidAmount)||0));if(paidText.length)row.append(deskEl('div','tiny','Оплата: '+paidText.join(' · ')));if(gl.comment)row.append(deskEl('div','tiny','Заметки: '+gl.comment));items.append(row);});}filter.input.onchange=draw;draw();oldList.replaceWith(list);
 }
 
 async function groupLessonSaveFeedback(lessonId){
@@ -5097,7 +5129,7 @@ function studentMonthSchedule(st,panel){
 
 /* Carry forward only the immediately preceding completed lesson in the same stream. */
 function lessonNextComment(l){if(Object.prototype.hasOwnProperty.call(l,'nextLessonComment'))return String(l.nextLessonComment||'').trim();return String(l.comment||'').match(/(?:^|\n)\s*На следующ(?:ий урок|ее занятие)\s*:\s*([\s\S]*)/i)?.[1]?.trim()||'';}
-function lessonPrevious(l,group=false){const key=l.date+' '+(l.time||'');return(group?data.groupLessons:data.lessons).filter(p=>p.id!==l.id&&(group?p.groupId===l.groupId&&(p.status==='done'||p.status!=='cancelled'&&(p.attendance||[]).some(a=>a.present===true)):p.studentId===l.studentId&&p.status==='done')&&p.date+' '+(p.time||'')<key).sort((a,b)=>(b.date+' '+(b.time||'')).localeCompare(a.date+' '+(a.time||''))||b.id-a.id)[0]||null;}
+function lessonPrevious(l,group=false){const key=l.date+' '+(l.time||'');return(group?data.groupLessons:data.lessons).filter(p=>p.id!==l.id&&(group?p.groupId===l.groupId&&groupLessonStatus(p)==='done':p.studentId===l.studentId&&p.status==='done')&&p.date+' '+(p.time||'')<key).sort((a,b)=>(b.date+' '+(b.time||'')).localeCompare(a.date+' '+(a.time||''))||b.id-a.id)[0]||null;}
 function lessonCarryover(l,group=false,preview=false){
  const previous=lessonPrevious(l,group);if(!previous)return null;const notes=[];const common=lessonNextComment(previous);if(common)notes.push({title:group?'Для группы':'',text:common});if(group){const current=new Set([...(getGroup(l.groupId)?.memberIds||[]),...(l.attendance||[]).map(a=>a.studentId)]);(previous.attendance||[]).filter(a=>current.has(a.studentId)&&a.nextLessonComment?.trim()).forEach(a=>notes.push({title:getStudent(a.studentId)?.name||'Ученик',text:a.nextLessonComment.trim()}));}if(!notes.length)return null;
  const box=deskEl('aside',preview?'lesson-carry-preview':'lesson-carryover');box.setAttribute('aria-label','Комментарий из прошлого урока');box.append(deskEl('strong','','С прошлого занятия · '+previous.date));notes.forEach(n=>{if(n.title)box.append(deskEl('div','lesson-carry-name',n.title));box.append(deskEl('div','lesson-carry-text',n.text));});if(!preview)box.append(deskButton('Открыть прошлое занятие',()=>{if(group){currentGroupLessonId=previous.id;currentView='groupLessonDetail';render();}else openLessonView(previous.id);},'btn-chip'));return box;
