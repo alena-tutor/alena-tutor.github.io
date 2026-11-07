@@ -12,6 +12,7 @@
 
 .dialog.dialog-wide{max-width:760px}.pet-choices{border:0;padding:0;margin:20px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pet-option{position:relative;display:block;border:2px solid var(--line);border-radius:18px;overflow:hidden;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}.pet-option:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 2px #c3654620}.pet-option:has(input:focus-visible){outline:3px solid #6189aa;outline-offset:3px}.pet-option input{position:absolute;top:12px;right:12px;width:20px;height:20px;accent-color:var(--accent);z-index:1}.pet-option img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}.pet-option-copy{display:grid;gap:3px;padding:12px}.pet-option-copy strong{font-size:16px}.pet-option-copy>span{font-size:12px;color:var(--muted)}@media(max-width:360px){.pet-choices{gap:8px}.pet-option-copy{padding:9px}.pet-option-copy>span{font-size:11px}}
 .practice-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin:22px 0}.practice-metrics strong{display:block;font-size:24px;line-height:1.2}.practice-metrics span{display:block;font-size:12px;color:var(--muted);margin-top:6px}#practicePeriod{max-width:170px}@media(max-width:700px){.practice-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.teacher-word-row{gap:14px;flex-wrap:wrap}}
+.pet-mood{display:grid;gap:3px;padding:12px 14px;border-radius:14px;margin-bottom:18px;background:var(--soft)}.pet-mood strong{font-size:15px}.pet-mood span{font-size:13px;color:var(--muted)}.pet-mood.happy{background:#edf4e9}.pet-mood.sad{background:#f5eee7}.mood-happy img{animation:pet-breathe 3s ease-in-out infinite}@keyframes pet-breathe{50%{transform:scale(1.012)}}@media(prefers-reduced-motion:reduce){.mood-happy img{animation:none}}
 </style>
 </head>
 <body>
@@ -25,8 +26,9 @@
 /*__DEMO__*/
 const PET_ART = /*__PET_ART__*/;
 const FOX_ART = PET_ART.fox;
+const PET_MOODS = /*__PET_MOODS__*/;
 function petType(species){return WordPetCore.petSpecies.find(p=>p.id===species)||WordPetCore.petSpecies[0];}
-function petImage(species){return PET_ART[petType(species).id]||FOX_ART;}
+function petImage(species,mood='calm'){const id=petType(species).id;return PET_MOODS[id]?.[mood]||PET_ART[id]||FOX_ART;}
 const IS_GOOGLE = Boolean(window.google?.script?.run);
 const state = {key:'',data:null,page:'home',filter:'all',search:'',session:null,feedback:null,teacherTab:'students',studentId:null,reportDays:'7',busy:false,assembly:[]};
 const practiceClock=WordPetActivity.create({now:()=>globalThis.performance?.now?.() ?? Date.now()});
@@ -112,14 +114,15 @@ function render() {
   void flushPracticeTime();
 }
 function homePage() {
-  const d=state.data,p=d.pet;
+  const d=state.data,p=d.pet,mood=WordPetCore.petMood(p);
   const done=d.doneToday;
   return `<section class="hero-heading"><div class="label">${esc(date(d.today))} · твоё пространство</div><h1 style="margin-top:8px">Привет, ${esc(d.name)}!</h1><p class="muted">${done?'Сегодняшняя тренировка пройдена. Можно позаниматься ещё — набор слов обновится.':'Твой питомец ждёт. Давай вспомним несколько слов?'}</p></section>
-  <div class="student-layout"><section class="card pet-card" aria-label="Питомец"><div class="pet-room" id="petRoom"><img src="${petImage(p.species)}" alt="${esc(petType(p.species).label)} в уютной комнате на зелёной подушке"><span class="level-pill">Уровень ${p.level}</span><span class="pet-name">${esc(p.name)}<button id="renamePet" aria-label="Переименовать питомца">${icon('edit')}</button></span>${p.accessory==='ball'?'<span class="toy" aria-label="Мячик"></span>':''}</div><div class="pet-info">
+  <div class="student-layout"><section class="card pet-card" aria-label="Питомец"><div class="pet-room mood-${mood.id}" id="petRoom" data-mood="${mood.id}"><img src="${petImage(p.species,mood.id)}" alt="${esc(petType(p.species).label)}: ${esc(mood.label.toLowerCase())}, в уютной комнате"><span class="level-pill">Уровень ${p.level}</span><span class="pet-name">${esc(p.name)}<button id="renamePet" aria-label="Переименовать питомца">${icon('edit')}</button></span>${p.accessory==='ball'?'<span class="toy" aria-label="Мячик"></span>':''}</div><div class="pet-info">
   <div class="row between wrap" style="margin-bottom:18px"><span class="label">${esc(petType(p.species).label)}</span><button class="button secondary small" id="choosePet">Выбрать питомца</button></div>
+  <div class="pet-mood ${mood.id}" role="status"><strong>${esc(mood.label)}</strong><span>${esc(mood.message)}</span></div>
   <div class="meter-row"><span>Сытость</span><div class="meter warm"><i style="width:${p.food}%"></i></div><span>${p.food}%</span></div><div class="meter-row"><span>Чистота</span><div class="meter"><i style="width:${p.clean}%"></i></div><span>${p.clean}%</span></div>
   <div class="row between tiny muted"><span>${p.xp%100} / 100 опыта до следующего уровня</span><span>${p.coins} монет · ${p.rations} корма</span></div>
-  <div class="pet-actions"><button data-care="feed">${icon('food')}Кормить</button><button data-care="clean">${icon('spark')}Убрать</button><button data-care="toy">${icon('ball')}${p.accessory==='ball'?'Мячик куплен':'Мячик · 20'}</button></div><p class="pet-note">Питомец всегда дождётся тебя. Награды сохраняются.</p></div></section>
+  <div class="pet-actions"><button data-care="feed">${icon('food')}Кормить</button><button data-care="clean">${icon('spark')}Убрать</button><button data-care="toy">${icon('ball')}${p.accessory==='ball'?'Мячик куплен':'Мячик · 20'}</button></div><p class="pet-note">Настроение зависит от сытости и чистоты. Питомец всегда дождётся тебя.</p></div></section>
   <div class="stack"><section class="card mission"><div class="mission-top"><div><div class="label">${done?'Миссия выполнена':'Твоя миссия сегодня'}</div><h2>${done?'Можно ещё немного':'Помоги питомцу'}</h2></div><span class="mission-icon">${icon(done?'check':'book')}</span></div><p class="muted subtitle">Сначала список слов, затем 10 разных заданий: перевод, пропуски, буквы, предложения и понимание на слух. Незнакомые слова повторим ещё раз.</p>
   <div class="chips"><div class="chip recent"><b>${d.counts.recent}</b>с урока</div><div class="chip hard"><b>${d.counts.hard}</b>трудные</div><div class="chip"><b>${d.counts.review}</b>на повторение</div></div>
   <button class="button full" id="startMission" ${!d.words.length?'disabled':''}>${icon('play')}${done?'Посмотреть результат':'Начать тренировку'}</button>${done?'<button class="button secondary full" id="retryMission" style="margin-top:10px">Ещё тренировка</button>':''}
@@ -336,4 +339,5 @@ async function boot(){
 boot();
 </script>
 </body></html>
+
 

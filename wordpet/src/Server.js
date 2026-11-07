@@ -1,6 +1,6 @@
 /* Google Apps Script backend. All helpers ending in _ are private to script.run. */
 const APP_CONFIG = {
-  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.9.0',
+  title: 'WordPet', databaseId: '__DATABASE_ID__', timezone: 'Asia/Irkutsk', webAppUrl: '', version: '1.10.0',
   sourceSheet: 'Глоссарий'
 };
 const SCHEMA = {
@@ -214,7 +214,7 @@ function pet_(studentId) {
   return p;
 }
 function publicPet_(p) {
-  return {name:p.name,species:p.species,xp:Number(p.xp),level:Math.floor(Number(p.xp)/100)+1,food:Number(p.food),clean:Number(p.clean),coins:Number(p.coins),rations:Number(p.rations),accessory:p.accessory};
+  return {name:p.name,species:p.species,xp:Number(p.xp),level:Math.floor(Number(p.xp)/100)+1,food:Number(p.food),clean:Number(p.clean),coins:Number(p.coins),rations:Number(p.rations),accessory:p.accessory,mood:WordPetCore.petMood(p)};
 }
 function studentDashboard_(studentId) {
   const student = rows_('Ученики').find(s => s.id === studentId);
@@ -473,4 +473,5 @@ function rotateKey_(data) {
   a.token = token_(); put_('Доступ',a); refreshLinks_();
   return {ok:true,link:rows_('Доступ').find(r=>r.personId===a.personId).link};
 }
+
 

@@ -161,7 +161,7 @@ test('production HTML and Apps Script compile without demo data',()=>{
  const html=fs.readFileSync(root+'/output/App.html','utf8');const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];assert.equal(scripts.length,1);new vm.Script(scripts[0][1]);
  const code=fs.readFileSync(root+'/output/Code.gs','utf8');new vm.Script(code);
  assert.equal(code.includes('const DemoStore'),false);assert.equal(code.includes('demo-teacher'),false);
- assert.match(code,/version: '1.9.0'/);
+ assert.match(code,/version: '1.10.0'/);
  assert.match(code,/archiveScheduled_/);
 });
 
@@ -287,7 +287,7 @@ test('the old eight-tab database can open before the archive trigger creates its
 test('pet choice persists per pupil without changing earned rewards, vocabulary, progress or active training',()=>{
  const b=backend(),earned=finish(b,'learner_b');
  const before={words:JSON.stringify(b.records('Слова')),progress:JSON.stringify(b.records('Прогресс')),answers:JSON.stringify(b.records('Ответы')),sessions:JSON.stringify(b.records('Тренировки')),other:JSON.stringify(b.records('Питомцы').find(p=>p.studentId==='learner_a'))};
- for(const species of ['cat','dog','dragon','fox']){
+ for(const species of ['cat','dog','dragon','fox','pig']){
   const selected=b.api('learner_b','savePet',{species,studentId:'learner_a',xp:99999,coins:99999});
   assert.equal(selected.species,species);assert.equal(selected.name,earned.pet.name);
   for(const key of ['xp','coins','rations','food','clean','accessory'])assert.equal(selected[key],earned.pet[key]);
@@ -316,9 +316,9 @@ function petUi(){
 }
 test('pet picker renders accessible choices with distinct images and escapes an existing name',()=>{
  const u=petUi();u.context.openPetPicker();const html=u.element('dialogs').innerHTML;
- assert.equal((html.match(/type="radio"/g)||[]).length,4);assert.match(html,/value="cat" checked/);assert.match(html,/value="&lt;Луна&gt;"/);assert.equal(html.includes('value="<Луна>"'),false);assert.match(html,/dialog-wide/);
- assert.equal(vm.runInContext('new Set(WordPetCore.petSpecies.map(p=>petImage(p.id))).size',u.context),4);
- for(const id of ['fox','cat','dog','dragon']){
+ assert.equal((html.match(/type="radio"/g)||[]).length,5);assert.match(html,/value="cat" checked/);assert.match(html,/value="&lt;Луна&gt;"/);assert.equal(html.includes('value="<Луна>"'),false);assert.match(html,/dialog-wide/);
+ assert.equal(vm.runInContext('new Set(WordPetCore.petSpecies.map(p=>petImage(p.id))).size',u.context),5);
+ for(const id of ['fox','cat','dog','dragon','pig']){
   const image=vm.runInContext('petImage('+JSON.stringify(id)+')',u.context);assert.equal(Buffer.from(image.split(',')[1],'base64').subarray(0,2).toString('hex'),'ffd8');
  }
 });
@@ -600,4 +600,44 @@ test('browser clock saves practice, pauses on hidden or blurred pages and keeps 
  u.context.capture=async(action,data)=>{requests.push({action,data});return {saved:true};};await vm.runInContext('flushPracticeTime()',u.context);
  assert.equal(requests.at(-1).data.totalSeconds,40);assert.ok(requests.every(r=>r.action==='activity'&&r.data.sessionId==='session-one'));
  vm.runInContext("state.page='home';syncPracticeClock();",u.context);time+=120000;await vm.runInContext('flushPracticeTime()',u.context);assert.equal(requests.at(-1).data.totalSeconds,40);
+});
+
+
+test('pet moods follow the weakest care meter and require both meters for happiness',()=>{
+ const mood=(food,clean)=>core.petMood({food,clean,xp:9999});
+ assert.equal(mood(40,100).id,'sad');assert.equal(mood(100,40).id,'sad');
+ assert.equal(mood(41,100).id,'calm');assert.equal(mood(100,74).id,'calm');
+ assert.equal(mood(75,75).id,'happy');assert.equal(mood(100,100).id,'happy');
+ assert.equal(mood(25,25).id,'sad');assert.equal(mood(NaN,100).id,'sad');
+ assert.equal(mood('75','75').id,'happy');
+ assert.match(mood(30,30).message,/подкрепиться и освежить/);
+ assert.match(mood(100,30).message,/порядка/);
+});
+test('pig mood improves immediately after feeding and cleaning while all earned progress persists',()=>{
+ const b=backend();finish(b,'learner_b');b.api('learner_b','savePet',{species:'pig',name:'Пятачок'});
+ const row=b.data.get('Питомцы').find(r=>r[0]==='learner_b');row[4]=25;row[5]=25;
+ const before={progress:JSON.stringify(b.records('Прогресс')),sessions:JSON.stringify(b.records('Тренировки')),words:JSON.stringify(b.records('Слова'))};
+ assert.equal(b.api('learner_b','bootstrap').pet.mood.id,'sad');
+ assert.equal(b.api('learner_b','care',{kind:'feed'}).mood.id,'sad');
+ assert.equal(b.api('learner_b','care',{kind:'clean'}).mood.id,'calm');
+ const happy=b.api('learner_b','care',{kind:'feed'});assert.equal(happy.mood.id,'happy');assert.equal(happy.species,'pig');assert.equal(happy.name,'Пятачок');
+ assert.equal(b.api('learner_b','bootstrap').pet.mood.id,'happy');
+ assert.equal(JSON.stringify(b.records('Прогресс')),before.progress);assert.equal(JSON.stringify(b.records('Тренировки')),before.sessions);assert.equal(JSON.stringify(b.records('Слова')),before.words);
+ assert.equal(b.api('learner_a','bootstrap').pet.species,'fox');
+ row[4]=85;row[5]=100;row[8]='2026-10-02';assert.equal(b.api('learner_b','bootstrap').pet.mood.id,'sad','existing daily decay updates mood');
+});
+test('all five pets have three distinct embedded mood portraits and accessible mood labels',()=>{
+ const u=petUi(),b=backend();
+ const images=[];
+ for(const species of ['fox','cat','dog','dragon','pig']){
+  for(const [mood,food,clean,label] of [['sad',25,100,'Грустит'],['calm',65,75,'Спокоен'],['happy',90,100,'Радуется']]){
+   const data=b.api('learner_b','bootstrap');data.pet={...data.pet,species,food,clean};
+   vm.runInContext('state.data='+JSON.stringify(data),u.context);
+   const html=vm.runInContext('homePage()',u.context),src=vm.runInContext('petImage('+JSON.stringify(species)+','+JSON.stringify(mood)+')',u.context);
+   assert.ok(html.includes('data-mood="'+mood+'"'));assert.ok(html.includes('role="status"><strong>'+label));assert.ok(html.includes(src));
+   assert.equal(Buffer.from(src.split(',')[1],'base64').subarray(0,2).toString('hex'),'ffd8');images.push(crypto.createHash('sha256').update(src).digest('hex'));
+  }
+ }
+ assert.equal(new Set(images).size,15);
+ u.context.openPetPicker();assert.ok(u.element('dialogs').innerHTML.includes('value="pig"'));assert.ok(u.element('dialogs').innerHTML.includes('Поросёнок'));
 });

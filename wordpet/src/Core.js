@@ -4,8 +4,16 @@ const WordPetCore = (() => {
     Object.freeze({id:'fox',label:'Лисёнок',description:'Любопытный исследователь'}),
     Object.freeze({id:'cat',label:'Котёнок',description:'Уютный напарник'}),
     Object.freeze({id:'dog',label:'Щенок',description:'Верный друг'}),
-    Object.freeze({id:'dragon',label:'Дракончик',description:'Маленький любитель приключений'})
+    Object.freeze({id:'dragon',label:'Дракончик',description:'Маленький любитель приключений'}),
+    Object.freeze({id:'pig',label:'Поросёнок',description:'Добродушный любитель уюта'})
   ]);
+  function petMood(pet) {
+    const metric = value => Number.isFinite(Number(value)) ? Math.max(0,Math.min(100,Number(value))) : 0;
+    const food = metric(pet.food), clean = metric(pet.clean);
+    if (Math.min(food,clean) <= 40) return {id:'sad',label:'Грустит',message:food<=40&&clean<=40?'Пора подкрепиться и освежить комнату.':food<=40?'Хочется подкрепиться.':'Хочется немного порядка в комнате.'};
+    if (food >= 75 && clean >= 75) return {id:'happy',label:'Радуется',message:'Сытый, в чистоте и готов играть!'};
+    return {id:'calm',label:'Спокоен',message:'Немного заботы — и настроение станет ещё лучше.'};
+  }
   const dayMs = 86400000;
   const norm = value => String(value == null ? '' : value).normalize('NFKC').toLowerCase()
     .replace(/[‘’ʼ`]/g, "'").replace(/[‐‑–—]/g, '-').replace(/\s+/g, ' ').trim()
@@ -227,6 +235,7 @@ const WordPetCore = (() => {
     const p = progress.filter(x => x.wordId === word.id && ['write_en','listen','gap'].includes(x.skill));
     return p.some(x => Number(x.streak) >= 2);
   };
-  return { petSpecies, norm, day, dateValue, key, parseGlossary, category, selectWords, selectPracticeWords, makeTasks, gapData, letterParts, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
+  return { petSpecies, petMood, norm, day, dateValue, key, parseGlossary, category, selectWords, selectPracticeWords, makeTasks, gapData, letterParts, sentenceParts, migrateTasks, publicTask, grade, studyWords, queueReview, updateProgress, mastered, shuffle };
 })();
 if (typeof module !== 'undefined') module.exports = WordPetCore;
+

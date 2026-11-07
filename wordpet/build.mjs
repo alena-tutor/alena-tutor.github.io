@@ -10,13 +10,18 @@ const core=await read('src/Core.js'),archive=await read('src/Archive.js'),speech
 const artwork=(await read('src/fox-room.base64')).trim();
 if(!/^[A-Za-z0-9+/=]+$/.test(artwork))throw Error('Invalid artwork');
 const petArt={fox:`data:image/jpeg;base64,${artwork}`};
-for(const id of ['cat','dog','dragon']){
+for(const id of ['cat','dog','dragon','pig']){
   const encoded=(await read(`src/${id}-room.base64`)).trim();
   if(!/^[A-Za-z0-9+/=]+$/.test(encoded))throw Error('Invalid pet artwork: '+id);
   petArt[id]=`data:image/jpeg;base64,${encoded}`;
 }
+const moodArt=JSON.parse(await read('src/pet-moods.json'));
+for(const id of ['fox','cat','dog','dragon','pig']){
+  if(!moodArt[id] || ['sad','happy'].some(m=>! /^[A-Za-z0-9+/=]+$/.test(moodArt[id][m] || '')))throw Error('Invalid mood artwork: '+id);
+  for(const mood of ['sad','happy'])moodArt[id][mood]='data:image/jpeg;base64,'+moodArt[id][mood];
+}
 const pronunciation=await read('src/Pronunciation.js'),activity=await read('src/Activity.js');
-const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__PRONUNCIATION__*/',()=>pronunciation).replace('/*__ACTIVITY__*/',()=>activity).replace('/*__DEMO__*/','').replace('/*__PET_ART__*/',()=>JSON.stringify(petArt));
+const html=(await read('src/App.html')).replace('/*__CORE__*/',()=>core).replace('/*__PRONUNCIATION__*/',()=>pronunciation).replace('/*__ACTIVITY__*/',()=>activity).replace('/*__DEMO__*/','').replace('/*__PET_ART__*/',()=>JSON.stringify(petArt)).replace('/*__PET_MOODS__*/',()=>JSON.stringify(moodArt));
 const server=(await read('src/Server.js')).replace('__DATABASE_ID__',()=>config.spreadsheetId).replace("webAppUrl: ''",()=>`webAppUrl: ${JSON.stringify(config.webAppUrl)}`);
 const code=core.replace(/if \(typeof module[^\n]+\n?/,'')+'\n'+server+'\n'+archive+'\n'+speech+'\nconst WORD_EXAMPLES_ = '+JSON.stringify(JSON.parse(await read('src/examples.json')))+';\nconst APP_HTML_ = '+JSON.stringify(html)+';\n';
 new vm.Script(code);
@@ -25,4 +30,5 @@ await fs.writeFile(path.join(root,'output/Code.gs'),code);
 await fs.writeFile(path.join(root,'output/App.html'),html);
 await fs.writeFile(path.join(root,'output/appsscript.json'),JSON.stringify({timeZone:'Asia/Irkutsk',runtimeVersion:'V8',exceptionLogging:'STACKDRIVER',webapp:{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'},oauthScopes:['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/userinfo.email']},null,2));
 console.log('WordPet production build ready. Student data is read from the private Google spreadsheet.');
+
 
