@@ -5093,7 +5093,7 @@ const unpaidJournalStart='2026-09-01';
 function unpaidLessonRows(studentId=null){
  const today=financeToday(),rows=[],missing=[];
  data.students.filter(st=>st.paymentMode==='perLesson'&&(studentId===null||st.id===studentId)).forEach(st=>{
-  const completed=deskBillingLessons(st.id).filter(x=>x.lesson.date>=unpaidJournalStart&&x.lesson.date<=today&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present===true:x.lesson.status==='done'));
+  const completed=deskBillingLessons(st.id).filter(x=>x.lesson.date>=unpaidJournalStart&&x.lesson.date<=today&&x.lesson.status!=='cancelled'&&x.payment.debtSettlement?.confirmedClear!==true&&(x.group?x.payment.present===true:x.lesson.status==='done'));
   const price=Number(st.lessonPrice);
   if(!Number.isFinite(price)||price<=0){if(completed.length)missing.push(st);return;}
   const cost=Math.round(price*100);
@@ -5113,7 +5113,7 @@ function unpaidLessonsPanel(studentId=null){
  const report=unpaidLessonRows(studentId),section=deskEl('section','card unpaid-lessons'),title=deskEl('div','card-title','Неоплаченные занятия'),summary=deskEl('div','unpaid-summary');
  section.setAttribute('aria-label','Неоплаченные занятия');
  summary.append(deskEl('strong','unpaid-total',financeMoney(report.total/100)),deskEl('span','tiny','Занятий с остатком: '+report.rows.length));
- section.append(title,summary,deskEl('p','tiny','Проведённые уроки с сентября 2026, по текущей цене занятия. Частичные оплаты учтены. Будущие и отменённые уроки исключены.'));
+ section.append(title,summary,deskEl('p','tiny','Проведённые уроки с сентября 2026, по текущей цене занятия. Частичные оплаты и подтверждённые сверки учтены. Будущие и отменённые уроки исключены.'));
  if(!report.rows.length)section.append(deskEl('p','tiny',report.missing.length?'Для полного расчёта укажи стоимость занятий ниже.':'Все проведённые занятия оплачены.'));
  const grouped=new Map();
  report.rows.forEach(row=>{if(!grouped.has(row.student.id))grouped.set(row.student.id,{student:row.student,rows:[],total:0});const item=grouped.get(row.student.id);item.rows.push(row);item.total+=row.remaining;});
