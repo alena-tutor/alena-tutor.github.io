@@ -973,6 +973,12 @@
 .unpaid-missing{border-top:1px solid var(--border);padding-top:10px}
 .unpaid-missing button{margin:0 6px 6px 0;max-width:100%;white-space:normal}
 @media(max-width:600px){.unpaid-lessons{padding:16px}.unpaid-actions>button{flex:1;min-width:0}.unpaid-summary{gap:4px}.unpaid-student-heading{align-items:flex-start}}
+
+.makeup-panel{min-width:0;margin:14px 0}
+.makeup-row{padding:12px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+.makeup-row>.desk-toolbar{flex-wrap:wrap;margin-top:10px;gap:8px}
+.makeup-info{border-left:3px solid var(--accent)}
+@media(max-width:600px){.makeup-panel{padding:16px}.makeup-row .desk-toolbar>button{min-width:0;flex:1}}
 </style>
 <style>
 #teacher-cloud-status {width:100%;margin:16px 0 8px;text-align:left;white-space:normal;background:#594439;color:#fff5ed;border-color:#796051;min-height:44px;}
@@ -1303,7 +1309,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     // Returns lessons for students who are NOT in a group (avoids duplicating
     // a child's schedule once they belong to a group with its own groupLessons).
     return data.lessons.filter(l => {
-      if (getGroupForStudent(l.studentId)) return false;
+      if (getGroupForStudent(l.studentId)&&!l.makeupFor) return false;
       return extraFilterFn ? extraFilterFn(l) : true;
     });
   }
@@ -1356,7 +1362,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           gl.attendance.push({studentId:sid, present:null, comment:""});
         }
       });
-      gl.attendance = gl.attendance.filter(a=>g.memberIds.includes(a.studentId));
+      gl.attendance = gl.attendance.filter(a=>g.memberIds.includes(a.studentId)||a.makeupRequested);
     });
   }
 
@@ -1374,7 +1380,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
       const hadSchedule = !!(st.schedule && st.schedule.length);
       const futureLessons = data.lessons.filter(l =>
-        l.studentId===st.id && l.status==="scheduled" && l.date>=today
+        l.studentId===st.id && !l.makeupFor && l.status==="scheduled" && l.date>=today
       );
 
       if (hadSchedule || futureLessons.length) {
@@ -1382,7 +1388,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         if (futureLessons.length) {
           lessonsRemoved += futureLessons.length;
           data.lessons = data.lessons.filter(l =>
-            !(l.studentId===st.id && l.status==="scheduled" && l.date>=today)
+            !(l.studentId===st.id && !l.makeupFor && l.status==="scheduled" && l.date>=today)
           );
         }
       }
@@ -1458,7 +1464,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const today = todayISO();
     // Determine how far ahead lessons were generated, based on existing future scheduled lessons
     const futureScheduled = data.lessons.filter(l =>
-      l.studentId===studentId && l.status==="scheduled" && l.date>=today
+      l.studentId===studentId && !l.makeupFor && l.status==="scheduled" && l.date>=today
     );
     let weeksAhead = 4;
     if (futureScheduled.length) {
@@ -1469,7 +1475,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
     // Remove future scheduled lessons (keep past/done/cancelled lessons untouched)
     data.lessons = data.lessons.filter(l =>
-      !(l.studentId===studentId && l.status==="scheduled" && l.date>=today)
+      !(l.studentId===studentId && !l.makeupFor && l.status==="scheduled" && l.date>=today)
     );
 
     student.schedule = newSchedule.length ? newSchedule : null;
@@ -1486,7 +1492,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       alert("Для ученика не задано расписание.");
       return;
     }
-    const lessons = getLessonsByStudent(studentId);
+    const lessons = getLessonsByStudent(studentId).filter(l=>!l.makeupFor);
     let start;
     if (lessons.length) {
       const maxDateStr = lessons.reduce((max,l)=> !max || l.date>max ? l.date : max, "");
@@ -1614,7 +1620,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       timeline.appendChild(track);
 
       const allEvents = [
-        ...todaysAll.map(l=>({time:l.time, status:l.status, name:getStudent(l.studentId)?.name||"?", kind:"lesson", id:l.id})),
+        ...todaysAll.map(l=>({time:l.time, status:l.status, name:l.makeupFor?makeupTitle(l):getStudent(l.studentId)?.name||"?", kind:"lesson", id:l.id})),
         ...todaysGroupAll.map(gl=>({time:gl.time, status:groupLessonStatus(gl), name:getGroup(gl.groupId)?.name||"Группа", kind:"group", id:gl.id}))
       ].filter(e=>e.status!=="cancelled" || true)
        .sort((a,b)=>a.time.localeCompare(b.time));
@@ -1811,6 +1817,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     todayCard.appendChild(sr3);
     rightCol.appendChild(todayCard);
     rightCol.appendChild(unpaidLessonsPanel());
+    const makeups=makeupPendingPanel();if(makeups)rightCol.appendChild(makeups);
 
     /* Дни рождения */
     const upcomingBirthdays = getUpcomingBirthdays(3);
@@ -1960,7 +1967,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     top.className="lesson-top";
     const name=document.createElement("div");
     name.className="lesson-name";
-    name.textContent = st ? st.name : "—";
+    name.textContent = lesson.makeupFor?makeupTitle(lesson):st ? st.name : "—";
     const time=document.createElement("div");
     time.className="lesson-time";
     time.textContent=lesson.time;
@@ -2041,6 +2048,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function setLessonStatus(id,status){
     const l=data.lessons.find(x=>x.id===id);
     if(!l) return;
+    if(status==="done"&&!makeupCanComplete(l))return;
     l.status=status;
     save();
   }
@@ -2151,7 +2159,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       const list=document.createElement("div");
       list.className="calendar-lessons";
       const lessons=data.lessons
-        .filter(l=>l.date===iso && l.status!=="cancelled" && !getGroupForStudent(l.studentId))
+        .filter(l=>l.date===iso && l.status!=="cancelled" && (!getGroupForStudent(l.studentId)||l.makeupFor))
         .sort((a,b)=>a.time.localeCompare(b.time));
       const grpLessons=data.groupLessons
         .filter(gl=>gl.date===iso)
@@ -2209,7 +2217,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           const tSpan=document.createElement("span");
           tSpan.textContent=l.time;
           const nSpan=document.createElement("span");
-          nSpan.textContent=st?st.name:"—";
+          nSpan.textContent=l.makeupFor?makeupTitle(l):st?st.name:"—";
           line1.appendChild(tSpan);
           line1.appendChild(nSpan);
 
@@ -2242,7 +2250,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function calendarMoveDialog(lesson,newDate,group=false){
     const entity=group?getGroup(lesson.groupId):getStudent(lesson.studentId),form=deskEl('div','form-section group-editor'),date=groupField('Новая дата занятия','date',newDate),weekday=groupDay(newDate),slot=(entity?.schedule||[]).find(x=>x.dayKey===weekday),time=groupField('Новое время занятия','time',slot?.time||lesson.time||'');
     form.append(deskEl('div','tiny',`Было: ${lesson.date} · ${lesson.time||'время не указано'}. Изменится только это занятие.`),date.wrap,time.wrap);const error=deskEl('div','tiny');error.setAttribute('role','alert');form.append(error);
-    form.append(deskButton('Сохранить перенос',()=>{if(!date.input.value||!date.input.checkValidity()||!time.input.value||!time.input.checkValidity()){error.textContent='Укажи новую дату и время занятия.';return;}const items=group?data.groupLessons:data.lessons;if(items.some(l=>l.id!==lesson.id&&(group?l.groupId===lesson.groupId:l.studentId===lesson.studentId)&&l.date===date.input.value&&l.time===time.input.value&&l.status!=='cancelled')){error.textContent='На эту дату и время уже есть занятие. Выбери другое время.';return;}lesson.date=date.input.value;lesson.time=time.input.value;lesson.wasMoved=true;save();},'btn-main'),deskButton('Отмена',()=>form.closest('dialog')?.close()));deskModal('Перенести занятие · '+(entity?.name||'Ученик'),form);
+    form.append(deskButton('Сохранить перенос',()=>{if(!date.input.value||!date.input.checkValidity()||!time.input.value||!time.input.checkValidity()){error.textContent='Укажи новую дату и время занятия.';return;}const items=group?data.groupLessons:data.lessons;if(items.some(l=>l.id!==lesson.id&&(group?l.groupId===lesson.groupId:l.studentId===lesson.studentId)&&l.date===date.input.value&&l.time===time.input.value&&l.status!=='cancelled')){error.textContent='На эту дату и время уже есть занятие. Выбери другое время.';return;}if(!group&&lesson.makeupFor&&lesson.status==='scheduled'){const failure=makeupSlotError(makeupSource(lesson),date.input.value,time.input.value,Number(lesson.durationMinutes)||60,lesson.id);if(failure){error.textContent=failure;return;}}lesson.date=date.input.value;lesson.time=time.input.value;lesson.wasMoved=true;save();},'btn-main'),deskButton('Отмена',()=>form.closest('dialog')?.close()));deskModal('Перенести занятие · '+(entity?.name||'Ученик'),form);
   }
   function moveLessonDate(lessonId,newDate){const lesson=data.lessons.find(l=>l.id===lessonId);if(lesson)calendarMoveDialog(lesson,newDate);}
   function moveGroupLessonDate(lessonId,newDate){const lesson=data.groupLessons.find(l=>l.id===lessonId);if(lesson)calendarMoveDialog(lesson,newDate,true);}
@@ -2852,6 +2860,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     btnDelete.onclick=()=>{
       if(!confirm("Удалить группу и все её занятия? Дети из группы останутся в системе как обычные ученики.")) return;
       data.groups = data.groups.filter(x=>x.id!==g.id);
+      const sourceIds=new Set(data.groupLessons.filter(x=>x.groupId===g.id).map(x=>x.id));
+      data.lessons.filter(l=>l.status==='scheduled'&&sourceIds.has(l.makeupFor?.groupLessonId)).forEach(l=>l.status='cancelled');
       data.groupLessons = data.groupLessons.filter(x=>x.groupId!==g.id);
       currentView="groups";
       save();
@@ -2935,7 +2945,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (addedStudent && addedStudent.schedule) {
         const today = todayISO();
         data.lessons = data.lessons.filter(l =>
-          !(l.studentId===sid && l.status==="scheduled" && l.date>=today)
+          !(l.studentId===sid && !l.makeupFor && l.status==="scheduled" && l.date>=today)
         );
         addedStudent.schedule = null;
       }
@@ -3771,7 +3781,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     eyebrow.textContent = l.status==="done" ? "ПРОВЕДЁННОЕ ЗАНЯТИЕ" : l.status==="cancelled" ? "ОТМЕНЁННОЕ ЗАНЯТИЕ" : "ЗАПЛАНИРОВАННОЕ ЗАНЯТИЕ";
     const title=document.createElement("div");
     title.className="card-title";
-    title.textContent = st? st.name : "Ученик";
+    title.textContent = l.makeupFor?makeupTitle(l):st? st.name : "Ученик";
     const subtitle=document.createElement("div");
     subtitle.className="card-subtitle";
     subtitle.innerHTML = `<span class="status-dot ${l.status==='cancelled'?'cancelled':l.status}"></span>${l.date} • ${l.time}`;
@@ -3786,6 +3796,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     header.appendChild(left);
     header.appendChild(btnBack);
     card.appendChild(header);
+    const makeupInfo=makeupLessonInfo(l);if(makeupInfo)card.append(makeupInfo);
 
     const form=document.createElement("div");
     form.className="form-section lesson-plan-editor";
@@ -3834,11 +3845,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     btnApplyDateTime.className="btn-secondary";
     btnApplyDateTime.textContent="Сохранить дату и время";
     btnApplyDateTime.style.marginTop="6px";
+    if(l.makeupFor)selScope.disabled=true;
     function applyLessonTiming(){
       const newDate=inDate.value,newTime=inTime.value;
       if(!newDate||!inDate.checkValidity()||!inTime.checkValidity()||(!newTime&&(l.time||newDate!==l.date))){alert('Укажите корректную дату и время.');return false;}
       if(data.lessons.some(other=>other.id!==l.id&&other.studentId===l.studentId&&other.date===newDate&&other.time===newTime&&other.status!=='cancelled')){alert('На эту дату и время уже есть занятие этого ученика.');return false;}
-      const oldTime=l.time,oldDay=groupDay(l.date);const future=selScope.value==='future'?data.lessons.filter(other=>other.id!==l.id&&other.studentId===l.studentId&&other.status==='scheduled'&&other.time===oldTime&&groupDay(other.date)===oldDay&&other.date>=financeToday()):[];
+      if(l.makeupFor&&l.status==='scheduled'&&(newDate!==l.date||newTime!==l.time)){const error=makeupSlotError(makeupSource(l),newDate,newTime,Number(l.durationMinutes)||60,l.id);if(error){alert(error);return false;}}
+      const oldTime=l.time,oldDay=groupDay(l.date);const future=selScope.value==='future'?data.lessons.filter(other=>other.id!==l.id&&!other.makeupFor&&other.studentId===l.studentId&&other.status==='scheduled'&&other.time===oldTime&&groupDay(other.date)===oldDay&&other.date>=financeToday()):[];
       if(future.some(other=>data.lessons.some(x=>x.id!==other.id&&x.studentId===l.studentId&&(x.id===l.id?newDate:x.date)===other.date&&(x.id===l.id||future.includes(x)?newTime:x.time)===newTime&&x.status!=='cancelled'))){alert('Изменение времени создаст два занятия в один час. Измени только этот урок.');return false;}
       const changed=l.date!==newDate||l.time!==newTime;future.forEach(other=>other.time=newTime);l.date=newDate;l.time=newTime;if(changed)l.wasMoved=true;return true;
     }
@@ -4128,20 +4141,21 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
     const rowPaid=document.createElement("div");
     rowPaid.className="form-row";
-    if (st && st.paymentMode==="perLesson"){
+    if (st && st.paymentMode==="perLesson"&&(!l.makeupFor||makeupSource(l))){
+      const paymentTarget=makeupSource(l)?.attendance||l;
       const lblPaid=document.createElement("div");
       lblPaid.className="form-label";
-      lblPaid.textContent="Оплачено за это занятие (₽)";
+      lblPaid.textContent=l.makeupFor?"Общая оплата за исходное занятие и отработку (₽)":"Оплачено за это занятие (₽)";
       const inPaid=document.createElement("input");
       inPaid.className="form-input";
       inPaid.type="number";
       inPaid.min="0";
       inPaid.placeholder="например, 1500";
-      inPaid.value = (l.paidAmount!=null) ? l.paidAmount : "";
+      inPaid.value = (paymentTarget.paidAmount!=null) ? paymentTarget.paidAmount : "";
       inPaid.onchange=()=>{
         if(!applyLessonTiming())return;
         applyLessonContent();
-        l.paidAmount = inPaid.value!=="" ? parseFloat(inPaid.value) : null;
+        paymentTarget.paidAmount = inPaid.value!=="" ? parseFloat(inPaid.value) : null;
         save();
       };
       rowPaid.appendChild(lblPaid);
@@ -4151,7 +4165,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const btnDone=document.createElement("button");
     btnDone.className="btn-secondary";
     btnDone.textContent="Отметить как проведён";
-    btnDone.onclick=()=>{if(!applyLessonTiming())return;applyLessonContent();l.status="done";save();};
+    btnDone.onclick=()=>{if(!makeupCanComplete(l)||!applyLessonTiming())return;applyLessonContent();l.status="done";save();};
 
     const btnCancel=document.createElement("button");
     btnCancel.className="btn-danger";
@@ -4877,28 +4891,28 @@ function deskContact(value,type){const a=deskEl('a','desk-contact',value);if(typ
 function renderParents(main){const page=deskPage(main,'Родители','Контакты семьи и быстрый переход к ребёнку','На связи с семьёй');const families=new Map();data.students.filter(s=>s.parentName||s.parentContact).forEach(s=>{const key=s.parentContact?`${s.parentContactType||'phone'}:${s.parentContact.trim()}`:`student:${s.id}`;if(!families.has(key))families.set(key,[]);families.get(key).push(s);});if(!families.size){page.append(deskEl('div','empty-state','Добавь данные родителя в профиле ученика — они появятся здесь.'));return;}const list=deskEl('div','desk-parents');[...families.values()].forEach((children,i)=>{const st=children[0];const row=deskEl('div',`desk-parentrow tone-${i%3}`);const identity=deskIdentity(st.parentName||'Родитель',children.map(c=>c.name).join(' · '));row.append(identity);const contact=deskEl('div');if(st.parentContact)contact.append(deskContact(st.parentContact,st.parentContactType));else contact.append(deskEl('span','tiny','Контакт пока не указан'));row.append(contact);const links=deskEl('div','desk-members');children.forEach(s=>links.append(deskButton(s.name+' ↗',()=>openStudentView(s.id),'btn-chip small')));row.append(links);list.append(row);});page.append(list);}
 function renderGroups(main){const activeGroups=data.groups.filter(g=>!g.archived);const page=deskPage(main,'Группы','Состав, расписание и посещаемость','Учиться вместе',deskButton('+ Создать группу',()=>deskModal('Новая группа',buildGroupForm()),'btn-main'));if(!activeGroups.length){page.append(deskEl('div','empty-state','Создай первую группу и добавь в неё учеников.'));return;}const list=deskEl('div','students-list');activeGroups.forEach((g,i)=>{const members=getGroupMembers(g.id);const tile=deskEl('div',`student-card tone-${i%3}`);deskActivate(tile,()=>{currentView='groupDetail';currentGroupId=g.id;render();});const banner=deskEl('div','desk-banner');banner.append(deskEl('span','',`${members.length} участников`),deskIcon(['flower','sprout','feather'][i%3]));tile.append(banner,deskEl('div','student-name',g.name),deskEl('div','tiny',deskSchedule(g.schedule)||'Расписание пока не задано'));const people=deskEl('div','desk-members');members.forEach(m=>people.append(deskEl('span','',m.name)));tile.append(people);const footer=deskEl('div','desk-footer');footer.append(deskEl('span','tiny','Расписание и посещаемость'),deskButton('Открыть ↗',e=>{e.stopPropagation();currentView='groupDetail';currentGroupId=g.id;render();},'btn-chip small'));tile.append(footer);list.append(tile);});page.append(list);}
 let deskProfileTab='lessons';let deskProfileStudent=null;
-function deskStudentTabs(main){const card=main.querySelector('.card');if(!card)return;const st=getStudent(currentStudentId);if(!st)return;if(deskProfileStudent!==st.id){deskProfileStudent=st.id;deskProfileTab='lessons';}const contact=card.children[1],schedule=card.children[2],payment=card.querySelector(':scope > .form-section'),lessons=card.querySelector(':scope > .lesson-list');const tabs=deskEl('div','desk-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Информация об ученике');const panels={lessons:deskEl('div','desk-panel'),contacts:deskEl('div','desk-panel desk-contacts'),payment:deskEl('div','desk-panel'),notes:deskEl('div','desk-panel')};if(schedule)panels.lessons.append(schedule);if(lessons)lessons.remove();studentMonthSchedule(st,panels.lessons);if(contact)panels.contacts.append(contact);panels.contacts.append(deskEl('div','tiny',st.birthday?'День рождения: '+formatBirthdayShort(st.birthday):'Дата рождения пока не указана'),deskEl('div','tiny','Часовой пояс: '+(st.tz||data.tutorTZ)));if(payment)panels.payment.append(payment);const notes=deskEl('div','desk-profile-note',st.notes||'Заметок пока нет. Добавить их можно через «Изменить».');panels.notes.append(notes,deskButton('Изменить заметки',()=>openEditStudent(st.id)));Object.entries({lessons:'Расписание и планы',contacts:'Контакты',payment:'Оплата',notes:'Заметки'}).forEach(([key,label])=>{const b=deskButton(label,()=>{deskProfileTab=key;apply();},'desk-tab');b.id='desk-tab-'+key;b.setAttribute('role','tab');b.setAttribute('aria-controls','desk-panel-'+key);const p=panels[key];p.id='desk-panel-'+key;p.setAttribute('role','tabpanel');p.setAttribute('aria-labelledby',b.id);tabs.append(b);});function apply(){Object.keys(panels).forEach(key=>{panels[key].hidden=key!==deskProfileTab;const b=tabs.querySelector('#desk-tab-'+key);b.setAttribute('aria-selected',String(key===deskProfileTab));b.tabIndex=key===deskProfileTab?0:-1;});}tabs.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const keys=Object.keys(panels);let n=keys.indexOf(deskProfileTab);n=e.key==='Home'?0:e.key==='End'?keys.length-1:(n+(e.key==='ArrowRight'?1:-1)+keys.length)%keys.length;deskProfileTab=keys[n];apply();tabs.children[n].focus();e.preventDefault();});card.append(tabs,...Object.values(panels));apply();}
+function deskStudentTabs(main){const card=main.querySelector('.card');if(!card)return;const st=getStudent(currentStudentId);if(!st)return;if(deskProfileStudent!==st.id){deskProfileStudent=st.id;deskProfileTab='lessons';}const contact=card.children[1],schedule=card.children[2],payment=card.querySelector(':scope > .form-section'),lessons=card.querySelector(':scope > .lesson-list');const tabs=deskEl('div','desk-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Информация об ученике');const panels={lessons:deskEl('div','desk-panel'),contacts:deskEl('div','desk-panel desk-contacts'),payment:deskEl('div','desk-panel'),notes:deskEl('div','desk-panel')};if(schedule)panels.lessons.append(schedule);if(lessons)lessons.remove();studentMonthSchedule(st,panels.lessons);const makeups=makeupPendingPanel(st.id);if(makeups)panels.lessons.prepend(makeups);if(contact)panels.contacts.append(contact);panels.contacts.append(deskEl('div','tiny',st.birthday?'День рождения: '+formatBirthdayShort(st.birthday):'Дата рождения пока не указана'),deskEl('div','tiny','Часовой пояс: '+(st.tz||data.tutorTZ)));if(payment)panels.payment.append(payment);const notes=deskEl('div','desk-profile-note',st.notes||'Заметок пока нет. Добавить их можно через «Изменить».');panels.notes.append(notes,deskButton('Изменить заметки',()=>openEditStudent(st.id)));Object.entries({lessons:'Расписание и планы',contacts:'Контакты',payment:'Оплата',notes:'Заметки'}).forEach(([key,label])=>{const b=deskButton(label,()=>{deskProfileTab=key;apply();},'desk-tab');b.id='desk-tab-'+key;b.setAttribute('role','tab');b.setAttribute('aria-controls','desk-panel-'+key);const p=panels[key];p.id='desk-panel-'+key;p.setAttribute('role','tabpanel');p.setAttribute('aria-labelledby',b.id);tabs.append(b);});function apply(){Object.keys(panels).forEach(key=>{panels[key].hidden=key!==deskProfileTab;const b=tabs.querySelector('#desk-tab-'+key);b.setAttribute('aria-selected',String(key===deskProfileTab));b.tabIndex=key===deskProfileTab?0:-1;});}tabs.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const keys=Object.keys(panels);let n=keys.indexOf(deskProfileTab);n=e.key==='Home'?0:e.key==='End'?keys.length-1:(n+(e.key==='ArrowRight'?1:-1)+keys.length)%keys.length;deskProfileTab=keys[n];apply();tabs.children[n].focus();e.preventDefault();});card.append(tabs,...Object.values(panels));apply();}
 let deskJournalFrom='',deskJournalTo='';
-function renderJournal(main){const page=deskPage(main,'Журнал','Темы, оценки, домашние задания и заметки','История маленьких шагов');const filters=deskEl('div','form-row-inline');const sel=deskEl('select','form-select');sel.setAttribute('aria-label','Ученик');sel.append(new Option('Все ученики','all'));data.students.forEach(s=>sel.append(new Option(s.name,String(s.id))));sel.value=journalFilterStudentId;const start=deskEl('input','form-input'),end=deskEl('input','form-input');start.type=end.type='date';start.value=deskJournalFrom;end.value=deskJournalTo;[[sel,'Ученик'],[start,'С даты'],[end,'По дату']].forEach(([field,title])=>{const label=deskEl('label');label.append(deskEl('span','form-label',title),field);filters.append(label);});page.append(filters);const list=deskEl('div','desk-journal-list');list.style.marginTop='20px';page.append(list);function fill(){journalFilterStudentId=sel.value;deskJournalFrom=start.value;deskJournalTo=end.value;list.replaceChildren();if(start.value&&end.value&&start.value>end.value){const warning=deskEl('div','empty-state','Начальная дата должна быть раньше конечной.');warning.setAttribute('role','alert');list.append(warning);return;}const rows=[];data.students.filter(s=>sel.value==='all'||String(s.id)===sel.value).forEach(st=>getLessonsByStudent(st.id).filter(l=>(!start.value||l.date>=start.value)&&(!end.value||l.date<=end.value)).forEach(l=>rows.push({st,l})));data.students.filter(s=>sel.value==='all'||String(s.id)===sel.value).forEach(st=>{const group=getGroupForStudent(st.id);if(!group)return;data.groupLessons.filter(l=>l.groupId===group.id&&(!start.value||l.date>=start.value)&&(!end.value||l.date<=end.value)).forEach(gl=>{const attendance=(gl.attendance||[]).find(a=>a.studentId===st.id);rows.push({st,groupLesson:true,l:{...gl,status:attendance?.present===true?'done':attendance?.present===false?'cancelled':'scheduled',gradeLesson:attendance?.gradeLesson??gl.gradeLesson,gradeHW:attendance?.gradeHW??gl.gradeHW,comment:[gl.comment,attendance?.comment].filter(Boolean).join('\n')}});});});rows.sort((a,b)=>(b.l.date+' '+b.l.time).localeCompare(a.l.date+' '+a.l.time));if(!rows.length)list.append(deskEl('div','empty-state','За выбранный период занятий нет.'));rows.forEach(({st,l,groupLesson})=>{const entry=deskEl('article','desk-journalentry');const top=deskEl('div','desk-journalheading');top.append(deskEl('span','tiny',`${l.date} · ${l.time} · ${st.name}`),deskEl('span','desk-pill '+(l.status==='done'?'good':''),l.status==='done'?'Проведён':l.status==='cancelled'?'Отменён':'Запланирован'));entry.append(top,deskEl('div','desk-journal-title',l.topic||'Тема не указана'));const details=deskEl('details');details.append(deskEl('summary','','Домашнее задание, оценки и комментарии'));const body=deskEl('div','desk-contacts');body.style.paddingTop='14px';body.append(deskEl('div','tiny','Д/з: '+(l.hw||'Не задано')),deskEl('div','tiny',`Оценка за урок: ${l.gradeLesson??'—'} · За Д/з: ${l.gradeHW??'—'}`));[l.commentLesson&&'Урок: '+l.commentLesson,l.commentHW&&'Д/з: '+l.commentHW,l.comment].filter(Boolean).forEach(t=>body.append(deskEl('div','tiny',t)));body.append(deskButton('Открыть занятие ↗',()=>{if(groupLesson){currentView='groupLessonDetail';currentGroupLessonId=l.id;render();}else openLessonView(l.id);},'btn-chip small'));details.append(body);entry.append(details);list.append(entry);});}sel.onchange=start.onchange=end.onchange=fill;fill();}
+function renderJournal(main){const page=deskPage(main,'Журнал','Темы, оценки, домашние задания и заметки','История маленьких шагов');const filters=deskEl('div','form-row-inline');const sel=deskEl('select','form-select');sel.setAttribute('aria-label','Ученик');sel.append(new Option('Все ученики','all'));data.students.forEach(s=>sel.append(new Option(s.name,String(s.id))));sel.value=journalFilterStudentId;const start=deskEl('input','form-input'),end=deskEl('input','form-input');start.type=end.type='date';start.value=deskJournalFrom;end.value=deskJournalTo;[[sel,'Ученик'],[start,'С даты'],[end,'По дату']].forEach(([field,title])=>{const label=deskEl('label');label.append(deskEl('span','form-label',title),field);filters.append(label);});page.append(filters);const list=deskEl('div','desk-journal-list');list.style.marginTop='20px';page.append(list);function fill(){journalFilterStudentId=sel.value;deskJournalFrom=start.value;deskJournalTo=end.value;list.replaceChildren();if(start.value&&end.value&&start.value>end.value){const warning=deskEl('div','empty-state','Начальная дата должна быть раньше конечной.');warning.setAttribute('role','alert');list.append(warning);return;}const rows=[];data.students.filter(s=>sel.value==='all'||String(s.id)===sel.value).forEach(st=>getLessonsByStudent(st.id).filter(l=>(!start.value||l.date>=start.value)&&(!end.value||l.date<=end.value)).forEach(l=>rows.push({st,l})));data.students.filter(s=>sel.value==='all'||String(s.id)===sel.value).forEach(st=>{const group=getGroupForStudent(st.id);if(!group)return;data.groupLessons.filter(l=>l.groupId===group.id&&(!start.value||l.date>=start.value)&&(!end.value||l.date<=end.value)).forEach(gl=>{const attendance=(gl.attendance||[]).find(a=>a.studentId===st.id);rows.push({st,groupLesson:true,l:{...gl,status:gl.status==='cancelled'?'cancelled':attendance?.makeupRequested?'absent':attendance?.present===true?'done':attendance?.present===false?'cancelled':'scheduled',gradeLesson:attendance?.gradeLesson??gl.gradeLesson,gradeHW:attendance?.gradeHW??gl.gradeHW,comment:[gl.comment,attendance?.comment].filter(Boolean).join('\n')}});});});rows.sort((a,b)=>(b.l.date+' '+b.l.time).localeCompare(a.l.date+' '+a.l.time));if(!rows.length)list.append(deskEl('div','empty-state','За выбранный период занятий нет.'));rows.forEach(({st,l,groupLesson})=>{const entry=deskEl('article','desk-journalentry');const top=deskEl('div','desk-journalheading');top.append(deskEl('span','tiny',`${l.date} · ${l.time} · ${st.name}`),deskEl('span','desk-pill '+(l.status==='done'?'good':''),l.status==='done'?'Проведён':l.status==='cancelled'?'Отменён':l.status==='absent'?'Пропуск с отработкой':'Запланирован'));entry.append(top,deskEl('div','desk-journal-title',(l.makeupFor?'Отработка · ':'')+(l.topic||'Тема не указана')));const details=deskEl('details');details.append(deskEl('summary','','Домашнее задание, оценки и комментарии'));const body=deskEl('div','desk-contacts');body.style.paddingTop='14px';body.append(deskEl('div','tiny','Д/з: '+(l.hw||'Не задано')),deskEl('div','tiny',`Оценка за урок: ${l.gradeLesson??'—'} · За Д/з: ${l.gradeHW??'—'}`));[l.commentLesson&&'Урок: '+l.commentLesson,l.commentHW&&'Д/з: '+l.commentHW,l.comment].filter(Boolean).forEach(t=>body.append(deskEl('div','tiny',t)));body.append(deskButton('Открыть занятие ↗',()=>{if(groupLesson){currentView='groupLessonDetail';currentGroupLessonId=l.id;render();}else openLessonView(l.id);},'btn-chip small'));details.append(body);entry.append(details);list.append(entry);});}sel.onchange=start.onchange=end.onchange=fill;fill();}
 function deskDecorate(){document.querySelectorAll('.desk-dialog').forEach(d=>d.remove());mainCol.dataset.view=currentView;document.querySelectorAll('.nav-btn').forEach(b=>{const parent={student:'students',editStudent:'students',lesson:'today',groupDetail:'groups',groupLessonDetail:'groups',planDetail:'plans',subscriptionEdit:'subscriptions'};const active=b.dataset.view===(parent[currentView]||currentView);b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});if(currentView==='student')deskStudentTabs(mainCol);if(currentView!=='today'){const c=mainCol.querySelector(':scope > .card');if(c){c.classList.add('desk-page');const h=c.querySelector(':scope > .card-header');if(h)h.classList.add('desk-hero');}}if(currentView==='today'){const left=mainCol.querySelector('.home-left'),right=mainCol.querySelector('.home-right');if(left&&right){const notes=left.firstElementChild;right.append(notes);const summary=right.firstElementChild;summary.classList.add('desk-summary');mainCol.insertBefore(summary,mainCol.querySelector('.home-grid'));right.querySelectorAll('.card').forEach(c=>{if(c.querySelector('.card-title')?.textContent==='Темы сегодня')c.remove();});}}if(currentView==='plans'){mainCol.querySelectorAll('.student-card').forEach((item,i)=>{item.classList.add('tone-'+i%3);const cover=deskEl('div','desk-bookcover');const name=item.querySelector('.student-name')?.textContent||'Курс';cover.textContent=name.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();item.prepend(cover);deskActivate(item,item.onclick);});}if(currentView==='planDetail'){mainCol.querySelectorAll('.student-card').forEach((item,i)=>{const wrap=deskEl('details','desk-planlesson');const title=item.querySelector('.student-name')?.textContent||`Урок ${i+1}`;wrap.append(deskEl('summary','',title));item.replaceWith(wrap);wrap.append(item);});}if(currentView==='subscriptions'){mainCol.querySelectorAll('.subs-table-row').forEach((row,i)=>{const labels=['Ученик','Оплачено / цена','Прошли / всего','Осталось занятий','Статус / действия'];[...row.children].forEach((c,j)=>c.dataset.label=labels[j]);const st=data.students.filter(s=>s.paymentMode!=='perLesson')[i];if(st){const stats=getSubscriptionStats(st.id);if(stats.total>0){const meter=deskEl('div','desk-meter');const fill=deskEl('span');fill.style.width=Math.min(100,Math.max(0,stats.remaining/stats.total*100))+'%';meter.append(fill);row.children[3].append(meter);}}});}if(currentView==='settings'){const area=mainCol.querySelector('textarea');if(area){const tools=deskEl('div','desk-settings-tools');tools.append(deskButton('Скачать резервную копию',()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=deskEl('a');link.href=url;link.download='teacher-desk-backup-'+todayISO()+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}));const input=deskEl('input');input.type='file';input.accept='.json,application/json';input.hidden=true;input.onchange=async()=>{const file=input.files[0];if(!file)return;try{const text=await file.text();JSON.parse(text);area.value=text;area.focus();}catch(e){alert('Не удалось прочитать JSON. Выберите резервную копию кабинета.');}input.value='';};tools.append(deskButton('Выбрать файл для импорта',()=>input.click()),input);area.parentElement.before(tools);}}mainCol.querySelectorAll('.form-input,.form-select,textarea').forEach((f,i)=>{const label=f.closest('.form-row')?.querySelector('.form-label');if(label&&!f.id){f.id='desk-field-'+i;f.setAttribute('aria-label',label.textContent);}});mainCol.querySelectorAll('.lesson-card').forEach(el=>{if(el.onclick)deskActivate(el,el.onclick);});}
 Object.entries(deskIconPaths).forEach(([key])=>{const icon=document.querySelector(`.nav-btn[data-view="${key==='sun'?'today':key}"] .icon`);if(icon)icon.replaceChildren(deskIcon(key));});
 
 /* Payments and subscription cycles */
 function deskBillingLessons(studentId){
- const individual=getLessonsByStudent(studentId).map(l=>({key:'i:'+l.id,lesson:l,payment:l,group:false}));
- const group=data.groupLessons.flatMap(l=>{const a=(l.attendance||[]).find(a=>a.studentId===studentId);return a?[{key:'g:'+l.id,lesson:l,payment:a,group:true}]:[];});
+ const individual=getLessonsByStudent(studentId).filter(l=>!l.makeupFor).map(l=>({key:'i:'+l.id,lesson:l,payment:l,group:false}));
+ const group=data.groupLessons.flatMap(l=>{const a=(l.attendance||[]).find(a=>a.studentId===studentId);if(!a)return[];const makeup=a.makeupRequested?makeupLessonFor(l.id,studentId):null;return[{key:'g:'+l.id,lesson:makeup||l,sourceLesson:l,payment:a,group:true,makeupLesson:makeup}];});
  return [...individual,...group];
 }
 function getSubscriptionStats(studentId){
  const lessons=getLessonsByStudent(studentId),sub=getSubscription(studentId);
  const excluded=new Set(sub?.excludedLessonKeys||[]);
- const rawDone=deskBillingLessons(studentId).filter(x=>!excluded.has(x.key)&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present===true:x.lesson.status==='done')).length;
+ const rawDone=deskBillingLessons(studentId).filter(x=>!excluded.has(x.key)&&deskBillingCompleted(x)).length;
  const doneCount=Math.max(0,rawDone+(Number(sub?.doneOffset)||0)),total=Number(sub?.total)||0;
  const price=Number(sub?.price)||0,paid=Number(sub?.paid)||0;
  return {sub,lessons,rawDone,doneCount,total,remaining:Math.max(total-doneCount,0),price,paid,debt:Math.max(price-paid,0)};
 }
 function getPerLessonStats(studentId,yearMonth){
- const ym=yearMonth||todayISO().slice(0,7);const entries=deskBillingLessons(studentId).filter(x=>x.lesson.date.slice(0,7)===ym&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present===true:x.lesson.status==='done'));
+ const ym=yearMonth||todayISO().slice(0,7);const entries=deskBillingLessons(studentId).filter(x=>x.lesson.date.slice(0,7)===ym&&deskBillingCompleted(x));
  const totalPaid=entries.reduce((sum,x)=>sum+(Number(x.payment.paidAmount)||0),0);
  const rate=Number(getStudent(studentId)?.lessonPrice)||0;
  return {ym,lessons:entries.map(x=>x.lesson),entries,totalLessons:entries.length,totalPaid,unpaidCount:entries.filter(x=>!(Number(x.payment.paidAmount)>0)).length,totalDue:Math.max(entries.length*rate-totalPaid,0)};
@@ -4922,7 +4936,7 @@ function deskNewSubscription(studentId){
   if(!deskMoneyValid([total.input,price.input,paid.input])||Number(total.input.value)<1){error.textContent='Укажи целое число занятий от 1 и неотрицательные суммы.';return;}
   let sub=getSubscription(studentId);if(!sub){sub={id:data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1,studentId,history:[]};data.subscriptions.push(sub);}
   if(sub.total>0||sub.price>0||sub.paid>0){sub.history=sub.history||[];sub.history.push({financeCycle:sub.financeCycle||sub.startedAt||'legacy',startedAt:sub.startedAt||null,closedAt:new Date().toISOString(),total:old.total,price:old.price,paid:old.paid,doneCount:old.doneCount,remaining:old.remaining,doneOffset:sub.doneOffset||0,excludedLessonKeys:[...(sub.excludedLessonKeys||[])]});}
-  sub.excludedLessonKeys=deskBillingLessons(studentId).filter(x=>x.group?x.payment.present!==null&&x.payment.present!==undefined:x.lesson.status==='done'||x.lesson.status==='cancelled').map(x=>x.key);
+  sub.excludedLessonKeys=deskBillingLessons(studentId).filter(x=>x.group?(x.payment.makeupRequested?deskBillingCompleted(x):x.payment.present!==null&&x.payment.present!==undefined):x.lesson.status==='done'||x.lesson.status==='cancelled').map(x=>x.key);
   sub.doneOffset=0;sub.total=Number(total.input.value);sub.price=Number(price.input.value);sub.paid=Number(paid.input.value);sub.startedAt=new Date().toISOString();sub.financeCycle=sub.startedAt;st.paymentMode='subscription';deskProfileTab='payment';currentView='student';currentStudentId=studentId;save();
  },'btn-main'));
  deskModal('Новый абонемент · '+st.name,form);
@@ -4932,7 +4946,7 @@ function deskPerLessonPanel(st){const panel=deskEl('div','form-section');const r
  panel.append(deskEl('div','tiny','Указывай общую оплаченную сумму за занятие. Новая доплата запишется сегодняшним числом в «Финансы»; дату можно изменить в истории поступлений.'));const month=getPerLessonStats(st.id);panel.append(deskEl('div','tiny',`За ${month.ym}: проведено ${month.totalLessons} · оплачено за проведённые ${month.totalPaid} ₽`));if(st.lessonPrice>0)panel.append(deskEl('div','tiny',`Ожидается по текущей цене: ${month.totalDue} ₽`));
  const entries=deskBillingLessons(st.id).filter(x=>x.lesson.status!=='cancelled').sort((a,b)=>(b.lesson.date+' '+b.lesson.time).localeCompare(a.lesson.date+' '+a.lesson.time));
  if(!entries.length)panel.append(deskEl('div','tiny','Занятий пока нет. Оплату можно записать через «Записать поступление».'));
- entries.forEach(x=>{const row=deskEl('div','desk-payment-row');row.append(deskEl('div','tiny',`${x.lesson.date} · ${x.lesson.time} · ${x.group?'Группа':x.lesson.topic||'Занятие'}`));const field=deskNumberField('Получено за занятие (₽)',x.payment.paidAmount||0);row.append(field.wrap,deskButton('Записать оплату',()=>{if(!deskMoneyValid([field.input])){field.input.reportValidity();return;}x.payment.paidAmount=Number(field.input.value);save();},'btn-chip'));panel.append(row);});
+ entries.forEach(x=>{const row=deskEl('div','desk-payment-row');row.append(deskEl('div','tiny',`${x.lesson.date} · ${x.lesson.time} · ${x.makeupLesson?'Отработка':x.group?'Группа':x.lesson.topic||'Занятие'}`));const field=deskNumberField('Получено за занятие (₽)',x.payment.paidAmount||0);row.append(field.wrap,deskButton('Записать оплату',()=>{if(!deskMoneyValid([field.input])){field.input.reportValidity();return;}x.payment.paidAmount=Number(field.input.value);save();},'btn-chip'));panel.append(row);});
  return panel;
 }
 let deskFinanceFilter='all';
@@ -4979,16 +4993,116 @@ function buildGroupForm(opts={}){
   group.name=name.input.value.trim();group.buildinLink=link.input.value.trim();group.schedule=rows.length?rows.map(r=>({...r.old,dayKey:r.dayKey,time:r.time})):null;edits.forEach((next,id)=>Object.assign(data.groupLessons.find(l=>l.id===id),next));if(Number(generate.input.value))autoCreateLessonsForGroup(group,Number(generate.input.value),start.input.value);currentView='groupDetail';currentGroupId=group.id;save();
  },'btn-main'),deskButton('Отмена',()=>{currentView='groupDetail';currentGroupId=group.id;render();}));return form;
 }
+
+/* A makeup is an individual calendar event; its payment belongs to the original attendance row. */
+function makeupSource(lesson){
+ if(!lesson?.makeupFor)return null;
+ const groupLesson=data.groupLessons.find(g=>g.id===lesson.makeupFor.groupLessonId);
+ const attendance=groupLesson?.attendance?.find(a=>a.studentId===lesson.studentId);
+ return groupLesson&&attendance?{groupLesson,attendance}:null;
+}
+function makeupLessonFor(groupLessonId,studentId){
+ return data.lessons.filter(l=>l.makeupFor?.groupLessonId===groupLessonId&&l.studentId===studentId&&l.status!=='cancelled').sort((a,b)=>b.id-a.id)[0]||null;
+}
+function makeupTitle(lesson){
+ const source=makeupSource(lesson),name=getStudent(lesson.studentId)?.name||'Ученик';
+ return lesson.makeupFor?'Отработка · '+name+' · '+(getGroup(source?.groupLesson.groupId)?.name||'Группа'):name;
+}
+function deskBillingCompleted(row){
+ if((row.sourceLesson||row.lesson).status==='cancelled')return false;
+ if(!row.group)return row.lesson.status==='done';
+ if(row.payment.makeupRequested)return row.makeupLesson?.status==='done';
+ return row.payment.present===true;
+}
+function makeupRows(studentId=null,groupId=null){
+ const rows=[];
+ data.groupLessons.filter(g=>g.status!=='cancelled'&&(groupId===null||g.groupId===groupId)).forEach(g=>(g.attendance||[]).forEach(a=>{
+  if(!a.makeupRequested||(studentId!==null&&a.studentId!==studentId)||!getStudent(a.studentId))return;
+  const lesson=makeupLessonFor(g.id,a.studentId);
+  if(lesson?.status!=='done')rows.push({groupLesson:g,attendance:a,lesson});
+ }));
+ return rows.sort((a,b)=>(a.lesson?.date||'9999').localeCompare(b.lesson?.date||'9999')||a.groupLesson.date.localeCompare(b.groupLesson.date));
+}
+function makeupDuration(lesson){
+ const minutes=t=>{const parts=String(t||'').split(':').map(Number);return parts.length===2?parts[0]*60+parts[1]:NaN;};
+ const direct=Number(lesson.durationMinutes);if(Number.isFinite(direct)&&direct>0)return direct;
+ const end=minutes(lesson.endTime)-minutes(lesson.time);if(Number.isFinite(end)&&end>0)return end;
+ const entity=lesson.groupId?getGroup(lesson.groupId):getStudent(lesson.studentId),slot=(entity?.schedule||[]).find(s=>s.dayKey===groupDay(lesson.date)&&s.time===lesson.time);
+ const span=Number(slot?.durationMinutes)||minutes(slot?.endTime)-minutes(slot?.time);
+ return Number.isFinite(span)&&span>0?span:60;
+}
+function makeupSlotError(source,date,time,duration,excludeId=null){
+ if(!source||source.groupLesson.status==='cancelled'||!source.attendance.makeupRequested||source.attendance.present===true)return 'Сначала сохрани пропуск с отработкой в групповом уроке.';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<financeToday()||date<source.groupLesson.date||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return 'Выбери сегодняшнюю или будущую дату и корректное время.';
+ const parsed=new Date(date+'T12:00:00Z');if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==date)return 'Выбери существующую дату.';
+ if(!Number.isInteger(duration)||duration<15||duration>480)return 'Укажи длительность от 15 до 480 минут.';
+ const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3,5)),start=minutes(time),end=start+duration;
+ if(end>1440)return 'Занятие должно закончиться до полуночи.';
+ const events=[...getIndividualLessons(l=>l.id!==excludeId&&l.date===date&&l.status!=='cancelled'),...data.groupLessons.filter(g=>g.date===date&&g.status!=='cancelled')];
+ if(events.some(l=>{if(!l.time)return false;const from=minutes(l.time),span=makeupDuration(l);return start<from+span&&end>from;}))return 'Это время пересекается с другим занятием. Выбери свободное время.';
+ return '';
+}
+function makeupSchedule(groupLessonId,studentId,date,time,duration=60){
+ const g=data.groupLessons.find(x=>x.id===groupLessonId),a=g?.attendance?.find(x=>x.studentId===studentId),source=g&&a?{groupLesson:g,attendance:a}:null,existing=makeupLessonFor(groupLessonId,studentId);
+ if(existing?.status==='done')throw new Error('Отработка уже проведена.');
+ const error=makeupSlotError(source,date,time,duration,existing?.id);if(error)throw new Error(error);
+ if(existing){Object.assign(existing,{date,time,durationMinutes:duration,wasMoved:true});return existing;}
+ const lesson={id:data.lessons.length?Math.max(...data.lessons.map(l=>l.id))+1:1,studentId,date,time,status:'scheduled',durationMinutes:duration,makeupFor:{groupLessonId},topic:g.topic||'',hw:g.hw||'',lessonPlan:g.lessonPlan||'',nextLessonComment:'',comment:'',gradeLesson:null,gradeHW:null,wasMoved:false};
+ data.lessons.push(lesson);return lesson;
+}
+function makeupScheduleDialog(groupLessonId,studentId){
+ const g=data.groupLessons.find(x=>x.id===groupLessonId),a=g?.attendance?.find(x=>x.studentId===studentId);
+ if(!g||!a)return;
+ const existing=makeupLessonFor(groupLessonId,studentId),form=deskEl('div','form-section group-editor'),date=groupField('Дата отработки','date',existing?.date||financeToday()),time=groupField('Время отработки','time',existing?.time||''),duration=deskNumberField('Длительность отработки (минут)',existing?.durationMinutes||makeupDuration(g),true),error=deskEl('p','tiny');
+ date.input.min=financeToday();duration.input.min='15';duration.input.max='480';error.setAttribute('role','alert');
+ form.append(deskEl('p','tiny','За пропущенное занятие '+g.date+' · '+getStudent(studentId)?.name+'. Оплата общая с исходным уроком, повторно не начисляется.'),date.wrap,time.wrap,duration.wrap,error,deskButton('Назначить отработку',()=>{
+  if(!date.input.checkValidity()||!time.input.checkValidity()||!duration.input.checkValidity()){error.textContent='Проверь дату, время и длительность.';return;}
+  try{const lesson=makeupSchedule(groupLessonId,studentId,date.input.value,time.input.value,Number(duration.input.value));currentLessonId=lesson.id;currentView='lesson';save();}
+  catch(failure){error.textContent=failure.message;}
+ },'btn-main'));
+ deskModal('Отработка · '+(getStudent(studentId)?.name||'Ученик'),form);
+}
+function makeupPendingPanel(studentId=null,groupId=null){
+ const rows=makeupRows(studentId,groupId);if(!rows.length)return null;
+ const section=deskEl('section','card makeup-panel'),waiting=rows.filter(r=>!r.lesson).length;
+ section.append(deskEl('h3','card-title','Отработки'),deskEl('p','tiny','Ожидают даты: '+waiting+' · Назначено: '+(rows.length-waiting)));
+ rows.forEach(({groupLesson:g,attendance:a,lesson})=>{
+  const row=deskEl('div','makeup-row');row.append(deskEl('strong','',getStudent(a.studentId)?.name||'Ученик'),deskEl('div','tiny',(getGroup(g.groupId)?.name||'Группа')+' · пропуск '+g.date),deskEl('div','tiny',lesson?'Назначена: '+lesson.date+' · '+lesson.time:'Ожидает отработки'));
+  const tools=deskEl('div','desk-toolbar');if(lesson)tools.append(deskButton('Открыть отработку',()=>openLessonView(lesson.id),'btn-chip'));
+  tools.append(deskButton(lesson?'Перенести отработку':'Назначить отработку',()=>makeupScheduleDialog(g.id,a.studentId),'btn-main'));row.append(tools);section.append(row);
+ });
+ return section;
+}
+function makeupCanComplete(lesson){
+ if(!lesson.makeupFor)return true;
+ const source=makeupSource(lesson);
+ if(source&&source.groupLesson.status!=='cancelled'&&source.attendance.makeupRequested&&source.attendance.present!==true&&makeupLessonFor(source.groupLesson.id,lesson.studentId)?.id===lesson.id)return true;
+ alert('Исходное занятие отменено или пропуск уже изменён. Проверь запись группы.');return false;
+}
+function makeupLessonInfo(lesson){
+ if(!lesson.makeupFor)return null;
+ const source=makeupSource(lesson),box=deskEl('aside','form-section makeup-info');
+ box.append(deskEl('strong','','Индивидуальная отработка'),deskEl('p','tiny',source?'За групповой урок '+source.groupLesson.date+'. Оплата учитывается один раз в исходном занятии. Абонемент списывается после проведения отработки.':'Исходное групповое занятие не найдено.'));
+ if(source)box.append(deskButton('Открыть исходный урок',()=>{currentView='groupLessonDetail';currentGroupLessonId=source.groupLesson.id;render();},'btn-chip'));
+ return box;
+}
+
 function groupLessonEditor(gl,isNew=false){
  const g=getGroup(gl.groupId),form=deskEl('div','form-section group-lesson-editor'),date=groupField('Дата занятия','date',gl.date),time=groupField('Время занятия','time',gl.time),topic=groupField('Тема занятия','text',gl.topic),hw=groupField('Домашнее задание','textarea',gl.hw),notes=groupField('Общие заметки о занятии','textarea',gl.comment);topic.input.placeholder='Например: to be, повторение местоимений';hw.input.placeholder='Страница, упражнения, что повторить';notes.input.placeholder='Как прошло занятие и что сделать в следующий раз';const when=deskEl('div','form-row-inline');when.append(date.wrap,time.wrap);form.append(when,deskEl('p','tiny','Дата и время меняются только у этого урока. Регулярные дни можно изменить в карточке группы.'),topic.wrap,hw.wrap,notes.wrap);
  const plan=groupField('План урока','textarea',gl.lessonPlan||''),next=groupField('Комментарий к следующему занятию','textarea',lessonNextComment(gl));plan.wrap.classList.add('lesson-plan-field');next.wrap.classList.add('lesson-next-field');topic.wrap.after(plan.wrap);notes.wrap.after(next.wrap);
  const payments=[];
  const attendance=(gl.attendance||[]).map(a=>({...a}));(g?.memberIds||[]).forEach(id=>{if(!attendance.some(a=>a.studentId===id))attendance.push({studentId:id,present:null,comment:''});});
  form.append(deskEl('h3','','Посещаемость, оценки и оплата по детям'));
- attendance.forEach(a=>{const st=getStudent(a.studentId);if(!st)return;const box=deskEl('div','group-child-editor');box.append(deskEl('h4','',st.name));const present=groupSelect('Посещаемость: '+st.name,[['','Не отмечено'],['yes','Был на занятии'],['no','Пропустил']],a.present===true?'yes':a.present===false?'no':'');present.input.onchange=()=>a.present=present.input.value==='yes'?true:present.input.value==='no'?false:null;const grade=groupSelect('Оценка за урок: '+st.name,[['','Без оценки'],...Array.from({length:5},(_,i)=>[String(i+1),String(i+1)])],a.gradeLesson),gradeHW=groupSelect('Оценка за домашку: '+st.name,[['','Без оценки'],...Array.from({length:5},(_,i)=>[String(i+1),String(i+1)])],a.gradeHW);grade.input.onchange=()=>a.gradeLesson=grade.input.value?Number(grade.input.value):null;gradeHW.input.onchange=()=>a.gradeHW=gradeHW.input.value?Number(gradeHW.input.value):null;const line=deskEl('div','form-row-inline');line.append(present.wrap,grade.wrap,gradeHW.wrap);const comment=groupField('Комментарий: '+st.name,'textarea',a.comment);comment.input.oninput=()=>a.comment=comment.input.value;const childNext=groupField('Комментарий к следующему занятию: '+st.name,'textarea',a.nextLessonComment||'');childNext.input.oninput=()=>a.nextLessonComment=childNext.input.value;box.append(line,comment.wrap,childNext.wrap);if(st.paymentMode==='perLesson')groupLessonPaymentFields(box,a,st,payments);form.append(box);});
+ attendance.forEach(a=>{const st=getStudent(a.studentId);if(!st)return;const box=deskEl('div','group-child-editor');box.append(deskEl('h4','',st.name));const present=groupSelect('Посещаемость: '+st.name,[['','Не отмечено'],['yes','Был на занятии'],['no','Пропуск без отработки'],['makeup','Пропуск → с отработкой']],a.makeupRequested?'makeup':a.present===true?'yes':a.present===false?'no':'');present.input.onchange=()=>{a.present=present.input.value==='yes'?true:present.input.value==='no'||present.input.value==='makeup'?false:null;if(present.input.value==='makeup')a.makeupRequested=true;else delete a.makeupRequested;};const grade=groupSelect('Оценка за урок: '+st.name,[['','Без оценки'],...Array.from({length:5},(_,i)=>[String(i+1),String(i+1)])],a.gradeLesson),gradeHW=groupSelect('Оценка за домашку: '+st.name,[['','Без оценки'],...Array.from({length:5},(_,i)=>[String(i+1),String(i+1)])],a.gradeHW);grade.input.onchange=()=>a.gradeLesson=grade.input.value?Number(grade.input.value):null;gradeHW.input.onchange=()=>a.gradeHW=gradeHW.input.value?Number(gradeHW.input.value):null;const line=deskEl('div','form-row-inline');line.append(present.wrap,grade.wrap,gradeHW.wrap);const comment=groupField('Комментарий: '+st.name,'textarea',a.comment);comment.input.oninput=()=>a.comment=comment.input.value;const childNext=groupField('Комментарий к следующему занятию: '+st.name,'textarea',a.nextLessonComment||'');childNext.input.oninput=()=>a.nextLessonComment=childNext.input.value;box.append(line,comment.wrap,childNext.wrap);if(st.paymentMode==='perLesson')groupLessonPaymentFields(box,a,st,payments);
+ if(a.makeupRequested&&!isNew){const makeup=makeupLessonFor(gl.id,a.studentId);box.append(deskEl('p','tiny',makeup?(makeup.status==='done'?'Отработано: ':'Отработка назначена: ')+makeup.date+' · '+makeup.time:'Ожидает отработки'),deskButton(makeup?'Открыть отработку':'Назначить отработку',()=>{if(edited){message.textContent='Сначала сохрани изменения в карточке занятия.';return;}if(makeup)openLessonView(makeup.id);else makeupScheduleDialog(gl.id,a.studentId);},'btn-chip'));}
+ box.append(deskEl('p','tiny','Для отработки выбери «Пропуск → с отработкой» и сохрани занятие.'));
+ form.append(box);});
  const message=deskEl('p','tiny');message.setAttribute('role','alert');const commit=async()=>{
   if(!date.input.value||!time.input.value){message.textContent='Укажи дату и время занятия.';return;}if(data.groupLessons.some(l=>l.groupId===gl.groupId&&l.id!==gl.id&&l.date===date.input.value&&l.time===time.input.value)){message.textContent='У группы уже есть занятие на эту дату и время. Открой его или выбери другое время.';return;}
-  if(!groupLessonPaymentsValid(payments,message))return;financeReconcile(null);
+  if(!groupLessonPaymentsValid(payments,message))return;
+ for(const a of attendance){const makeup=makeupLessonFor(gl.id,a.studentId);if(!a.makeupRequested&&makeup?.status==='done'){message.textContent='Сначала отмени проведённую отработку, чтобы изменить этот пропуск.';return;}}
+ financeReconcile(null);
+ attendance.forEach(a=>{if(!a.makeupRequested){const makeup=makeupLessonFor(gl.id,a.studentId);if(makeup?.status==='scheduled')makeup.status='cancelled';}});
   const changedDate=gl.date!==date.input.value||gl.time!==time.input.value;Object.assign(gl,{date:date.input.value,time:time.input.value,topic:topic.input.value,hw:hw.input.value,comment:notes.input.value,lessonPlan:plan.input.value,nextLessonComment:next.input.value,attendance});if(changedDate&&!isNew)gl.wasMoved=true;if(isNew){gl.id=data.groupLessons.length?Math.max(...data.groupLessons.map(l=>l.id))+1:1;data.groupLessons.push(gl);}groupLessonRecordPayments(gl,payments);currentGroupLessonId=gl.id;currentView='groupLessonDetail';save();await groupLessonSaveFeedback(gl.id);
  };
  const bar=deskEl('div','desk-toolbar group-save-bar'),status=deskEl('span','tiny','Изменения сохраняются по кнопке');
@@ -5011,6 +5125,7 @@ function groupLessonEditor(gl,isNew=false){
    }else{
     if(gl.status==='done')gl.statusBeforeCancellation='done';
     gl.status='cancelled';
+    data.lessons.filter(l=>l.makeupFor?.groupLessonId===gl.id&&l.status==='scheduled').forEach(l=>l.status='cancelled');
    }
    save();
    await groupLessonSaveFeedback(gl.id);
@@ -5024,7 +5139,7 @@ function groupLessonEditor(gl,isNew=false){
 function renderGroupLessonDetail(main,lessonId){const gl=data.groupLessons.find(l=>l.id===lessonId);if(!gl){main.append(deskEl('div','empty-state','Занятие не найдено.'));return;}const group=getGroup(gl.groupId),page=deskPage(main,(group?.name||'Группа')+' · '+gl.date,'Тема, домашнее задание, посещаемость и оплата',groupLessonStatusLabel(gl)+' · Занятие группы',deskButton('← К группе',()=>{currentView='groupDetail';currentGroupId=gl.groupId;render();}));const carry=lessonCarryover(gl,true);if(carry)page.append(carry);page.append(groupLessonEditor(gl));}
 function groupNewLesson(group){const draft={groupId:group.id,date:todayISO(),time:group.schedule?.[0]?.time||'16:00',topic:'',hw:'',comment:'',attendance:group.memberIds.map(studentId=>({studentId,present:null,comment:''}))};deskModal('Новое занятие · '+group.name,groupLessonEditor(draft,true));}
 function renderGroupDetail(main,groupId){
- renderGroupDetailBase(main,groupId);const group=getGroup(groupId);if(!group)return;const card=main.lastElementChild,head=card.querySelector('.card-header'),summary=deskEl('div','group-schedule-summary');summary.append(deskEl('div','',deskSchedule(group.schedule)||'Расписание пока не задано'),deskButton('Изменить дни и время',()=>deskModal('Расписание · '+group.name,buildGroupForm({group})),'btn-main'));head.after(summary,groupPaymentOverview(group));head.querySelector('.card-subtitle').textContent='Расписание, участники, оплата и журнал занятий';
+ renderGroupDetailBase(main,groupId);const group=getGroup(groupId);if(!group)return;const card=main.lastElementChild,head=card.querySelector('.card-header'),summary=deskEl('div','group-schedule-summary');summary.append(deskEl('div','',deskSchedule(group.schedule)||'Расписание пока не задано'),deskButton('Изменить дни и время',()=>deskModal('Расписание · '+group.name,buildGroupForm({group})),'btn-main'));head.after(summary,groupPaymentOverview(group));const makeupPanel=makeupPendingPanel(null,groupId);if(makeupPanel)summary.after(makeupPanel);head.querySelector('.card-subtitle').textContent='Расписание, участники, оплата и журнал занятий';
  const oldList=card.lastElementChild,list=deskEl('div','group-lessons-list'),tools=deskEl('div','desk-toolbar'),filter=groupSelect('Показать занятия',[['upcoming','Сегодня и будущие'],['past','Прошедшие'],['all','Все занятия']],'upcoming');tools.append(deskButton('+ Добавить занятие',()=>groupNewLesson(group),'btn-main'),filter.wrap);list.append(tools);const items=deskEl('div');list.append(items);function draw(){items.replaceChildren();const lessons=data.groupLessons.filter(l=>l.groupId===groupId&&(filter.input.value==='all'||(filter.input.value==='past'?l.date<todayISO():l.date>=todayISO()))).sort((a,b)=>(filter.input.value==='past'?-1:1)*(a.date+' '+a.time).localeCompare(b.date+' '+b.time));if(!lessons.length)items.append(deskEl('div','empty-state','Занятий в этом списке пока нет. Добавь урок или выбери другой период.'));lessons.forEach(gl=>{const row=deskEl('article','lesson-card group-lesson-card'),top=deskEl('div','lesson-top');top.append(deskEl('strong','',gl.date+' · '+gl.time),deskButton('Открыть и редактировать',()=>{currentView='groupLessonDetail';currentGroupLessonId=gl.id;render();}));row.append(top,deskEl('div','tiny group-lesson-status',groupLessonStatusLabel(gl)),deskEl('div','group-lesson-topic',gl.topic||'Тема пока не указана'),deskEl('div','tiny','Домашнее задание: '+(gl.hw||'Не задано')));const paidText=(gl.attendance||[]).filter(a=>getStudent(a.studentId)?.paymentMode==='perLesson').map(a=>(getStudent(a.studentId)?.name||'Ученик')+': '+financeMoney(Number(a.paidAmount)||0));if(paidText.length)row.append(deskEl('div','tiny','Оплата: '+paidText.join(' · ')));if(gl.comment)row.append(deskEl('div','tiny','Заметки: '+gl.comment));items.append(row);});}filter.input.onchange=draw;draw();oldList.replaceWith(list);
 }
 
@@ -5057,7 +5172,7 @@ const groupPaymentMonths=new Map();
 function groupPaymentOverview(group){
  const section=deskEl('section','form-section group-payment-overview'),head=deskEl('div','desk-toolbar'),month=groupField('Месяц оплат группы','month',groupPaymentMonths.get(group.id)||financeToday().slice(0,7));head.append(deskEl('h3','','Оплата группы'),month.wrap);section.append(head,deskEl('p','tiny','Суммы относятся к занятиям выбранного месяца. Доход по дате поступления денег смотри в «Финансах».'));const list=deskEl('div','group-payment-grid');section.append(list);
  function draw(){list.replaceChildren();groupPaymentMonths.set(group.id,month.input.value);getGroupMembers(group.id).forEach(st=>{const card=deskEl('article','group-payment-person');card.append(deskEl('strong','',st.name));if(st.paymentMode==='perLesson'){
- const rows=data.groupLessons.filter(l=>l.groupId===group.id&&l.date.slice(0,7)===month.input.value).map(l=>({l,a:(l.attendance||[]).find(a=>a.studentId===st.id)})).filter(x=>x.a);const paid=rows.reduce((n,x)=>n+(Number(x.a.paidAmount)||0),0),due=rows.filter(x=>x.a.present===true&&x.l.status!=='cancelled').reduce((n,x)=>n+Math.max(0,(Number(st.lessonPrice)||0)-(Number(x.a.paidAmount)||0)),0);card.append(deskEl('div','tiny','По занятиям · '+financeMoney(st.lessonPrice||0)+' за урок'),deskEl('div','group-payment-value',financeMoney(paid)),deskEl('div','tiny','Оплачено за занятия месяца, включая предоплаты'),deskEl('span','desk-pill '+(due===0?'good':''),'За проведённые осталось оплатить: '+financeMoney(due)),deskButton('+ Записать оплату',()=>deskModal('Оплата · '+st.name,financePaymentForm(null,st.id)),'btn-main'));
+ const rows=deskBillingLessons(st.id).filter(x=>x.group&&x.sourceLesson.groupId===group.id&&x.lesson.date.slice(0,7)===month.input.value).map(x=>({l:x.lesson,a:x.payment,entry:x}));const paid=rows.reduce((n,x)=>n+(Number(x.a.paidAmount)||0),0),due=rows.filter(x=>deskBillingCompleted(x.entry)).reduce((n,x)=>n+Math.max(0,(Number(st.lessonPrice)||0)-(Number(x.a.paidAmount)||0)),0);card.append(deskEl('div','tiny','По занятиям · '+financeMoney(st.lessonPrice||0)+' за урок'),deskEl('div','group-payment-value',financeMoney(paid)),deskEl('div','tiny','Оплачено за занятия месяца, включая предоплаты'),deskEl('span','desk-pill '+(due===0?'good':''),'За проведённые осталось оплатить: '+financeMoney(due)),deskButton('+ Записать оплату',()=>deskModal('Оплата · '+st.name,financePaymentForm(null,st.id)),'btn-main'));
  }else{const stats=getSubscriptionStats(st.id);card.append(deskEl('div','tiny','Абонемент'),deskEl('div','tiny',`Осталось ${stats.remaining} из ${stats.total} занятий`),deskEl('div','tiny','Оплачено '+financeMoney(stats.paid)),deskButton('Открыть абонемент',()=>{deskProfileTab='payment';deskProfileStudent=st.id;openStudentView(st.id);},'btn-chip'));}
  card.append(deskButton('История поступлений ↗',()=>{financeStudent=String(st.id);financeMonth=month.input.value;currentView='finance';render();},'btn-chip'));list.append(card);});}
  month.input.onchange=()=>{if(month.input.value&&month.input.checkValidity())draw();};draw();return section;
@@ -5093,7 +5208,7 @@ const unpaidJournalStart='2026-09-01';
 function unpaidLessonRows(studentId=null){
  const today=financeToday(),rows=[],missing=[];
  data.students.filter(st=>st.paymentMode==='perLesson'&&(studentId===null||st.id===studentId)).forEach(st=>{
-  const completed=deskBillingLessons(st.id).filter(x=>x.lesson.date>=unpaidJournalStart&&x.lesson.date<=today&&x.lesson.status!=='cancelled'&&x.payment.debtSettlement?.confirmedClear!==true&&(x.group?x.payment.present===true:x.lesson.status==='done'));
+  const completed=deskBillingLessons(st.id).filter(x=>x.lesson.date>=unpaidJournalStart&&x.lesson.date<=today&&x.payment.debtSettlement?.confirmedClear!==true&&deskBillingCompleted(x));
   const price=Number(st.lessonPrice);
   if(!Number.isFinite(price)||price<=0){if(completed.length)missing.push(st);return;}
   const cost=Math.round(price*100);
@@ -5106,7 +5221,8 @@ function unpaidLessonRows(studentId=null){
  return {rows,missing,total:rows.reduce((sum,x)=>sum+x.remaining,0)};
 }
 function unpaidOpenLesson(row){
- if(row.group){currentView='groupLessonDetail';currentGroupLessonId=row.lesson.id;render();}
+ if(row.makeupLesson)openLessonView(row.makeupLesson.id);
+ else if(row.group){currentView='groupLessonDetail';currentGroupLessonId=row.sourceLesson?.id||row.lesson.id;render();}
  else openLessonView(row.lesson.id);
 }
 function unpaidLessonsPanel(studentId=null){
@@ -5122,7 +5238,7 @@ function unpaidLessonsPanel(studentId=null){
   meta.append(deskEl('strong','',financeMoney(item.total/100)),deskEl('span','tiny','Занятий: '+item.rows.length));
   heading.append(name,meta);details.append(heading);
   item.rows.forEach(row=>{
-   const line=deskEl('div','unpaid-lesson'),group=row.group?getGroup(row.lesson.groupId):null;
+   const line=deskEl('div','unpaid-lesson'),group=row.group?getGroup((row.sourceLesson||row.lesson).groupId):null;
    line.append(deskEl('strong','',row.lesson.date+' · '+(row.lesson.time||'')+(group?' · '+group.name:'')),deskEl('div','tiny','Стоимость '+financeMoney(row.cost/100)+' · оплачено '+financeMoney(row.paid/100)),deskEl('div','unpaid-remaining','Осталось '+financeMoney(row.remaining/100)));
    const actions=deskEl('div','desk-toolbar unpaid-actions');
    actions.append(deskButton('Записать оплату',()=>deskModal('Оплата · '+row.student.name,financePaymentForm(null,row.student.id,row.sourceKey)),'btn-main'),deskButton('Открыть урок',()=>unpaidOpenLesson(row),'btn-chip'));
@@ -5187,7 +5303,7 @@ function studentMonthRows(id,month){
  const groups=data.groupLessons.flatMap(l=>{if(l.date?.slice(0,7)!==month)return[];const attendance=(l.attendance||[]).find(a=>String(a.studentId)===String(id));return attendance?[{lesson:l,attendance,group:true}]:[];});
  return [...individual,...groups].sort((a,b)=>(a.lesson.date+' '+a.lesson.time).localeCompare(b.lesson.date+' '+b.lesson.time)||Number(a.group)-Number(b.group));
 }
-function studentMonthStatus(row){if(row.lesson.status==='cancelled')return['cancelled','Отменён'];if(row.group&&row.attendance.present===false)return['absent','Пропуск'];if(row.group?row.attendance.present===true:row.lesson.status==='done')return['done','Проведён'];return['scheduled','Запланирован'];}
+function studentMonthStatus(row){if(row.lesson.status==='cancelled')return['cancelled','Отменён'];if(row.group&&row.attendance.makeupRequested){const makeup=makeupLessonFor(row.lesson.id,row.attendance.studentId);return['absent',makeup?.status==='done'?'Пропуск · отработано':makeup?'Пропуск · отработка '+makeup.date:'Ожидает отработки'];}if(row.group&&row.attendance.present===false)return['absent','Пропуск'];if(row.group?row.attendance.present===true:row.lesson.status==='done')return['done','Проведён'];return['scheduled','Запланирован'];}
 function studentMonthSchedule(st,panel){
  const section=deskEl('section','student-month-section'),toolbar=deskEl('div','student-month-toolbar');const prev=deskButton('←',()=>move(-1),'btn-chip'),next=deskButton('→',()=>move(1),'btn-chip');prev.setAttribute('aria-label','Предыдущий месяц');next.setAttribute('aria-label','Следующий месяц');
  const month=groupField('Месяц расписания','month',studentMonthValue(st.id));month.input.min=studentMonthStart;const now=deskButton('Текущий месяц',()=>{studentMonths.set(st.id,financeToday().slice(0,7));draw();},'btn-chip');toolbar.append(prev,month.wrap,next,now);section.append(toolbar);
@@ -5200,7 +5316,7 @@ function studentMonthSchedule(st,panel){
   const rows=studentMonthRows(st.id,value),counts={done:0,scheduled:0,absent:0,cancelled:0};rows.forEach(r=>counts[studentMonthStatus(r)[0]]++);summary.replaceChildren();[['Всего',rows.length],['Проведено',counts.done],['Запланировано',counts.scheduled],['Пропуски',counts.absent],['Отменено',counts.cancelled]].filter(([label,n])=>n||label==='Всего').forEach(([label,n])=>summary.append(deskEl('span','desk-pill',`${label}: ${n}`)));
   list.replaceChildren();if(!rows.length){list.append(deskEl('div','empty-state','На этот месяц занятия ещё не записаны. Выбери другой месяц или добавь урок.'));return;}
   rows.forEach(row=>{const l=row.lesson,[state,label]=studentMonthStatus(row),card=deskEl('article','student-month-lesson');card.dataset.lessonId=l.id;card.dataset.lessonKind=row.group?'group':'individual';const badge=deskEl('div','student-month-date');const date=new Date(l.date+'T12:00:00Z');badge.append(deskEl('strong','',String(date.getUTCDate())),deskEl('span','',new Intl.DateTimeFormat('ru-RU',{weekday:'short',timeZone:'UTC'}).format(date)));
-   const body=deskEl('div','student-month-body'),top=deskEl('div','student-month-top');top.append(deskEl('strong','',l.time||'Время не указано'),deskEl('span','student-month-status '+state,label));body.append(top,deskEl('div','student-month-topic',l.topic||'Тему можно добавить в карточке занятия'));if(row.group)body.append(deskEl('div','tiny',getGroup(l.groupId)?.name||'Групповое занятие'));if(l.hw)body.append(deskEl('div','tiny student-month-preview','Д/з: '+l.hw));if(l.comment)body.append(deskEl('div','tiny student-month-preview','План и заметки: '+l.comment));const open=deskButton('Открыть занятие',()=>{if(row.group){currentGroupLessonId=l.id;currentView='groupLessonDetail';render();}else openLessonView(l.id);},'btn-chip');open.setAttribute('aria-label','Открыть занятие '+l.date+' '+l.time);body.append(open);card.append(badge,body);list.append(card);
+   const body=deskEl('div','student-month-body'),top=deskEl('div','student-month-top');top.append(deskEl('strong','',l.time||'Время не указано'),deskEl('span','student-month-status '+state,label));body.append(top,deskEl('div','student-month-topic',(l.makeupFor?'Отработка · ':'')+(l.topic||'Тему можно добавить в карточке занятия')));if(row.group)body.append(deskEl('div','tiny',getGroup(l.groupId)?.name||'Групповое занятие'));if(l.hw)body.append(deskEl('div','tiny student-month-preview','Д/з: '+l.hw));if(l.comment)body.append(deskEl('div','tiny student-month-preview','План и заметки: '+l.comment));const open=deskButton('Открыть занятие',()=>{if(row.group){currentGroupLessonId=l.id;currentView='groupLessonDetail';render();}else openLessonView(l.id);},'btn-chip');open.setAttribute('aria-label','Открыть занятие '+l.date+' '+l.time);body.append(open);card.append(badge,body);list.append(card);
   });
  }
  draw();
@@ -5215,7 +5331,7 @@ function lessonCarryover(l,group=false,preview=false){
 }
 
 let subscriptionTableSearch='',subscriptionTableFilter='all',subscriptionTableOrder='remaining';
-function subscriptionUpcoming(id){const sub=getSubscription(id),excluded=new Set(sub?.excludedLessonKeys||[]);return deskBillingLessons(id).filter(x=>!excluded.has(x.key)&&x.lesson.date>=financeToday()&&x.lesson.status!=='cancelled'&&(x.group?x.payment.present!==true&&x.payment.present!==false:x.lesson.status==='scheduled')).length;}
+function subscriptionUpcoming(id){const sub=getSubscription(id),excluded=new Set(sub?.excludedLessonKeys||[]);return deskBillingLessons(id).filter(x=>!excluded.has(x.key)&&x.lesson.date>=financeToday()&&(x.sourceLesson||x.lesson).status!=='cancelled'&&(x.group?(x.payment.makeupRequested?x.makeupLesson?.status==='scheduled':x.payment.present!==true&&x.payment.present!==false):x.lesson.status==='scheduled')).length;}
 function subscriptionPaymentDialog(st){const form=financePaymentForm(null,st.id),sub=getSubscription(st.id),source=financeSources().find(s=>s.target===sub),select=form.querySelector('[aria-label="За что оплата"]');if(source&&select){select.value=source.key;select.dispatchEvent(new Event('change'));const amount=form.querySelector('[aria-label="Сумма (₽)"]');amount.value=getSubscriptionStats(st.id).debt||'';}deskModal('Оплата абонемента · '+st.name,form);}
 function subscriptionSummaryTable(){
  const section=deskEl('section','subscription-summary'),heading=deskEl('div','desk-toolbar');heading.append(deskEl('h2','','Таблица абонементов'));const filter=groupSelect('Показать абонементы',[['all','Все абонементы'],['ending','Заканчиваются: 0–2 занятия'],['debt','Есть остаток к оплате']],subscriptionTableFilter);heading.append(filter.wrap);section.append(heading);
