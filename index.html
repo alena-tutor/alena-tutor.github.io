@@ -4926,18 +4926,50 @@ function deleteStudent(id){
 }
 function deskNumberField(label,value,integer=false){const wrap=deskEl('label','form-row');const input=deskEl('input','form-input');input.type='number';input.min='0';input.step=integer?'1':'0.01';input.value=value??0;input.setAttribute('aria-label',label);wrap.append(deskEl('span','form-label',label),input);return {wrap,input};}
 function deskMoneyValid(inputs){return inputs.every(input=>input.value.trim()!==''&&Number.isFinite(Number(input.value))&&Number(input.value)>=0&&input.checkValidity());}
+
+function subscriptionCarryRows(studentId){
+ const sub=getSubscription(studentId),excluded=new Set(sub?.excludedLessonKeys||[]);
+ return deskBillingLessons(studentId).filter(x=>!excluded.has(x.key)&&deskBillingCompleted(x)&&x.lesson.date<=financeToday()).sort((a,b)=>(b.lesson.date+' '+(b.lesson.time||'')).localeCompare(a.lesson.date+' '+(a.lesson.time||''))||b.key.localeCompare(a.key));
+}
+function subscriptionRollover(studentId,values){
+ const st=getStudent(studentId);if(!st)throw new Error('Ученик не найден.');
+ const {total,price,paid,carryCount}=values,old=getSubscriptionStats(studentId),eligible=subscriptionCarryRows(studentId);
+ if(!Number.isInteger(total)||total<1||!Number.isFinite(price)||price<0||!Number.isFinite(paid)||paid<0||!Number.isInteger(carryCount)||carryCount<0||carryCount>eligible.length||carryCount>old.doneCount)throw new Error('Проверь количество занятий, суммы и число переносимых уроков.');
+ const moved=eligible.slice(0,carryCount),keys=new Set(moved.map(x=>x.key));
+ financeReconcile(null);
+ let sub=getSubscription(studentId);
+ if(!sub){sub={id:data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1,studentId,history:[]};data.subscriptions.push(sub);}
+ if(sub.total>0||sub.price>0||sub.paid>0){
+  sub.history=sub.history||[];
+  const used=Math.max(0,old.doneCount-carryCount);
+  sub.history.push({financeCycle:sub.financeCycle||sub.startedAt||'legacy',startedAt:sub.startedAt||null,closedAt:new Date().toISOString(),total:old.total,price:old.price,paid:old.paid,doneCount:used,remaining:Math.max(0,old.total-used),doneOffset:sub.doneOffset||0,excludedLessonKeys:[...(sub.excludedLessonKeys||[])],carriedLessonKeys:[...(sub.carriedLessonKeys||[])],transferredOutLessonKeys:[...keys],...(sub.cycleCorrection?{cycleCorrection:sub.cycleCorrection}:{})});
+ }
+ sub.excludedLessonKeys=deskBillingLessons(studentId).filter(x=>!keys.has(x.key)&&(x.group?(x.payment.makeupRequested?deskBillingCompleted(x):x.payment.present!==null&&x.payment.present!==undefined):x.lesson.status==='done'||x.lesson.status==='cancelled')).map(x=>x.key);
+ sub.carriedLessonKeys=[...keys];delete sub.cycleCorrection;
+ sub.doneOffset=0;sub.total=total;sub.price=price;sub.paid=paid;sub.startedAt=new Date().toISOString();sub.financeCycle=sub.startedAt;st.paymentMode='subscription';
+ return sub;
+}
 function deskNewSubscription(studentId){
- const st=getStudent(studentId);if(!st)return;const old=getSubscriptionStats(studentId);const form=deskEl('div','form-section');
- form.append(deskEl('div','tiny','Счётчик нового абонемента начнётся с нуля. Проведённые уроки и предыдущий абонемент сохранятся в истории.'));
- const total=deskNumberField('Занятий в новом абонементе',old.total||8,true),price=deskNumberField('Стоимость нового абонемента (₽)',old.price),paid=deskNumberField('Оплачено за новый абонемент (₽)',0);
- form.append(total.wrap,price.wrap,paid.wrap);
- const error=deskEl('div','tiny');error.setAttribute('role','alert');form.append(error);
+ const st=getStudent(studentId);if(!st)return;
+ const old=getSubscriptionStats(studentId),eligible=subscriptionCarryRows(studentId),capacity=Math.min(eligible.length,old.doneCount),suggested=old.total>0?Math.min(capacity,Math.max(0,old.doneCount-old.total)):0;
+ const form=deskEl('div','form-section finance-editor');
+ form.append(deskEl('p','tiny','Предыдущий абонемент сохранится в истории. Если занятия по новому пакету уже прошли, перенеси их в новый счётчик ниже.'));
+ const total=deskNumberField('Занятий в новом абонементе',old.total||8,true),price=deskNumberField('Стоимость нового абонемента (₽)',old.price),paid=deskNumberField('Оплачено за новый абонемент (₽)',0),carry=deskNumberField('Уже проведено по новому абонементу',suggested,true);
+ carry.input.max=String(capacity);
+ const preview=deskEl('p','tiny');
+ function showCarry(){
+  const count=Number(carry.input.value);
+  preview.textContent=Number.isInteger(count)&&count>0&&count<=capacity?'В новый абонемент войдут последние проведённые занятия: '+eligible.slice(0,count).reverse().map(x=>x.lesson.date+' · '+(x.lesson.time||'')).join(', '):'При значении 0 новый счётчик начнётся с нуля.';
+ }
+ carry.input.oninput=showCarry;showCarry();
+ form.append(total.wrap,price.wrap,paid.wrap,carry.wrap,preview);
+ const error=deskEl('p','tiny');error.setAttribute('role','alert');form.append(error);
  form.append(deskButton('Начать новый абонемент',()=>{
-  if(!deskMoneyValid([total.input,price.input,paid.input])||Number(total.input.value)<1){error.textContent='Укажи целое число занятий от 1 и неотрицательные суммы.';return;}
-  let sub=getSubscription(studentId);if(!sub){sub={id:data.subscriptions.length?Math.max(...data.subscriptions.map(s=>s.id))+1:1,studentId,history:[]};data.subscriptions.push(sub);}
-  if(sub.total>0||sub.price>0||sub.paid>0){sub.history=sub.history||[];sub.history.push({financeCycle:sub.financeCycle||sub.startedAt||'legacy',startedAt:sub.startedAt||null,closedAt:new Date().toISOString(),total:old.total,price:old.price,paid:old.paid,doneCount:old.doneCount,remaining:old.remaining,doneOffset:sub.doneOffset||0,excludedLessonKeys:[...(sub.excludedLessonKeys||[])]});}
-  sub.excludedLessonKeys=deskBillingLessons(studentId).filter(x=>x.group?(x.payment.makeupRequested?deskBillingCompleted(x):x.payment.present!==null&&x.payment.present!==undefined):x.lesson.status==='done'||x.lesson.status==='cancelled').map(x=>x.key);
-  sub.doneOffset=0;sub.total=Number(total.input.value);sub.price=Number(price.input.value);sub.paid=Number(paid.input.value);sub.startedAt=new Date().toISOString();sub.financeCycle=sub.startedAt;st.paymentMode='subscription';deskProfileTab='payment';currentView='student';currentStudentId=studentId;save();
+  if(!deskMoneyValid([total.input,price.input,paid.input,carry.input])){error.textContent='Проверь суммы и целое количество занятий.';return;}
+  try{
+   subscriptionRollover(studentId,{total:Number(total.input.value),price:Number(price.input.value),paid:Number(paid.input.value),carryCount:Number(carry.input.value)});
+   deskProfileTab='payment';currentView='student';currentStudentId=studentId;save();
+  }catch(failure){error.textContent=failure.message;}
  },'btn-main'));
  deskModal('Новый абонемент · '+st.name,form);
 }
