@@ -5012,17 +5012,30 @@ function groupScheduleChanges(group,rows,start){
  });
  const seen=new Set();for(const l of data.groupLessons.filter(l=>l.groupId===group.id)){const next=edits.get(l.id)||l,key=next.date+' '+next.time;if(seen.has(key))throw new Error('Получаются два занятия в одно время. Измени расписание или перенеси один из уроков отдельно.');seen.add(key);}return edits;
 }
+function groupCreateAddedDays(group,slots,startDate){
+ if(!slots.length)return 0;
+ const future=data.groupLessons.filter(l=>l.groupId===group.id&&l.date>=startDate&&!l.wasMoved);
+ let endDate;
+ if(future.length){const last=future.reduce((max,l)=>l.date>max?l.date:max,startDate),dow=new Date(last+'T12:00:00Z').getUTCDay();endDate=groupShiftDate(last,(7-dow)%7);}
+ else endDate=groupShiftDate(startDate,27);
+ const before=data.groupLessons.length;
+ for(let date=startDate;date<=endDate;date=groupShiftDate(date,1)){
+  const day=groupDay(date);
+  slots.filter(slot=>slot.dayKey===day).forEach(slot=>createGroupLesson(group.id,date,slot.time));
+ }
+ return data.groupLessons.length-before;
+}
 function buildGroupForm(opts={}){
  const group=opts.group;if(!group)return legacyBuildGroupForm(opts);const form=deskEl('div','form-section group-editor'),name=groupField('Название группы','text',group.name),link=groupField('Ссылка на план группы (необязательно)','url',group.buildinLink);const top=deskEl('div','form-row-inline');top.append(name.wrap,link.wrap);form.append(top,deskEl('h3','','Регулярное расписание'));
  const list=deskEl('div','group-schedule-list');form.append(list);let rows=(group.schedule||[]).map(s=>({old:{...s},dayKey:s.dayKey,time:s.time}));
  function draw(){list.replaceChildren();rows.forEach((r,index)=>{const line=deskEl('div','group-schedule-row'),day=groupSelect('День занятия '+(index+1),daysOfWeek.map(d=>[d.key,d.label]),r.dayKey),time=groupField('Время занятия '+(index+1),'time',r.time);day.input.onchange=()=>r.dayKey=day.input.value;time.input.oninput=()=>r.time=time.input.value;line.append(day.wrap,time.wrap,deskButton('Убрать день',()=>{rows.splice(index,1);draw();}));list.append(line);});}
  draw();form.append(deskButton('+ Добавить день',()=>{rows.push({old:null,dayKey:'mon',time:'16:00'});draw();}));
  const start=groupField('Применить расписание с','date',todayISO()),move=deskEl('input');move.type='checkbox';move.checked=true;move.setAttribute('aria-label','Перенести будущие занятия по новому расписанию');const check=deskEl('label','group-check');check.append(move,document.createTextNode('Перенести будущие занятия по новому расписанию'));
- const generate=groupSelect('Добавить занятия по расписанию',[['0','Не добавлять новые занятия'],['4','На 4 недели'],['8','На 8 недель'],['12','На 12 недель']],'0');form.append(start.wrap,check,deskEl('p','tiny','Темы, домашние задания и заметки переедут вместе с уроками. Проведённые занятия и отдельные переносы останутся на своих датах. Убранный день исчезнет из регулярного расписания; уже созданные для него уроки останутся в списке.'),generate.wrap);
+ const generate=groupSelect('Добавить занятия по расписанию',[['0','Текущий период — новые дни автоматически'],['4','На 4 недели'],['8','На 8 недель'],['12','На 12 недель']],'0');form.append(start.wrap,check,deskEl('p','tiny','Темы, домашние задания и заметки переедут вместе с уроками. Проведённые занятия и отдельные переносы останутся на своих датах. Новый день автоматически получит занятия до конца уже созданного периода; если будущих уроков нет — на 4 недели. Убранный день исчезнет из регулярного расписания; уже созданные для него уроки останутся в списке.'),generate.wrap);
  const message=deskEl('p','tiny');message.setAttribute('role','alert');form.append(message,deskButton('Сохранить группу',()=>{
   if(!name.input.value.trim()){message.textContent='Укажи название группы.';return;}if(!start.input.value||start.input.value<todayISO()){message.textContent='Выбери сегодняшнюю или будущую дату начала расписания.';return;}if(rows.some(r=>!r.time)){message.textContent='Укажи время для каждого дня.';return;}const slots=new Set(rows.map(r=>r.dayKey+' '+r.time));if(slots.size!==rows.length){message.textContent='Один день и время указаны дважды.';return;}
   let edits;try{edits=move.checked?groupScheduleChanges(group,rows,start.input.value):new Map();}catch(error){message.textContent=error.message;return;}
-  group.name=name.input.value.trim();group.buildinLink=link.input.value.trim();group.schedule=rows.length?rows.map(r=>({...r.old,dayKey:r.dayKey,time:r.time})):null;edits.forEach((next,id)=>Object.assign(data.groupLessons.find(l=>l.id===id),next));if(Number(generate.input.value))autoCreateLessonsForGroup(group,Number(generate.input.value),start.input.value);currentView='groupDetail';currentGroupId=group.id;save();
+  group.name=name.input.value.trim();group.buildinLink=link.input.value.trim();group.schedule=rows.length?rows.map(r=>({...r.old,dayKey:r.dayKey,time:r.time})):null;edits.forEach((next,id)=>Object.assign(data.groupLessons.find(l=>l.id===id),next));if(Number(generate.input.value))autoCreateLessonsForGroup(group,Number(generate.input.value),start.input.value);else groupCreateAddedDays(group,rows.filter(row=>!row.old),start.input.value);currentView='groupDetail';currentGroupId=group.id;save();
  },'btn-main'),deskButton('Отмена',()=>{currentView='groupDetail';currentGroupId=group.id;render();}));return form;
 }
 
