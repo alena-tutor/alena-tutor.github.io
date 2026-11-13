@@ -979,6 +979,12 @@
 .makeup-row>.desk-toolbar{flex-wrap:wrap;margin-top:10px;gap:8px}
 .makeup-info{border-left:3px solid var(--accent)}
 @media(max-width:600px){.makeup-panel{padding:16px}.makeup-row .desk-toolbar>button{min-width:0;flex:1}}
+
+.lesson-prepayment-editor{min-width:0}
+.prepayment-total{font-size:19px;font-weight:700;color:var(--accent)}
+.prepayment-preview{display:grid;gap:8px;margin:12px 0}
+.prepayment-line{display:grid;gap:3px;background:var(--bg);padding:10px 12px;border-radius:10px;overflow-wrap:anywhere}
+@media(max-width:600px){.lesson-prepayment-editor .form-input,.lesson-prepayment-editor .form-select{min-width:0;max-width:100%;box-sizing:border-box}}
 </style>
 <style>
 #teacher-cloud-status {width:100%;margin:16px 0 8px;text-align:left;white-space:normal;background:#594439;color:#fff5ed;border-color:#796051;min-height:44px;}
@@ -4914,8 +4920,8 @@ function getSubscriptionStats(studentId){
 function getPerLessonStats(studentId,yearMonth){
  const ym=yearMonth||todayISO().slice(0,7);const entries=deskBillingLessons(studentId).filter(x=>x.lesson.date.slice(0,7)===ym&&deskBillingCompleted(x));
  const totalPaid=entries.reduce((sum,x)=>sum+(Number(x.payment.paidAmount)||0),0);
- const rate=Number(getStudent(studentId)?.lessonPrice)||0;
- return {ym,lessons:entries.map(x=>x.lesson),entries,totalLessons:entries.length,totalPaid,unpaidCount:entries.filter(x=>!(Number(x.payment.paidAmount)>0)).length,totalDue:Math.max(entries.length*rate-totalPaid,0)};
+ const st=getStudent(studentId),outstanding=entries.map(x=>Math.max(0,lessonChargeCents(x,st)-Math.round((Number(x.payment.paidAmount)||0)*100)));
+ return {ym,lessons:entries.map(x=>x.lesson),entries,totalLessons:entries.length,totalPaid,unpaidCount:outstanding.filter(amount=>amount>0).length,totalDue:outstanding.reduce((sum,amount)=>sum+amount,0)/100};
 }
 function deleteStudent(id){
  const st=getStudent(id);if(!st)return;
@@ -4975,7 +4981,8 @@ function deskNewSubscription(studentId){
 }
 function deskModeControl(st){const label=deskEl('label','form-row');label.append(deskEl('span','form-label','Способ оплаты'));const sel=deskEl('select','form-select');sel.setAttribute('aria-label','Способ оплаты: '+st.name);sel.append(new Option('Абонемент','subscription'),new Option('По занятиям','perLesson'));sel.value=st.paymentMode||'subscription';sel.onchange=()=>{st.paymentMode=sel.value;save();};label.append(sel);return label;}
 function deskPerLessonPanel(st){const panel=deskEl('div','form-section');const rate=deskNumberField('Цена одного занятия (₽)',st.lessonPrice||0);const action=deskEl('div','form-row-inline');action.append(rate.wrap,deskButton('Сохранить цену',()=>{if(!deskMoneyValid([rate.input])){rate.input.reportValidity();return;}st.lessonPrice=Number(rate.input.value);save();}));panel.append(action);
- panel.append(deskEl('div','tiny','Указывай общую оплаченную сумму за занятие. Новая доплата запишется сегодняшним числом в «Финансы»; дату можно изменить в истории поступлений.'));const month=getPerLessonStats(st.id);panel.append(deskEl('div','tiny',`За ${month.ym}: проведено ${month.totalLessons} · оплачено за проведённые ${month.totalPaid} ₽`));if(st.lessonPrice>0)panel.append(deskEl('div','tiny',`Ожидается по текущей цене: ${month.totalDue} ₽`));
+ panel.append(deskButton('Предоплата за несколько занятий',()=>deskModal('Предоплата · '+st.name,lessonPrepaymentForm(st.id)),'btn-main'),deskEl('p','tiny',lessonPrepaymentBalance(st.id)));
+ panel.append(deskEl('div','tiny','Указывай общую оплаченную сумму за занятие. Новая доплата запишется сегодняшним числом в «Финансы»; дату можно изменить в истории поступлений.'));const month=getPerLessonStats(st.id);panel.append(deskEl('div','tiny',`За ${month.ym}: проведено ${month.totalLessons} · оплачено за проведённые ${month.totalPaid} ₽`));if(st.lessonPrice>0)panel.append(deskEl('div','tiny',`Осталось оплатить за проведённые: ${month.totalDue} ₽`));
  const entries=deskBillingLessons(st.id).filter(x=>x.lesson.status!=='cancelled').sort((a,b)=>(b.lesson.date+' '+b.lesson.time).localeCompare(a.lesson.date+' '+a.lesson.time));
  if(!entries.length)panel.append(deskEl('div','tiny','Занятий пока нет. Оплату можно записать через «Записать поступление».'));
  entries.forEach(x=>{const row=deskEl('div','desk-payment-row');row.append(deskEl('div','tiny',`${x.lesson.date} · ${x.lesson.time} · ${x.makeupLesson?'Отработка':x.group?'Группа':x.lesson.topic||'Занятие'}`));const field=deskNumberField('Получено за занятие (₽)',x.payment.paidAmount||0);row.append(field.wrap,deskButton('Записать оплату',()=>{if(!deskMoneyValid([field.input])){field.input.reportValidity();return;}x.payment.paidAmount=Number(field.input.value);save();},'btn-chip'));panel.append(row);});
@@ -5202,9 +5209,10 @@ async function groupLessonSaveFeedback(lessonId){
 }
 
 function groupLessonPaymentFields(box,a,st,payments){
+ const lessonPrice=Number(a.prepaymentUnitPrice)>0?Number(a.prepaymentUnitPrice):Number(st.lessonPrice)||0;
  const amount=deskNumberField('Оплачено за занятие: '+st.name+' (₽)',a.paidAmount||0),date=groupField('Дата новой оплаты: '+st.name,'date',financeToday());date.input.max=financeToday();const line=deskEl('div','form-row-inline');line.append(amount.wrap,date.wrap);
- const paid=deskButton('Оплачено '+financeMoney(st.lessonPrice||0),()=>{amount.input.value=st.lessonPrice||0;amount.input.dispatchEvent(new Event('input',{bubbles:true}));},'btn-chip');paid.disabled=!(st.lessonPrice>0);
- box.append(deskEl('h4','group-payment-title','Оплата по занятиям'),deskEl('div','tiny','Цена: '+financeMoney(st.lessonPrice||0)+' за ребёнка'),line,paid,deskEl('p','tiny','Укажи общую оплаченную сумму за этот урок. Новая доплата попадёт в «Финансы» по выбранной дате, даже если урок ещё впереди. Дату уже записанной оплаты можно изменить в «Финансах».'));
+ const paid=deskButton('Оплачено '+financeMoney(lessonPrice),()=>{amount.input.value=lessonPrice;amount.input.dispatchEvent(new Event('input',{bubbles:true}));},'btn-chip');paid.disabled=!(lessonPrice>0);
+ box.append(deskEl('h4','group-payment-title','Оплата по занятиям'),deskEl('div','tiny','Цена: '+financeMoney(lessonPrice)+' за ребёнка'),line,paid,deskEl('p','tiny','Укажи общую оплаченную сумму за этот урок. Новая доплата попадёт в «Финансы» по выбранной дате, даже если урок ещё впереди. Дату уже записанной оплаты можно изменить в «Финансах».'));
  payments.push({a,st,amount:amount.input,date:date.input,oldPaid:Number(a.paidAmount)||0});
 }
 function groupLessonPaymentsValid(payments,message){
@@ -5217,7 +5225,7 @@ const groupPaymentMonths=new Map();
 function groupPaymentOverview(group){
  const section=deskEl('section','form-section group-payment-overview'),head=deskEl('div','desk-toolbar'),month=groupField('Месяц оплат группы','month',groupPaymentMonths.get(group.id)||financeToday().slice(0,7));head.append(deskEl('h3','','Оплата группы'),month.wrap);section.append(head,deskEl('p','tiny','Суммы относятся к занятиям выбранного месяца. Доход по дате поступления денег смотри в «Финансах».'));const list=deskEl('div','group-payment-grid');section.append(list);
  function draw(){list.replaceChildren();groupPaymentMonths.set(group.id,month.input.value);getGroupMembers(group.id).forEach(st=>{const card=deskEl('article','group-payment-person');card.append(deskEl('strong','',st.name));if(st.paymentMode==='perLesson'){
- const rows=deskBillingLessons(st.id).filter(x=>x.group&&x.sourceLesson.groupId===group.id&&x.lesson.date.slice(0,7)===month.input.value).map(x=>({l:x.lesson,a:x.payment,entry:x}));const paid=rows.reduce((n,x)=>n+(Number(x.a.paidAmount)||0),0),due=rows.filter(x=>deskBillingCompleted(x.entry)).reduce((n,x)=>n+Math.max(0,(Number(st.lessonPrice)||0)-(Number(x.a.paidAmount)||0)),0);card.append(deskEl('div','tiny','По занятиям · '+financeMoney(st.lessonPrice||0)+' за урок'),deskEl('div','group-payment-value',financeMoney(paid)),deskEl('div','tiny','Оплачено за занятия месяца, включая предоплаты'),deskEl('span','desk-pill '+(due===0?'good':''),'За проведённые осталось оплатить: '+financeMoney(due)),deskButton('+ Записать оплату',()=>deskModal('Оплата · '+st.name,financePaymentForm(null,st.id)),'btn-main'));
+ const rows=deskBillingLessons(st.id).filter(x=>x.group&&x.sourceLesson.groupId===group.id&&x.lesson.date.slice(0,7)===month.input.value).map(x=>({l:x.lesson,a:x.payment,entry:x}));const paid=rows.reduce((n,x)=>n+(Number(x.a.paidAmount)||0),0),due=rows.filter(x=>deskBillingCompleted(x.entry)).reduce((n,x)=>n+Math.max(0,lessonChargeCents(x.entry,st)/100-(Number(x.a.paidAmount)||0)),0);card.append(deskEl('div','tiny','По занятиям · '+financeMoney(st.lessonPrice||0)+' за урок'),deskEl('div','group-payment-value',financeMoney(paid)),deskEl('div','tiny','Оплачено за занятия месяца, включая предоплаты'),deskEl('span','desk-pill '+(due===0?'good':''),'За проведённые осталось оплатить: '+financeMoney(due)),deskButton('+ Записать оплату',()=>deskModal('Оплата · '+st.name,financePaymentForm(null,st.id)),'btn-main'),deskButton('Предоплата за несколько занятий',()=>deskModal('Предоплата · '+st.name,lessonPrepaymentForm(st.id,group.id)),'btn-chip'),deskEl('div','tiny',lessonPrepaymentBalance(st.id,group.id)));
  }else{const stats=getSubscriptionStats(st.id);card.append(deskEl('div','tiny','Абонемент'),deskEl('div','tiny',`Осталось ${stats.remaining} из ${stats.total} занятий`),deskEl('div','tiny','Оплачено '+financeMoney(stats.paid)),deskButton('Открыть абонемент',()=>{deskProfileTab='payment';deskProfileStudent=st.id;openStudentView(st.id);},'btn-chip'));}
  card.append(deskButton('История поступлений ↗',()=>{financeStudent=String(st.id);financeMonth=month.input.value;currentView='finance';render();},'btn-chip'));list.append(card);});}
  month.input.onchange=()=>{if(month.input.value&&month.input.checkValidity())draw();};draw();return section;
@@ -5254,13 +5262,13 @@ function unpaidLessonRows(studentId=null){
  const today=financeToday(),rows=[],missing=[];
  data.students.filter(st=>st.paymentMode==='perLesson'&&(studentId===null||st.id===studentId)).forEach(st=>{
   const completed=deskBillingLessons(st.id).filter(x=>x.lesson.date>=unpaidJournalStart&&x.lesson.date<=today&&x.payment.debtSettlement?.confirmedClear!==true&&deskBillingCompleted(x));
-  const price=Number(st.lessonPrice);
-  if(!Number.isFinite(price)||price<=0){if(completed.length)missing.push(st);return;}
-  const cost=Math.round(price*100);
+  let unknownPrice=false;
   completed.forEach(x=>{
+   const cost=lessonChargeCents(x,st);if(cost<=0){unknownPrice=true;return;}
    const value=Number(x.payment.paidAmount),paid=Number.isFinite(value)?Math.max(0,Math.round(value*100)):0,remaining=Math.max(0,cost-paid);
    if(remaining)rows.push({...x,student:st,cost,paid,remaining,sourceKey:x.key+':'+st.id});
   });
+  if(unknownPrice)missing.push(st);
  });
  rows.sort((a,b)=>a.lesson.date.localeCompare(b.lesson.date)||(a.lesson.time||'').localeCompare(b.lesson.time||'')||a.student.name.localeCompare(b.student.name,'ru'));
  return {rows,missing,total:rows.reduce((sum,x)=>sum+x.remaining,0)};
@@ -5274,7 +5282,7 @@ function unpaidLessonsPanel(studentId=null){
  const report=unpaidLessonRows(studentId),section=deskEl('section','card unpaid-lessons'),title=deskEl('div','card-title','Неоплаченные занятия'),summary=deskEl('div','unpaid-summary');
  section.setAttribute('aria-label','Неоплаченные занятия');
  summary.append(deskEl('strong','unpaid-total',financeMoney(report.total/100)),deskEl('span','tiny','Занятий с остатком: '+report.rows.length));
- section.append(title,summary,deskEl('p','tiny','Проведённые уроки с сентября 2026, по текущей цене занятия. Частичные оплаты и подтверждённые сверки учтены. Будущие и отменённые уроки исключены.'));
+ section.append(title,summary,deskEl('p','tiny','Проведённые уроки с сентября 2026. Для предоплат сохранена согласованная цена; для остальных используется цена из карточки. Частичные оплаты и подтверждённые сверки учтены. Будущие и отменённые уроки исключены.'));
  if(!report.rows.length)section.append(deskEl('p','tiny',report.missing.length?'Для полного расчёта укажи стоимость занятий ниже.':'Все проведённые занятия оплачены.'));
  const grouped=new Map();
  report.rows.forEach(row=>{if(!grouped.has(row.student.id))grouped.set(row.student.id,{student:row.student,rows:[],total:0});const item=grouped.get(row.student.id);item.rows.push(row);item.total+=row.remaining;});
@@ -5297,6 +5305,121 @@ function unpaidLessonsPanel(studentId=null){
   section.append(note);
  }
  return section;
+}
+
+
+/* One receipt can be allocated to several ordinary lessons without creating a subscription. */
+function lessonChargeCents(row,student=null,fallback=null){
+ const fixed=Number(row.payment.prepaymentUnitPrice);
+ if(Number.isFinite(fixed)&&fixed>0)return Math.round(fixed*100);
+ const price=Number(fallback??student?.lessonPrice??getStudent(row.payment.studentId??row.lesson.studentId)?.lessonPrice);
+ return Number.isFinite(price)&&price>0?Math.round(price*100):0;
+}
+function prepaymentDateValid(value){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;
+ const date=new Date(value+'T12:00:00Z');return !Number.isNaN(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
+function prepaymentEligibleRows(studentId,fromDate,groupId=null){
+ return deskBillingLessons(studentId).filter(row=>{
+  if(groupId!==null&&(!row.group||row.sourceLesson.groupId!==groupId))return false;
+  if(!prepaymentDateValid(row.lesson.date)||row.lesson.date<fromDate||row.lesson.status==='cancelled'||(row.sourceLesson||row.lesson).status==='cancelled'||row.payment.debtSettlement?.confirmedClear)return false;
+  if(row.group&&row.payment.makeupRequested&&!row.makeupLesson)return false;
+  return !row.group||row.payment.present!==false||!!row.makeupLesson;
+ }).sort((a,b)=>(a.lesson.date+' '+(a.lesson.time||'')).localeCompare(b.lesson.date+' '+(b.lesson.time||''))||a.key.localeCompare(b.key));
+}
+function lessonPrepaymentPlan(studentId,{count,fromDate,price,amount=null,groupId=null}){
+ const st=getStudent(studentId);
+ if(!st||st.paymentMode!=='perLesson')throw new Error('Выбери ученика с оплатой по занятиям.');
+ if(!Number.isInteger(count)||count<1||count>100)throw new Error('Укажи целое количество занятий от 1 до 100.');
+ if(!prepaymentDateValid(fromDate))throw new Error('Укажи дату первого оплачиваемого занятия.');
+ const cost=Math.round(Number(price)*100);
+ if(!Number.isFinite(cost)||cost<1)throw new Error('Укажи стоимость одного занятия.');
+ const configured=Math.round(Number(st.lessonPrice)*100);
+ if(Number.isFinite(configured)&&configured>0&&configured!==cost)throw new Error('Цена отличается от карточки ученика. Сначала измени стоимость в его карточке.');
+ const rows=prepaymentEligibleRows(studentId,fromDate,groupId).map(row=>{
+  const paid=Math.max(0,Math.round((Number(row.payment.paidAmount)||0)*100));
+  const charge=lessonChargeCents(row,st,price);return {...row,paid,cost:charge,remaining:Math.max(0,charge-paid),sourceKey:row.key+':'+studentId};
+ }).filter(row=>row.remaining>0).slice(0,count);
+ if(rows.length<count)throw new Error('В расписании найдено только '+rows.length+' неоплаченных занятий. Уменьши количество или сначала продли расписание.');
+ const required=rows.reduce((sum,row)=>sum+row.remaining,0),received=amount===null?required:Math.round(Number(amount)*100);
+ if(!Number.isFinite(received)||received<=0)throw new Error('Укажи полученную сумму больше нуля.');
+ if(received>required)throw new Error('Полученная сумма больше остатка за выбранные занятия. Увеличь количество или выбери другую начальную дату.');
+ let rest=received;
+ const allocations=rows.map(row=>{const delta=Math.min(row.remaining,rest);rest-=delta;return {...row,delta,after:row.paid+delta};});
+ return {rows,allocations,required,received,cost,signature:JSON.stringify(rows.map(row=>[row.sourceKey,row.paid,row.cost]))};
+}
+function applyLessonPrepayment(studentId,options){
+ const batchId=options.batchId||crypto.randomUUID();
+ const previous=(data.incomeLedger?.records||[]).filter(r=>r.prepaymentBatch===batchId);
+ if(previous.length)return {batchId,alreadyRecorded:true,received:Math.round(previous.reduce((sum,r)=>sum+r.amount,0)*100)};
+ if(!prepaymentDateValid(options.paymentDate)||options.paymentDate>financeToday())throw new Error('Дата получения денег не может быть позже сегодняшней.');
+ const plan=lessonPrepaymentPlan(studentId,options);
+ if(options.expectedSignature&&options.expectedSignature!==plan.signature)throw new Error('Список занятий или оплаты изменились. Проверь обновлённый список перед сохранением.');
+ const records=plan.allocations.filter(row=>row.delta>0).map(row=>({
+  ...financeEntry({key:row.sourceKey,studentId,name:getStudent(studentId).name,kind:'lesson',title:(row.makeupLesson?'Отработка ':'Занятие ')+row.lesson.date+' · '+(row.lesson.time||'')},row.delta/100,options.paymentDate,options.note||'Предоплата за несколько занятий'),
+  prepaymentBatch:batchId
+ }));
+ financeReconcile(null);
+ const st=getStudent(studentId);if(!(Number(st.lessonPrice)>0))st.lessonPrice=plan.cost/100;
+ plan.allocations.filter(row=>row.delta>0).forEach(row=>{row.payment.paidAmount=row.after/100;row.payment.prepaymentUnitPrice=row.cost/100;});
+ financeLedger().records.push(...records);
+ return {...plan,batchId,alreadyRecorded:false};
+}
+function lessonPrepaymentBalance(studentId,groupId=null){
+ const st=getStudent(studentId),rows=prepaymentEligibleRows(studentId,financeToday(),groupId).filter(row=>!deskBillingCompleted(row));
+ if(!(Number(st?.lessonPrice)>0)&&!rows.some(row=>lessonChargeCents(row,st)>0))return 'Укажи стоимость, чтобы видеть остаток оплаченных занятий.';
+ const full=rows.filter(row=>{const cost=lessonChargeCents(row,st);return cost>0&&Math.round((Number(row.payment.paidAmount)||0)*100)>=cost;}).length,partial=rows.filter(row=>{const paid=Math.round((Number(row.payment.paidAmount)||0)*100),cost=lessonChargeCents(row,st);return paid>0&&paid<cost;}).length;
+ return 'Впереди оплачено занятий: '+full+(partial?' · частично: '+partial:'');
+}
+function lessonPrepaymentForm(preselect=null,groupId=null){
+ const form=deskEl('div','form-section finance-editor lesson-prepayment-editor'),members=groupId===null?data.students:getGroupMembers(groupId),students=members.filter(st=>st.paymentMode==='perLesson');
+ const student=groupSelect('Ученик для предоплаты',[['','Выбери ученика'],...students.map(st=>[String(st.id),st.name])],preselect===null?'':String(preselect));
+ const from=groupField('Оплатить занятия начиная с','date',financeToday()),count=deskNumberField('Количество занятий',4,true),price=deskNumberField('Стоимость одного занятия (₽)',''),date=groupField('Дата получения предоплаты','date',financeToday()),amount=deskNumberField('Получено денег (₽)',''),note=groupField('Комментарий к предоплате','textarea','');
+ count.input.min='1';count.input.max='100';price.input.min='0.01';amount.input.min='0.01';date.input.max=financeToday();
+ const priceHint=deskEl('p','tiny'),summary=deskEl('p','prepayment-total'),preview=deskEl('div','prepayment-preview'),error=deskEl('p','tiny');error.setAttribute('role','alert');
+ form.append(student.wrap,from.wrap,count.wrap,price.wrap,priceHint,date.wrap,amount.wrap,note.wrap,summary,preview,deskEl('p','tiny','Оплата распределится по указанным урокам. В доход попадёт общая полученная сумма по дате перевода. Посещаемость отмечается отдельно.'),error);
+ let signature='',committed=false,busy=false;
+ const batchId=crypto.randomUUID();
+ function settings(){return {count:Number(count.input.value),fromDate:from.input.value,price:Number(price.input.value),amount:Number(amount.input.value),groupId};}
+ function refresh(resetAmount=false){
+  preview.replaceChildren();summary.textContent='';signature='';
+  try{
+   const id=Number(student.input.value),base=lessonPrepaymentPlan(id,{...settings(),amount:null});
+   if(resetAmount)amount.input.value=base.required/100;
+   const plan=lessonPrepaymentPlan(id,settings());signature=plan.signature;
+   summary.textContent='Будет записано: '+financeMoney(plan.received/100);
+   plan.allocations.forEach(row=>{
+    const line=deskEl('div','prepayment-line');
+    line.append(deskEl('strong','',row.lesson.date+' · '+(row.lesson.time||'')+(row.makeupLesson?' · отработка':'')),deskEl('span','tiny','Стоимость '+financeMoney(row.cost/100)+' · уже оплачено '+financeMoney(row.paid/100)+' · сейчас '+financeMoney(row.delta/100)),deskEl('span','tiny',row.after>=row.cost?'Занятие будет оплачено полностью':'Остаток за урок: '+financeMoney((row.cost-row.after)/100)));
+    preview.append(line);
+   });
+   return true;
+  }catch(failure){preview.append(deskEl('p','tiny',failure.message));return false;}
+ }
+ function changeStudent(){
+  const st=getStudent(Number(student.input.value)),configured=Number(st?.lessonPrice)>0;
+  price.input.value=configured?st.lessonPrice:'';price.input.readOnly=configured;
+  priceHint.textContent=configured?'Цена из карточки ученика. Для ранее внесённых предоплат сохраняется прежняя цена; изменить общую стоимость можно в карточке ученика.':'Стоимость пока не указана. Введи её — при сохранении она добавится в карточку ученика.';
+  error.textContent='';refresh(true);
+ }
+ student.input.onchange=changeStudent;
+ from.input.onchange=count.input.oninput=price.input.oninput=()=>{error.textContent='';refresh(true);};
+ amount.input.oninput=()=>{error.textContent='';refresh(false);};
+ form.append(deskButton('Сохранить предоплату',async()=>{
+  if(committed||busy)return;
+  try{
+   if(!deskMoneyValid([count.input,price.input,amount.input])||!from.input.checkValidity()||!date.input.checkValidity())throw new Error('Проверь количество, стоимость, сумму и даты.');
+   const id=Number(student.input.value),latest=lessonPrepaymentPlan(id,settings());
+   if(!signature||signature!==latest.signature){refresh(true);throw new Error('Список занятий изменился. Проверь даты и сумму, затем нажми сохранить ещё раз.');}
+   busy=true;
+   applyLessonPrepayment(id,{...settings(),paymentDate:date.input.value,note:note.input.value,batchId,expectedSignature:signature});
+   committed=true;save();
+   await teacherCloud.flush();
+   const state=teacherCloud.getState();if(state.blocked||!state.ready||state.message.includes('Без связи'))teacherCloud.show();
+  }catch(failure){error.textContent=failure.message;refresh(false);}
+  finally{busy=false;}
+ },'btn-main'));
+ changeStudent();return form;
 }
 
 function financePaymentForm(existing=null,preselect=null,preselectedKey=null){
@@ -5328,7 +5451,7 @@ let financeMonth='',financeStudent='all',financeTab='dated';
 function renderFinance(main){
  financeReconcile(null);if(!financeMonth)financeMonth=financeToday().slice(0,7);
  const page=deskPage(main,'Финансы','Поступления по дате получения денег, включая предоплаты','Деньги под контролем',deskButton('+ Записать оплату',()=>deskModal('Новая оплата',financePaymentForm()),'btn-main'));
- page.append(unpaidLessonsPanel(financeStudent==='all'?null:Number(financeStudent)));
+ page.append(deskButton('Предоплата за несколько занятий',()=>deskModal('Предоплата за занятия',lessonPrepaymentForm(financeStudent==='all'?null:Number(financeStudent))),'btn-chip'),unpaidLessonsPanel(financeStudent==='all'?null:Number(financeStudent)));
  const filters=deskEl('div','form-row-inline'),month=groupField('Месяц','month',financeMonth),student=groupSelect('Фильтр по ученику',[['all','Все ученики'],...data.students.map(s=>[String(s.id),s.name])],financeStudent);filters.append(month.wrap,student.wrap);page.append(filters);
  month.input.onchange=()=>{if(month.input.value){financeMonth=month.input.value;render();}};student.input.onchange=()=>{financeStudent=student.input.value;render();};
  const stats=financeStats(financeMonth,financeStudent),cards=deskEl('div','finance-summary');[['Получено',stats.income],['Возвращено',stats.refunds],['Фактический доход',stats.net]].forEach(([label,value])=>{const card=deskEl('div','finance-total');card.append(deskEl('span','tiny',label),deskEl('strong','',financeMoney(value)));cards.append(card);});page.append(cards,deskEl('p','tiny','Доход = поступления − возвраты за выбранный месяц. Расходы здесь не учитываются.'));
